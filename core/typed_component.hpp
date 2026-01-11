@@ -379,7 +379,7 @@ public:
     template<StateTagConcept... Tags>
     auto computeStateFunctions(const std::vector<T>& state) const {
         static_assert(sizeof...(Tags) > 0, "Must specify at least one function");
-        static_assert((m_registry.template hasFunction<Tags>() && ...),
+        static_assert((hasFunction<Tags>() && ...),
                      "All requested functions must be available");
         return std::tuple{m_registry.template computeFunction<Tags>(state)...};
     }
