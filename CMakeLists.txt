@@ -72,6 +72,11 @@ target_link_libraries(autodiff_test sopot_core sopot_physics)
 target_compile_features(autodiff_test PRIVATE cxx_std_20)
 add_test(NAME autodiff_test COMMAND autodiff_test)
 
+add_executable(coupled_oscillator_test tests/coupled_oscillator_test.cpp)
+target_link_libraries(coupled_oscillator_test sopot_core sopot_physics)
+target_compile_features(coupled_oscillator_test PRIVATE cxx_std_20)
+add_test(NAME coupled_oscillator_test COMMAND coupled_oscillator_test)
+
 add_executable(rocket_flight_test tests/rocket_flight_test.cpp)
 target_link_libraries(rocket_flight_test sopot_core sopot_rocket)
 target_compile_features(rocket_flight_test PRIVATE cxx_std_20)
@@ -81,8 +86,9 @@ add_test(NAME rocket_flight_test COMMAND rocket_flight_test)
 add_custom_target(run_tests
     COMMAND compile_time_test
     COMMAND autodiff_test
+    COMMAND coupled_oscillator_test
     COMMAND rocket_flight_test
-    DEPENDS compile_time_test autodiff_test rocket_flight_test
+    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running SOPOT tests"
 )
