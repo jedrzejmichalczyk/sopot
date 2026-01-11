@@ -80,6 +80,42 @@ concept HasRegistryAwareDerivatives = requires(
         -> std::same_as<typename Component::LocalDerivative>;
 };
 
+//=============================================================================
+// query<Tag>() - Simplified state function access
+//=============================================================================
+// Free function that eliminates the need for 'registry.template' syntax.
+//
+// Usage:
+//   // Old (verbose - 'template' keyword required for dependent type):
+//   auto vel = registry.template computeFunction<kinematics::VelocityENU>(state);
+//
+//   // New (clean - no 'template' keyword needed):
+//   auto vel = query<kinematics::VelocityENU>(registry, state);
+//
+// Why this works: Free functions don't need the 'template' disambiguator
+// because they're not members of a dependent type.
+//=============================================================================
+
+// Concept: Registry provides state function for Tag
+template<typename Registry, typename Tag>
+concept RegistryProvides = requires {
+    { Registry::template hasFunction<Tag>() } -> std::convertible_to<bool>;
+} && Registry::template hasFunction<Tag>();
+
+// Query a state function from a registry (span version)
+template<StateTagConcept Tag, typename Registry, typename T>
+    requires RegistryProvides<Registry, Tag>
+inline auto query(const Registry& registry, std::span<const T> state) {
+    return registry.template computeFunction<Tag>(state);
+}
+
+// Query a state function from a registry (vector version)
+template<StateTagConcept Tag, typename Registry, typename T>
+    requires RegistryProvides<Registry, Tag>
+inline auto query(const Registry& registry, const std::vector<T>& state) {
+    return registry.template computeFunction<Tag>(state);
+}
+
 // Base component class templated on scalar type
 // T can be: double, Dual<double, N>, Quantity<Dim, double>, Quantity<Dim, Dual<...>>
 template<size_t StateSize, Scalar T = double>
@@ -164,13 +200,15 @@ class TypedRegistry {
 
     // Find first component that provides a given function type (compile-time)
     // CRITICAL: Must return by reference (decltype(auto)) to avoid copying components!
+    // Checks both simple compute(Tag, state) and registry-aware compute(Tag, state, registry)
     template<StateTagConcept Tag, size_t I = 0>
     constexpr decltype(auto) findProvider() const {
         if constexpr (I < sizeof...(Components)) {
             using ComponentType = std::tuple_element_t<I, std::tuple<const Components&...>>;
             using DecayedType = std::decay_t<ComponentType>;
 
-            if constexpr (TypedProvidesStateFunction<DecayedType, Tag, T>) {
+            if constexpr (TypedProvidesStateFunction<DecayedType, Tag, T> ||
+                          TypedProvidesRegistryAwareStateFunction<DecayedType, Tag, T, Self>) {
                 return std::get<I>(m_components);
             } else {
                 return findProvider<Tag, I + 1>();
@@ -185,9 +223,11 @@ public:
         : m_components(components...) {}
 
     // Compile-time function availability check
+    // Returns true if any component provides the state function (either simple or registry-aware)
     template<StateTagConcept Tag>
     static constexpr bool hasFunction() {
-        return (TypedProvidesStateFunction<Components, Tag, T> || ...);
+        return (TypedProvidesStateFunction<Components, Tag, T> || ...) ||
+               (TypedProvidesRegistryAwareStateFunction<Components, Tag, T, Self> || ...);
     }
 
     // Zero-overhead function dispatch
