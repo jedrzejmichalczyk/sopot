@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cassert>
+#include <span>
 
 // MSVC requires _USE_MATH_DEFINES before cmath for M_PI
 #define _USE_MATH_DEFINES
@@ -276,64 +277,71 @@ private:
     double m_spring_k;
     double m_x0;
     double m_v0;
+    mutable size_t m_offset{0};
 
 public:
     using Base = TypedComponent<2, T>;
-    using Base::computeLocalDerivatives;  // Expose base class template method
+    using typename Base::LocalState;
+    using typename Base::LocalDerivative;
 
     AutodiffOscillator(double mass, double k, double x0 = 1.0, double v0 = 0.0)
         : m_mass(mass), m_spring_k(k), m_x0(x0), m_v0(v0) {}
 
-    typename TypedComponent<2, T>::LocalDerivative computeLocalDerivatives(
-        T /*t*/,
-        const typename TypedComponent<2, T>::LocalState& local_state,
-        const std::vector<T>& /*global_state*/
-    ) const override {
-        T x = local_state[0];
-        T v = local_state[1];
+    void setOffset(size_t off) const { m_offset = off; }
 
-        typename TypedComponent<2, T>::LocalDerivative derivs;
+    // Non-virtual derivatives method - required by TypedODESystem
+    template<typename Registry>
+    LocalDerivative derivatives(
+        [[maybe_unused]] T t,
+        std::span<const T> local,
+        [[maybe_unused]] std::span<const T> global,
+        [[maybe_unused]] const Registry& registry
+    ) const {
+        T x = local[0];
+        T v = local[1];
+
+        LocalDerivative derivs;
         derivs[0] = v;  // dx/dt = v
         derivs[1] = T(-m_spring_k / m_mass) * x;  // dv/dt = -k/m * x
 
         return derivs;
     }
 
-    typename TypedComponent<2, T>::LocalState getInitialLocalState() const override {
-        typename TypedComponent<2, T>::LocalState state;
+    LocalState getInitialLocalState() const {
+        LocalState state;
         state[0] = T(m_x0);
         state[1] = T(m_v0);
         return state;
     }
 
-    std::string_view getComponentType() const override { return "AutodiffOscillator"; }
-    std::string_view getComponentName() const override { return "oscillator"; }
+    std::string_view getComponentType() const { return "AutodiffOscillator"; }
+    std::string_view getComponentName() const { return "oscillator"; }
 
     // State functions
-    T compute(kinematics::Position, const std::vector<T>& global_state) const {
-        return this->getGlobalState(global_state, 0);
+    T compute(kinematics::Position, std::span<const T> global_state) const {
+        return global_state[m_offset];
     }
 
-    T compute(kinematics::Velocity, const std::vector<T>& global_state) const {
-        return this->getGlobalState(global_state, 1);
+    T compute(kinematics::Velocity, std::span<const T> global_state) const {
+        return global_state[m_offset + 1];
     }
 
-    T compute(kinematics::Acceleration, const std::vector<T>& global_state) const {
-        T x = this->getGlobalState(global_state, 0);
+    T compute(kinematics::Acceleration, std::span<const T> global_state) const {
+        T x = global_state[m_offset];
         return T(-m_spring_k / m_mass) * x;
     }
 
-    T compute(energy::Kinetic, const std::vector<T>& global_state) const {
-        T v = this->getGlobalState(global_state, 1);
+    T compute(energy::Kinetic, std::span<const T> global_state) const {
+        T v = global_state[m_offset + 1];
         return T(0.5 * m_mass) * v * v;
     }
 
-    T compute(energy::Potential, const std::vector<T>& global_state) const {
-        T x = this->getGlobalState(global_state, 0);
+    T compute(energy::Potential, std::span<const T> global_state) const {
+        T x = global_state[m_offset];
         return T(0.5 * m_spring_k) * x * x;
     }
 
-    T compute(energy::Total, const std::vector<T>& global_state) const {
+    T compute(energy::Total, std::span<const T> global_state) const {
         return compute(energy::Kinetic{}, global_state) + compute(energy::Potential{}, global_state);
     }
 };
@@ -388,20 +396,17 @@ void testJacobianComputation() {
     //            [-4, 0]] for k=4, m=1
 
     using Dual2 = Dual<double, 2>;
-    AutodiffOscillator<Dual2> osc(1.0, 4.0);
 
-    // Set up state
+    // Create system with oscillator - this sets up the registry
+    auto system = makeTypedODESystem<Dual2>(AutodiffOscillator<Dual2>(1.0, 4.0));
+
+    // Set up state with derivative seeds
     std::vector<Dual2> state(2);
     state[0] = Dual2::variable(1.5, 0);  // x = 1.5
     state[1] = Dual2::variable(0.5, 1);  // v = 0.5
 
-    // Extract local state manually (since extractLocalState is protected)
-    ScalarState<Dual2, 2> local_state;
-    local_state[0] = state[0];
-    local_state[1] = state[1];
-
-    // Compute derivatives
-    auto derivs = osc.computeLocalDerivatives(Dual2::constant(0.0), local_state, state);
+    // Compute derivatives through the system
+    auto derivs = system.computeDerivatives(Dual2::constant(0.0), state);
 
     // Check Jacobian elements
     // dx/dt = v
@@ -588,27 +593,24 @@ private:
 
 public:
     using Base = TypedComponent<0, T>;
-    using Base::computeLocalDerivatives;  // Expose base class template method
+    using typename Base::LocalState;
+    using typename Base::LocalDerivative;
 
     AeroDragComponent(double cd = 1.0, double rho = 1.225, double area = 0.01)
         : m_drag_coeff(cd), m_air_density(rho), m_reference_area(area) {}
 
-    typename TypedComponent<0, T>::LocalDerivative computeLocalDerivatives(
-        T, const typename TypedComponent<0, T>::LocalState&, const std::vector<T>&
-    ) const override {
-        return {}; // No own state
-    }
+    void setOffset(size_t) const {} // No state
 
-    typename TypedComponent<0, T>::LocalState getInitialLocalState() const override {
+    LocalState getInitialLocalState() const {
         return {};
     }
 
-    std::string_view getComponentType() const override { return "AeroDragComponent"; }
-    std::string_view getComponentName() const override { return "aero"; }
+    std::string_view getComponentType() const { return "AeroDragComponent"; }
+    std::string_view getComponentName() const { return "aero"; }
 
     // Compute drag force using velocity from registry (cross-component access)
     template<typename Registry>
-    T computeDragForce(const std::vector<T>& state, const Registry& registry) const {
+    T computeDragForce(std::span<const T> state, const Registry& registry) const {
         // Query velocity through the registry - not hardcoded index
         static_assert(Registry::template hasFunction<kinematics::Velocity>(),
                      "Registry must provide Velocity function");

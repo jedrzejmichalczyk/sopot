@@ -27,12 +27,12 @@ public:
     void setInitialAngularVelocity(const Vector3<T>& omega) { m_initial_omega = omega; }
     void setOffset(size_t off) const { m_offset = off; }
 
-    LocalState getInitialLocalState() const override {
+    LocalState getInitialLocalState() const {
         return {m_initial_omega.x, m_initial_omega.y, m_initial_omega.z};
     }
 
-    std::string_view getComponentType() const override { return "RotationDynamics"; }
-    std::string_view getComponentName() const override { return m_name; }
+    std::string_view getComponentType() const { return "RotationDynamics"; }
+    std::string_view getComponentName() const { return m_name; }
 
     template<typename Registry>
     LocalDerivative derivatives(T, std::span<const T> local, std::span<const T> global,

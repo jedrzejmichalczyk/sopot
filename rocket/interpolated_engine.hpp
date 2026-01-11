@@ -57,8 +57,8 @@ public:
 
     void setOffset(size_t) const {} // No state
 
-    std::string_view getComponentType() const override { return "InterpolatedEngine"; }
-    std::string_view getComponentName() const override { return m_name; }
+    std::string_view getComponentType() const { return "InterpolatedEngine"; }
+    std::string_view getComponentName() const { return m_name; }
 
     void loadFromFile(const std::string& filename) {
         auto table = io::CsvParser::parseFile(filename);
@@ -86,7 +86,7 @@ public:
     bool isLoaded() const { return m_data_loaded; }
     double getBurnTime() const { return m_thrust_time; }
 
-    LocalState getInitialLocalState() const override { return {}; }
+    LocalState getInitialLocalState() const { return {}; }
 
     // Check if engine is active at time t
     bool isActive(T time) const {

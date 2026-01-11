@@ -34,11 +34,11 @@ public:
         : m_initial_time(initial_time), m_name(name) {}
 
     // Component identification
-    std::string_view getComponentType() const override { return "SimulationTime"; }
-    std::string_view getComponentName() const override { return m_name; }
+    std::string_view getComponentType() const { return "SimulationTime"; }
+    std::string_view getComponentName() const { return m_name; }
 
     // Initial state
-    LocalState getInitialLocalState() const override {
+    LocalState getInitialLocalState() const {
         return {m_initial_time};
     }
 

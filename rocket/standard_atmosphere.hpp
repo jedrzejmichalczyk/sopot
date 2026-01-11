@@ -38,9 +38,9 @@ public:
     void setOffset(size_t) const {} // No state
     void setAltitudeOffset(size_t off) const { m_altitude_offset = off; }
 
-    LocalState getInitialLocalState() const override { return {}; }
-    std::string_view getComponentType() const override { return "StandardAtmosphere"; }
-    std::string_view getComponentName() const override { return m_name; }
+    LocalState getInitialLocalState() const { return {}; }
+    std::string_view getComponentType() const { return "StandardAtmosphere"; }
+    std::string_view getComponentName() const { return m_name; }
 
     T computeTemperature(T altitude) const {
         double h = value_of(altitude);

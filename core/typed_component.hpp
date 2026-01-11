@@ -8,20 +8,59 @@
 #include <type_traits>
 #include <concepts>
 #include <stdexcept>
+#include <string_view>
 
 namespace sopot {
 
 // Forward declarations
 template<size_t N, Scalar T> class TypedComponent;
 
-// Component concept for compile-time validation
+//=============================================================================
+// Component Concepts - All compile-time verification
+//=============================================================================
+
+// Basic component structure requirements
 template<typename C>
 concept TypedComponentConcept = requires {
     typename C::scalar_type;
     typename C::LocalState;
     typename C::LocalDerivative;
-    C::state_size;
+    { C::state_size } -> std::convertible_to<size_t>;
 };
+
+// Check if component has derivatives method (CRTP-style, non-virtual)
+// This is the required interface for components with state
+template<typename Component, typename T, typename Registry>
+concept HasDerivativesMethod = requires(
+    const Component& c,
+    T t,
+    std::span<const T> local,
+    std::span<const T> global,
+    const Registry& registry
+) {
+    { c.derivatives(t, local, global, registry) } -> std::same_as<typename Component::LocalDerivative>;
+};
+
+// Check if component has getInitialLocalState (non-virtual)
+template<typename Component>
+concept HasInitialState = requires(const Component& c) {
+    { c.getInitialLocalState() } -> std::same_as<typename Component::LocalState>;
+};
+
+// Check if component has identification methods (non-virtual)
+template<typename Component>
+concept HasIdentification = requires(const Component& c) {
+    { c.getComponentType() } -> std::convertible_to<std::string_view>;
+    { c.getComponentName() } -> std::convertible_to<std::string_view>;
+};
+
+// Complete component concept - all required interfaces
+template<typename C, typename T, typename Registry>
+concept CompleteTypedComponent =
+    TypedComponentConcept<C> &&
+    HasInitialState<C> &&
+    HasIdentification<C> &&
+    (C::state_size == 0 || HasDerivativesMethod<C, T, Registry>);
 
 // Check if component provides a specific state function with span (preferred)
 template<typename Component, typename Tag, typename T>
@@ -31,20 +70,6 @@ concept TypedProvidesStateFunctionSpan = TypedComponentConcept<Component> &&
         { c.compute(Tag{}, state) };
     };
 
-// Check if component provides a specific state function with vector (legacy)
-template<typename Component, typename Tag, typename T>
-concept TypedProvidesStateFunctionVector = TypedComponentConcept<Component> &&
-    StateTagConcept<Tag> &&
-    requires(const Component& c, const std::vector<T>& state) {
-        { c.compute(Tag{}, state) };
-    };
-
-// Combined: accepts either span or vector interface
-template<typename Component, typename Tag, typename T>
-concept TypedProvidesStateFunction =
-    TypedProvidesStateFunctionSpan<Component, Tag, T> ||
-    TypedProvidesStateFunctionVector<Component, Tag, T>;
-
 // Check if component provides registry-aware state function (span)
 template<typename Component, typename Tag, typename T, typename Registry>
 concept TypedProvidesRegistryAwareStateFunctionSpan = TypedComponentConcept<Component> &&
@@ -53,32 +78,11 @@ concept TypedProvidesRegistryAwareStateFunctionSpan = TypedComponentConcept<Comp
         { c.compute(Tag{}, state, reg) };
     };
 
-// Check if component provides registry-aware state function (vector)
+// Combined: component provides state function (simple or registry-aware)
 template<typename Component, typename Tag, typename T, typename Registry>
-concept TypedProvidesRegistryAwareStateFunctionVector = TypedComponentConcept<Component> &&
-    StateTagConcept<Tag> &&
-    requires(const Component& c, const std::vector<T>& state, const Registry& reg) {
-        { c.compute(Tag{}, state, reg) };
-    };
-
-// Combined: accepts either interface
-template<typename Component, typename Tag, typename T, typename Registry>
-concept TypedProvidesRegistryAwareStateFunction =
-    TypedProvidesRegistryAwareStateFunctionSpan<Component, Tag, T, Registry> ||
-    TypedProvidesRegistryAwareStateFunctionVector<Component, Tag, T, Registry>;
-
-// Check if component has registry-aware computeLocalDerivatives
-template<typename Component, typename Registry>
-concept HasRegistryAwareDerivatives = requires(
-    const Component& c,
-    typename Component::scalar_type t,
-    const typename Component::LocalState& local,
-    const std::vector<typename Component::scalar_type>& global,
-    const Registry& reg
-) {
-    { c.computeLocalDerivatives(t, local, global, reg) }
-        -> std::same_as<typename Component::LocalDerivative>;
-};
+concept TypedProvidesStateFunction =
+    TypedProvidesStateFunctionSpan<Component, Tag, T> ||
+    TypedProvidesRegistryAwareStateFunctionSpan<Component, Tag, T, Registry>;
 
 //=============================================================================
 // query<Tag>() - Simplified state function access
@@ -116,8 +120,26 @@ inline auto query(const Registry& registry, const std::vector<T>& state) {
     return registry.template computeFunction<Tag>(state);
 }
 
-// Base component class templated on scalar type
-// T can be: double, Dual<double, N>, Quantity<Dim, double>, Quantity<Dim, Dual<...>>
+//=============================================================================
+// TypedComponent - Non-virtual base class for components
+//=============================================================================
+// All dispatch is resolved at compile time through concepts and templates.
+// No virtual functions - components must provide required methods directly.
+//
+// Required methods for components:
+//   - derivatives(t, local_span, global_span, registry) -> LocalDerivative
+//     (only required if state_size > 0)
+//   - getInitialLocalState() -> LocalState
+//   - getComponentType() -> std::string_view
+//   - getComponentName() -> std::string_view
+//   - compute(Tag{}, state) or compute(Tag{}, state, registry) for state functions
+//
+// This base class provides:
+//   - Type aliases (scalar_type, LocalState, LocalDerivative)
+//   - State offset management
+//   - Helper functions for state access
+//=============================================================================
+
 template<size_t StateSize, Scalar T = double>
 class TypedComponent {
 public:
@@ -126,71 +148,42 @@ public:
     using LocalState = ScalarState<T, StateSize>;
     using LocalDerivative = ScalarState<T, StateSize>;
 
-    virtual ~TypedComponent() = default;
-
-    // Legacy interface without registry (for backward compatibility)
-    // Override this if component doesn't need cross-component access
-    virtual LocalDerivative computeLocalDerivatives(
-        T t,
-        const LocalState& local_state,
-        const std::vector<T>& global_state
-    ) const {
-        // Default: no derivatives (override in derived class)
-        LocalDerivative result;
-        for (size_t i = 0; i < StateSize; ++i) {
-            result[i] = T{0};
-        }
-        return result;
-    }
-
-    // Registry-aware interface for cross-component state function access
-    // Override this if component needs to query state functions from other components
-    // The registry provides: registry.template computeFunction<Tag>(global_state)
-    template<typename Registry>
-    LocalDerivative computeLocalDerivatives(
-        T t,
-        const LocalState& local_state,
-        const std::vector<T>& global_state,
-        [[maybe_unused]] const Registry& registry
-    ) const {
-        // Default: delegate to legacy interface
-        return computeLocalDerivatives(t, local_state, global_state);
-    }
-
-    // Returns the initial state for this component
-    virtual LocalState getInitialLocalState() const = 0;
-
-    // Component identification
-    virtual std::string_view getComponentType() const = 0;
-    virtual std::string_view getComponentName() const = 0;
+    // No virtual destructor needed - no polymorphic deletion through base pointer
+    ~TypedComponent() = default;
 
     // State management
     size_t getStateOffset() const noexcept { return m_state_offset; }
     void setStateOffset(size_t offset) noexcept { m_state_offset = offset; }
 
+    // Alias for CRTP-style components that use setOffset
+    void setOffset(size_t offset) noexcept { m_state_offset = offset; }
+
 protected:
     size_t m_state_offset{0};
 
-    // Helper for accessing global state with bounds checking
-    T getGlobalState(const std::vector<T>& global_state, size_t index) const {
+    // Helper for accessing global state from span
+    T getGlobalState(std::span<const T> global_state, size_t index) const {
         size_t actual_index = m_state_offset + index;
-        if (actual_index >= global_state.size()) {
-            throw std::out_of_range("getGlobalState: index out of bounds");
-        }
         return global_state[actual_index];
     }
 
-    // Helper to extract local state from global state
-    LocalState extractLocalState(const std::vector<T>& global_state) const {
+    // Helper to extract local state from global state span
+    LocalState extractLocalState(std::span<const T> global_state) const {
         LocalState local;
         for (size_t i = 0; i < StateSize; ++i) {
-            local[i] = getGlobalState(global_state, i);
+            local[i] = global_state[m_state_offset + i];
         }
         return local;
     }
 };
 
-// Compile-time registry for typed components
+//=============================================================================
+// TypedRegistry - Compile-time registry for state function dispatch
+//=============================================================================
+// All state function resolution happens at compile time.
+// Registry-aware compute() methods take precedence over simple compute().
+//=============================================================================
+
 template<typename T, TypedComponentConcept... Components>
 class TypedRegistry {
     std::tuple<const Components&...> m_components;
@@ -200,21 +193,19 @@ class TypedRegistry {
 
     // Find first component that provides a given function type (compile-time)
     // CRITICAL: Must return by reference (decltype(auto)) to avoid copying components!
-    // Checks both simple compute(Tag, state) and registry-aware compute(Tag, state, registry)
     template<StateTagConcept Tag, size_t I = 0>
     constexpr decltype(auto) findProvider() const {
         if constexpr (I < sizeof...(Components)) {
             using ComponentType = std::tuple_element_t<I, std::tuple<const Components&...>>;
             using DecayedType = std::decay_t<ComponentType>;
 
-            if constexpr (TypedProvidesStateFunction<DecayedType, Tag, T> ||
-                          TypedProvidesRegistryAwareStateFunction<DecayedType, Tag, T, Self>) {
+            if constexpr (TypedProvidesStateFunction<DecayedType, Tag, T, Self>) {
                 return std::get<I>(m_components);
             } else {
                 return findProvider<Tag, I + 1>();
             }
         } else {
-            return std::get<0>(m_components); // Dummy return
+            return std::get<0>(m_components); // Dummy return (static_assert will catch)
         }
     }
 
@@ -223,53 +214,31 @@ public:
         : m_components(components...) {}
 
     // Compile-time function availability check
-    // Returns true if any component provides the state function (either simple or registry-aware)
     template<StateTagConcept Tag>
     static constexpr bool hasFunction() {
-        return (TypedProvidesStateFunction<Components, Tag, T> || ...) ||
-               (TypedProvidesRegistryAwareStateFunction<Components, Tag, T, Self> || ...);
+        return (TypedProvidesStateFunction<Components, Tag, T, Self> || ...);
     }
 
-    // Zero-overhead function dispatch
-    // Calls registry-aware compute if available, otherwise simple compute
-    // Supports both span and vector interfaces for backward compatibility
+    // Zero-overhead function dispatch (span interface only)
+    // Registry-aware compute() takes precedence over simple compute()
     template<StateTagConcept Tag>
     auto computeFunction(std::span<const T> state) const {
         static_assert(hasFunction<Tag>(), "No component provides this state function");
         const auto& provider = findProvider<Tag>();
         using ProviderType = std::decay_t<decltype(provider)>;
 
-        // Check for registry-aware span interface first (preferred)
+        // Prefer registry-aware compute over simple compute
         if constexpr (TypedProvidesRegistryAwareStateFunctionSpan<ProviderType, Tag, T, Self>) {
             return provider.compute(Tag{}, state, *this);
-        } else if constexpr (TypedProvidesStateFunctionSpan<ProviderType, Tag, T>) {
-            return provider.compute(Tag{}, state);
-        } else if constexpr (TypedProvidesRegistryAwareStateFunctionVector<ProviderType, Tag, T, Self>) {
-            std::vector<T> vec(state.begin(), state.end());
-            return provider.compute(Tag{}, vec, *this);
         } else {
-            std::vector<T> vec(state.begin(), state.end());
-            return provider.compute(Tag{}, vec);
+            return provider.compute(Tag{}, state);
         }
     }
 
-    // Convenience overload for vector
+    // Convenience overload for vector - converts to span
     template<StateTagConcept Tag>
     auto computeFunction(const std::vector<T>& state) const {
-        static_assert(hasFunction<Tag>(), "No component provides this state function");
-        const auto& provider = findProvider<Tag>();
-        using ProviderType = std::decay_t<decltype(provider)>;
-
-        // Check for registry-aware span interface first (preferred), then vector
-        if constexpr (TypedProvidesRegistryAwareStateFunctionSpan<ProviderType, Tag, T, Self>) {
-            return provider.compute(Tag{}, std::span<const T>(state), *this);
-        } else if constexpr (TypedProvidesStateFunctionSpan<ProviderType, Tag, T>) {
-            return provider.compute(Tag{}, std::span<const T>(state));
-        } else if constexpr (TypedProvidesRegistryAwareStateFunctionVector<ProviderType, Tag, T, Self>) {
-            return provider.compute(Tag{}, state, *this);
-        } else {
-            return provider.compute(Tag{}, state);
-        }
+        return computeFunction<Tag>(std::span<const T>(state));
     }
 
     static constexpr size_t component_count() {
@@ -282,7 +251,18 @@ public:
     }
 };
 
-// Typed ODE system that works with any scalar type
+//=============================================================================
+// TypedODESystem - Compile-time ODE system composition
+//=============================================================================
+// Composes multiple components into an ODE system.
+// All dispatch is resolved at compile time - no virtual functions.
+//
+// Components must provide:
+//   - derivatives(t, local_span, global_span, registry) -> LocalDerivative
+//     (only required if state_size > 0)
+//   - getInitialLocalState() -> LocalState
+//=============================================================================
+
 template<typename T, TypedComponentConcept... Components>
 class TypedODESystem {
 private:
@@ -291,6 +271,7 @@ private:
 
     static constexpr size_t m_total_state_size = (Components::state_size + ...);
     static constexpr size_t m_component_count = sizeof...(Components);
+    using RegistryType = TypedRegistry<T, Components...>;
 
     // Initialize component state offsets
     template<size_t I = 0, size_t Offset = 0>
@@ -298,17 +279,14 @@ private:
         if constexpr (I < sizeof...(Components)) {
             auto& component = std::get<I>(m_components);
             component.setStateOffset(Offset);
-            // Also call setOffset if component has it (for new CRTP-style components)
-            if constexpr (requires { component.setOffset(Offset); }) {
-                component.setOffset(Offset);
-            }
+            component.setOffset(Offset);  // TypedComponent provides this
             constexpr size_t NextOffset = Offset +
                 std::tuple_element_t<I, std::tuple<Components...>>::state_size;
             initializeOffsets<I + 1, NextOffset>();
         }
     }
 
-    // Collect derivatives from all components using non-virtual dispatch
+    // Collect derivatives from all components using compile-time dispatch
     template<size_t I = 0>
     void collectDerivatives(std::vector<T>& derivatives, T t, const std::vector<T>& state) const {
         if constexpr (I < sizeof...(Components)) {
@@ -322,22 +300,15 @@ private:
                 std::span<const T> local_span(state.data() + off, local_size);
                 std::span<const T> global_span(state);
 
-                // Check if component has non-virtual derivatives method
-                if constexpr (requires { component.derivatives(t, local_span, global_span, m_registry); }) {
-                    auto local_derivs = component.derivatives(t, local_span, global_span, m_registry);
-                    for (size_t j = 0; j < local_size; ++j) {
-                        derivatives[off + j] = local_derivs[j];
-                    }
-                } else {
-                    // Fall back to legacy virtual interface
-                    typename ComponentType::LocalState local_state;
-                    for (size_t j = 0; j < local_size; ++j) {
-                        local_state[j] = state[off + j];
-                    }
-                    auto local_derivs = component.computeLocalDerivatives(t, local_state, state, m_registry);
-                    for (size_t j = 0; j < local_size; ++j) {
-                        derivatives[off + j] = local_derivs[j];
-                    }
+                // Compile-time requirement: component must have derivatives method
+                static_assert(
+                    HasDerivativesMethod<ComponentType, T, RegistryType>,
+                    "Component with state_size > 0 must provide derivatives(t, local, global, registry)"
+                );
+
+                auto local_derivs = component.derivatives(t, local_span, global_span, m_registry);
+                for (size_t j = 0; j < local_size; ++j) {
+                    derivatives[off + j] = local_derivs[j];
                 }
             }
 
@@ -362,10 +333,10 @@ private:
 
             if constexpr (local_size > 0) {
                 auto local_state = component.getInitialLocalState();
-                size_t offset = component.getStateOffset();
+                size_t off = component.getStateOffset();
 
                 for (size_t j = 0; j < local_state.size; ++j) {
-                    state[offset + j] = local_state[j];
+                    state[off + j] = local_state[j];
                 }
             }
 
@@ -389,7 +360,7 @@ public:
         return derivatives;
     }
 
-    constexpr size_t getStateDimension() const noexcept {
+    static constexpr size_t getStateDimension() noexcept {
         return m_total_state_size;
     }
 
@@ -401,17 +372,17 @@ public:
 
     // State function access
     template<StateTagConcept Tag>
-    constexpr bool hasStateFunction() const {
-        return m_registry.template hasFunction<Tag>();
-    }
-
-    template<StateTagConcept Tag>
     static constexpr bool hasFunction() {
-        return TypedRegistry<T, Components...>::template hasFunction<Tag>();
+        return RegistryType::template hasFunction<Tag>();
     }
 
     template<StateTagConcept Tag>
     auto computeStateFunction(const std::vector<T>& state) const {
+        return m_registry.template computeFunction<Tag>(state);
+    }
+
+    template<StateTagConcept Tag>
+    auto computeStateFunction(std::span<const T> state) const {
         return m_registry.template computeFunction<Tag>(state);
     }
 
@@ -431,7 +402,7 @@ public:
         return std::get<I>(m_components);
     }
 
-    constexpr size_t getComponentCount() const {
+    static constexpr size_t getComponentCount() noexcept {
         return m_component_count;
     }
 

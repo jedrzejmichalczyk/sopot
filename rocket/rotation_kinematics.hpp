@@ -30,13 +30,13 @@ public:
     }
     void setOffset(size_t off) const { m_offset = off; }
 
-    LocalState getInitialLocalState() const override {
+    LocalState getInitialLocalState() const {
         return {m_initial_quaternion.q1, m_initial_quaternion.q2,
                 m_initial_quaternion.q3, m_initial_quaternion.q4};
     }
 
-    std::string_view getComponentType() const override { return "RotationKinematics"; }
-    std::string_view getComponentName() const override { return m_name; }
+    std::string_view getComponentType() const { return "RotationKinematics"; }
+    std::string_view getComponentName() const { return m_name; }
 
     template<typename Registry>
     LocalDerivative derivatives(T, std::span<const T> local, std::span<const T> global,

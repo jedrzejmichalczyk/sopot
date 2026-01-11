@@ -25,9 +25,9 @@ public:
     void setOffset(size_t) const {} // No state
     void setConstantGravity(T g) { m_gravity = g; }
 
-    LocalState getInitialLocalState() const override { return {}; }
-    std::string_view getComponentType() const override { return "Gravity"; }
-    std::string_view getComponentName() const override { return m_name; }
+    LocalState getInitialLocalState() const { return {}; }
+    std::string_view getComponentType() const { return "Gravity"; }
+    std::string_view getComponentName() const { return m_name; }
 
     T compute(dynamics::GravityAcceleration, std::span<const T>) const { return m_gravity; }
 };

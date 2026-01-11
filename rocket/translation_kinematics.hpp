@@ -37,12 +37,12 @@ public:
     void setInitialPosition(const Vector3<T>& pos) { m_initial_position = pos; }
     void setOffset(size_t off) const { m_offset = off; }
 
-    LocalState getInitialLocalState() const override {
+    LocalState getInitialLocalState() const {
         return {m_initial_position.x, m_initial_position.y, m_initial_position.z};
     }
 
-    std::string_view getComponentType() const override { return "TranslationKinematics"; }
-    std::string_view getComponentName() const override { return m_name; }
+    std::string_view getComponentType() const { return "TranslationKinematics"; }
+    std::string_view getComponentName() const { return m_name; }
 
     // Non-virtual derivatives - called directly by system
     template<typename Registry>

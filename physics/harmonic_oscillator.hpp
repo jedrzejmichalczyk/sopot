@@ -115,15 +115,16 @@ public:
         return result;
     }
 
-    LocalState getInitialLocalState() const override {
+    // Required by TypedComponent - non-virtual
+    LocalState getInitialLocalState() const {
         LocalState state;
         state[0] = T(m_initial_position);
         state[1] = T(m_initial_velocity);
         return state;
     }
 
-    std::string_view getComponentType() const override { return "HarmonicOscillator"; }
-    std::string_view getComponentName() const override { return m_name; }
+    std::string_view getComponentType() const { return "HarmonicOscillator"; }
+    std::string_view getComponentName() const { return m_name; }
 
     // State functions - all resolved at compile time
     T compute(kinematics::Position, std::span<const T> state) const {
@@ -223,9 +224,10 @@ public:
 
     void setOffset(size_t) const {} // No state
 
-    LocalState getInitialLocalState() const override { return {}; }
-    std::string_view getComponentType() const override { return "SimpleAerodynamics"; }
-    std::string_view getComponentName() const override { return m_name; }
+    // Required by TypedComponent - non-virtual
+    LocalState getInitialLocalState() const { return {}; }
+    std::string_view getComponentType() const { return "SimpleAerodynamics"; }
+    std::string_view getComponentName() const { return m_name; }
 
     // Drag force state function - queries velocity from registry
     template<typename Registry>

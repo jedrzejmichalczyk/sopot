@@ -59,8 +59,8 @@ public:
 
     void setOffset(size_t) const {} // No state
 
-    std::string_view getComponentType() const override { return "AxisymmetricAerodynamics"; }
-    std::string_view getComponentName() const override { return m_name; }
+    std::string_view getComponentType() const { return "AxisymmetricAerodynamics"; }
+    std::string_view getComponentName() const { return m_name; }
 
     void setReferenceArea(double area) { m_reference_area = area; }
     void setReferenceDiameter(double d) {
@@ -110,7 +110,7 @@ public:
         m_cmq_yz.setupFromTable(table.data, "cmq_yz");
     }
 
-    LocalState getInitialLocalState() const override { return {}; }
+    LocalState getInitialLocalState() const { return {}; }
 
     // Compute angle of attack from body velocity [rad]
     T computeAoA(const Vector3<T>& velocity_body) const {

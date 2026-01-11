@@ -87,9 +87,9 @@ public:
 
     void setOffset(size_t) const {} // No state
 
-    LocalState getInitialLocalState() const override { return {}; }
-    std::string_view getComponentType() const override { return "RocketBody"; }
-    std::string_view getComponentName() const override { return m_name; }
+    LocalState getInitialLocalState() const { return {}; }
+    std::string_view getComponentType() const { return "RocketBody"; }
+    std::string_view getComponentName() const { return m_name; }
 
     // Get mass at time t
     T getMass(T time) const {

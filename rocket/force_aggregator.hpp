@@ -44,9 +44,9 @@ public:
 
     void setOffset(size_t) const {} // No state
 
-    std::string_view getComponentType() const override { return "ForceAggregator"; }
-    std::string_view getComponentName() const override { return m_name; }
-    LocalState getInitialLocalState() const override { return {}; }
+    std::string_view getComponentType() const { return "ForceAggregator"; }
+    std::string_view getComponentName() const { return m_name; }
+    LocalState getInitialLocalState() const { return {}; }
 
     //=========================================================================
     // STATE FUNCTIONS - Aggregate forces from other components
