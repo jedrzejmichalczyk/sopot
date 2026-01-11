@@ -8,9 +8,15 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -O3")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -DDEBUG")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -DNDEBUG")
+# Platform-specific compiler flags
+if(MSVC)
+    add_compile_options(/W4 /permissive-)
+    add_compile_options("$<$<CONFIG:Release>:/O2>")
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options("$<$<CONFIG:Release>:-O3>")
+    add_compile_options("$<$<CONFIG:Debug>:-O0;-g>")
+endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -52,18 +58,24 @@ set(ROCKET_HEADERS
 )
 target_sources(sopot_rocket INTERFACE ${ROCKET_HEADERS})
 
+# Enable testing
+enable_testing()
+
 # Test executables
 add_executable(compile_time_test tests/compile_time_test.cpp)
 target_link_libraries(compile_time_test sopot_core sopot_physics)
 target_compile_features(compile_time_test PRIVATE cxx_std_20)
+add_test(NAME compile_time_test COMMAND compile_time_test)
 
 add_executable(autodiff_test tests/autodiff_test.cpp)
 target_link_libraries(autodiff_test sopot_core sopot_physics)
 target_compile_features(autodiff_test PRIVATE cxx_std_20)
+add_test(NAME autodiff_test COMMAND autodiff_test)
 
 add_executable(rocket_flight_test tests/rocket_flight_test.cpp)
 target_link_libraries(rocket_flight_test sopot_core sopot_rocket)
 target_compile_features(rocket_flight_test PRIVATE cxx_std_20)
+add_test(NAME rocket_flight_test COMMAND rocket_flight_test)
 
 # Custom target to run all tests
 add_custom_target(run_tests

@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build:
+    name: ${{ matrix.os }} - ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux GCC
+          - os: ubuntu-24.04
+            compiler: gcc-13
+            cc: gcc-13
+            cxx: g++-13
+
+          - os: ubuntu-24.04
+            compiler: gcc-14
+            cc: gcc-14
+            cxx: g++-14
+
+          # Linux Clang
+          - os: ubuntu-24.04
+            compiler: clang-17
+            cc: clang-17
+            cxx: clang++-17
+
+          - os: ubuntu-24.04
+            compiler: clang-18
+            cc: clang-18
+            cxx: clang++-18
+
+          # macOS
+          - os: macos-14
+            compiler: apple-clang
+            cc: clang
+            cxx: clang++
+
+          # Windows MSVC
+          - os: windows-latest
+            compiler: msvc
+            cc: cl
+            cxx: cl
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install GCC (Linux)
+      if: runner.os == 'Linux' && startsWith(matrix.compiler, 'gcc')
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ${{ matrix.cxx }}
+
+    - name: Install Clang (Linux)
+      if: runner.os == 'Linux' && startsWith(matrix.compiler, 'clang')
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ${{ matrix.compiler }}
+
+    - name: Configure (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release \
+                 -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+                 -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+
+    - name: Configure (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build --config Release --parallel
+
+    - name: Test - compile_time_test
+      run: |
+        cd build
+        ctest --output-on-failure -R compile_time_test -C Release
+
+    - name: Test - autodiff_test
+      run: |
+        cd build
+        ctest --output-on-failure -R autodiff_test -C Release
+
+    - name: Test - rocket_flight_test
+      run: |
+        cd build
+        ctest --output-on-failure -R rocket_flight_test -C Release
+
+    - name: Run all tests directly (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        ./build/compile_time_test
+        ./build/autodiff_test
+        ./build/rocket_flight_test
+
+    - name: Run all tests directly (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .\build\Release\compile_time_test.exe
+        .\build\Release\autodiff_test.exe
+        .\build\Release\rocket_flight_test.exe
