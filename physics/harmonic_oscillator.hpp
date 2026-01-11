@@ -4,8 +4,15 @@
 #include "../core/scalar.hpp"
 #include "../core/state_function_tags.hpp"
 #include <string>
-#include <cmath>
 #include <span>
+
+// MSVC requires _USE_MATH_DEFINES before cmath for M_PI
+#define _USE_MATH_DEFINES
+#include <cmath>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 namespace sopot::physics {
 

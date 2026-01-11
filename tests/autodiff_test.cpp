@@ -5,8 +5,15 @@
 #include "../core/linearization.hpp"
 #include <iostream>
 #include <iomanip>
-#include <cmath>
 #include <cassert>
+
+// MSVC requires _USE_MATH_DEFINES before cmath for M_PI
+#define _USE_MATH_DEFINES
+#include <cmath>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 using namespace sopot;
 using namespace sopot::units;
