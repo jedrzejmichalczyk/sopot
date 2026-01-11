@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/jedrzejmichalczyk/sopot/actions/workflows/ci.yml"><img src="https://github.com/jedrzejmichalczyk/sopot/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/C%2B%2B-20-blue.svg" alt="C++20">
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT">
   <img src="https://img.shields.io/badge/Header--Only-Yes-brightgreen.svg" alt="Header Only">
