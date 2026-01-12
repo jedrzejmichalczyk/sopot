@@ -117,59 +117,6 @@ private:
 };
 
 // ============================================================================
-// TOPOLOGICAL SORT - Kahn's algorithm (compile-time)
-// ============================================================================
-
-template<size_t N>
-constexpr std::array<size_t, N> topologicalSort(
-    const std::array<std::array<bool, N>, N>& adj
-) {
-    std::array<size_t, N> result{};
-    std::array<bool, N> visited{};
-    std::array<int, N> inDegree{};
-
-    // Compute in-degrees
-    for (size_t i = 0; i < N; ++i) {
-        for (size_t j = 0; j < N; ++j) {
-            if (adj[i][j]) {
-                inDegree[i]++;
-            }
-        }
-    }
-
-    // Process nodes with in-degree 0
-    size_t resultIdx = 0;
-    bool changed = true;
-
-    while (changed && resultIdx < N) {
-        changed = false;
-        for (size_t i = 0; i < N; ++i) {
-            if (!visited[i] && inDegree[i] == 0) {
-                result[resultIdx++] = i;
-                visited[i] = true;
-                changed = true;
-
-                // Decrease in-degree of neighbors
-                for (size_t j = 0; j < N; ++j) {
-                    if (adj[j][i]) {
-                        inDegree[j]--;
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    // If we didn't process all nodes, there's a cycle
-    if (resultIdx < N) {
-        // Return empty array to signal cycle
-        return {};
-    }
-
-    return result;
-}
-
-// ============================================================================
 // SYSTEM - Compose components with automatic dependency resolution
 // ============================================================================
 
