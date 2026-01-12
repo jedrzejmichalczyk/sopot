@@ -97,6 +97,10 @@ add_executable(simple_reactor_demo experimental/simple_reactor_demo.cpp)
 target_include_directories(simple_reactor_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
 target_compile_features(simple_reactor_demo PRIVATE cxx_std_20)
 
+add_executable(system_builder_demo experimental/system_builder_demo.cpp)
+target_include_directories(system_builder_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
+target_compile_features(system_builder_demo PRIVATE cxx_std_20)
+
 # Custom target to run all tests
 add_custom_target(run_tests
     COMMAND compile_time_test
