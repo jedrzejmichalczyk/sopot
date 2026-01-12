@@ -6,6 +6,8 @@
 #include <array>
 #include <tuple>
 #include <utility>
+#include <stdexcept>
+#include <set>
 
 namespace sopot::connected_masses {
 
@@ -28,6 +30,65 @@ struct MassParams {
 };
 
 namespace detail {
+
+/**
+ * @brief Validate edge list for correctness
+ *
+ * Checks for:
+ * - Self-loops (edges connecting a node to itself)
+ * - Out-of-range indices (indices >= NumMasses)
+ * - Duplicate edges
+ *
+ * @tparam NumMasses Number of masses in the system
+ * @tparam NumEdges Number of edges
+ * @param edges Edge list to validate
+ * @throws std::invalid_argument if validation fails
+ */
+template<size_t NumMasses, size_t NumEdges>
+constexpr void validateEdges(const std::array<std::pair<size_t, size_t>, NumEdges>& edges) {
+    for (size_t k = 0; k < NumEdges; ++k) {
+        const auto& edge = edges[k];
+        size_t i = edge.first;
+        size_t j = edge.second;
+
+        // Check for self-loops
+        if (i == j) {
+            throw std::invalid_argument(
+                "Self-loop detected: edge " + std::to_string(k) + " connects node " +
+                std::to_string(i) + " to itself"
+            );
+        }
+
+        // Check for out-of-range indices
+        if (i >= NumMasses) {
+            throw std::invalid_argument(
+                "Edge " + std::to_string(k) + " has out-of-range first index: " +
+                std::to_string(i) + " (must be < " + std::to_string(NumMasses) + ")"
+            );
+        }
+        if (j >= NumMasses) {
+            throw std::invalid_argument(
+                "Edge " + std::to_string(k) + " has out-of-range second index: " +
+                std::to_string(j) + " (must be < " + std::to_string(NumMasses) + ")"
+            );
+        }
+
+        // Check for duplicate edges (both (i,j) and (j,i) representations)
+        for (size_t m = k + 1; m < NumEdges; ++m) {
+            const auto& other_edge = edges[m];
+            size_t mi = other_edge.first;
+            size_t mj = other_edge.second;
+
+            if ((i == mi && j == mj) || (i == mj && j == mi)) {
+                throw std::invalid_argument(
+                    "Duplicate edge detected: edges " + std::to_string(k) + " and " +
+                    std::to_string(m) + " both connect nodes " + std::to_string(i) +
+                    " and " + std::to_string(j)
+                );
+            }
+        }
+    }
+}
 
 // Helper: Create a mass with given index
 template<size_t Index, typename T>
@@ -112,14 +173,16 @@ struct SpringTupleMaker {
  * @code
  * // Three masses in a triangular configuration
  * constexpr auto edges = std::array{
- *     std::pair{0uz, 1uz},  // Mass 0 <-> Mass 1
- *     std::pair{1uz, 2uz},  // Mass 1 <-> Mass 2
- *     std::pair{0uz, 2uz}   // Mass 0 <-> Mass 2
+ *     std::pair{size_t(0), size_t(1)},  // Mass 0 <-> Mass 1
+ *     std::pair{size_t(1), size_t(2)},  // Mass 1 <-> Mass 2
+ *     std::pair{size_t(0), size_t(2)}   // Mass 0 <-> Mass 2
  * };
  *
  * auto system = makeConnectedMassSystem<double, 3, edges>(
- *     {{{1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 0.5, 0.0}}},  // masses
- *     {{{10.0, 1.0, 0.5}, {10.0, 1.0, 0.5}, {10.0, 1.0, 0.5}}} // springs
+ *     // Mass parameters: {{mass, initial_position, initial_velocity}, ...}
+ *     {{{1.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {1.0, 0.5, 0.0}}},
+ *     // Spring parameters: {{stiffness, rest_length, damping}, ...}
+ *     {{{10.0, 1.0, 0.5}, {10.0, 1.0, 0.5}, {10.0, 1.0, 0.5}}}
  * );
  * @endcode
  *
@@ -140,6 +203,9 @@ auto makeConnectedMassSystem(
 ) {
     // Validate edge list at compile time
     static_assert(Edges.size() > 0, "Must have at least one edge");
+
+    // Validate edges for self-loops, out-of-range indices, and duplicates
+    detail::validateEdges<NumMasses>(Edges);
 
     // Generate mass components
     auto mass_tuple = detail::makeMassTuple<T>(
@@ -192,16 +258,38 @@ auto makeUniformConnectedSystem(
  * @brief Convert adjacency matrix to edge list (runtime helper)
  *
  * Takes a symmetric adjacency matrix and extracts the upper triangular edges.
- * This version returns a runtime array since we can't know the size at compile time
- * without evaluating the matrix content.
+ * For undirected graphs, the matrix must be symmetric: matrix[i][j] == matrix[j][i].
+ * This function validates symmetry and throws if the matrix is asymmetric.
  *
  * @tparam N Matrix dimension
- * @tparam MaxEdges Maximum possible edges (N*(N-1)/2)
- * @param matrix Symmetric adjacency matrix (true = connected)
- * @return std::vector of edges
+ * @param matrix Adjacency matrix (true = connected) - must be symmetric for undirected graphs
+ * @return std::vector of edges from upper triangle
+ * @throws std::invalid_argument if matrix is asymmetric (has diagonal elements set)
  */
 template<size_t N>
 inline auto matrixToEdges(const bool (&matrix)[N][N]) {
+    // Validate matrix symmetry (for undirected graphs)
+    for (size_t i = 0; i < N; ++i) {
+        // Check diagonal (self-loops not allowed)
+        if (matrix[i][i]) {
+            throw std::invalid_argument(
+                "Self-loop detected in adjacency matrix at diagonal element [" +
+                std::to_string(i) + "][" + std::to_string(i) + "]"
+            );
+        }
+
+        // Check symmetry
+        for (size_t j = i + 1; j < N; ++j) {
+            if (matrix[i][j] != matrix[j][i]) {
+                throw std::invalid_argument(
+                    "Adjacency matrix is not symmetric: matrix[" + std::to_string(i) +
+                    "][" + std::to_string(j) + "] != matrix[" + std::to_string(j) +
+                    "][" + std::to_string(i) + "]. For undirected graphs, the matrix must be symmetric."
+                );
+            }
+        }
+    }
+
     // Count edges in upper triangle
     size_t count = 0;
     for (size_t i = 0; i < N; ++i) {

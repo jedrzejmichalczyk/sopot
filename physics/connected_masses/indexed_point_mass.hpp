@@ -4,6 +4,7 @@
 #include "core/scalar.hpp"
 #include "indexed_tags.hpp"
 #include <string>
+#include <stdexcept>
 
 namespace sopot::connected_masses {
 
@@ -34,9 +35,10 @@ public:
     /**
      * @brief Construct point mass with specified properties
      *
-     * @param mass Mass value (kg)
+     * @param mass Mass value (kg) - must be positive
      * @param initial_position Initial position (m)
      * @param initial_velocity Initial velocity (m/s)
+     * @throws std::invalid_argument if mass is not positive
      */
     explicit IndexedPointMass(
         double mass,
@@ -48,6 +50,12 @@ public:
         , m_initial_velocity(initial_velocity)
         , m_name("Mass" + std::to_string(Index))
     {
+        if (mass <= 0.0) {
+            throw std::invalid_argument(
+                "Mass must be positive (got " + std::to_string(mass) +
+                " for Mass" + std::to_string(Index) + ")"
+            );
+        }
     }
 
     // Required: Initial state

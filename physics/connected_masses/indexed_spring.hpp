@@ -4,6 +4,7 @@
 #include "core/scalar.hpp"
 #include "indexed_tags.hpp"
 #include <string>
+#include <stdexcept>
 
 namespace sopot::connected_masses {
 
@@ -37,9 +38,10 @@ public:
     /**
      * @brief Construct spring with specified properties
      *
-     * @param stiffness Spring constant k (N/m)
-     * @param rest_length Natural length L0 (m)
-     * @param damping Damping coefficient c (N·s/m), default 0
+     * @param stiffness Spring constant k (N/m) - must be positive
+     * @param rest_length Natural length L0 (m) - must be non-negative
+     * @param damping Damping coefficient c (N·s/m), default 0 - must be non-negative
+     * @throws std::invalid_argument if parameters are invalid
      */
     explicit IndexedSpring(
         double stiffness,
@@ -49,8 +51,26 @@ public:
         : m_stiffness(stiffness)
         , m_rest_length(rest_length)
         , m_damping(damping)
-        , m_name("Spring" + std::to_string(Index1) + std::to_string(Index2))
+        , m_name("Spring" + std::to_string(Index1) + "_" + std::to_string(Index2))
     {
+        if (stiffness <= 0.0) {
+            throw std::invalid_argument(
+                "Spring stiffness must be positive (got " + std::to_string(stiffness) +
+                " for Spring" + std::to_string(Index1) + "_" + std::to_string(Index2) + ")"
+            );
+        }
+        if (rest_length < 0.0) {
+            throw std::invalid_argument(
+                "Spring rest length must be non-negative (got " + std::to_string(rest_length) +
+                " for Spring" + std::to_string(Index1) + "_" + std::to_string(Index2) + ")"
+            );
+        }
+        if (damping < 0.0) {
+            throw std::invalid_argument(
+                "Spring damping must be non-negative (got " + std::to_string(damping) +
+                " for Spring" + std::to_string(Index1) + "_" + std::to_string(Index2) + ")"
+            );
+        }
     }
 
     // Required: No internal state
@@ -146,13 +166,20 @@ public:
         return T(0.5) * T(m_stiffness) * extension * extension;
     }
 
-    // Fallback compute methods (return zero when registry not available)
+    // Fallback compute methods (throw error when registry not available)
+    // These should never be called - the registry-aware versions should always be used
     T compute(typename TagSet1::Force, std::span<const T> /*state*/) const {
-        return T(0);
+        throw std::logic_error(
+            "Spring force computation requires registry access. "
+            "This fallback should never be called."
+        );
     }
 
     T compute(typename TagSet2::Force, std::span<const T> /*state*/) const {
-        return T(0);
+        throw std::logic_error(
+            "Spring force computation requires registry access. "
+            "This fallback should never be called."
+        );
     }
 };
 
