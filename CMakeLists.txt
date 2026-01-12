@@ -82,13 +82,19 @@ target_link_libraries(rocket_flight_test sopot_core sopot_rocket)
 target_compile_features(rocket_flight_test PRIVATE cxx_std_20)
 add_test(NAME rocket_flight_test COMMAND rocket_flight_test)
 
+add_executable(connected_masses_test tests/connected_masses_test.cpp)
+target_link_libraries(connected_masses_test sopot_core sopot_physics)
+target_compile_features(connected_masses_test PRIVATE cxx_std_20)
+add_test(NAME connected_masses_test COMMAND connected_masses_test)
+
 # Custom target to run all tests
 add_custom_target(run_tests
     COMMAND compile_time_test
     COMMAND autodiff_test
     COMMAND coupled_oscillator_test
     COMMAND rocket_flight_test
-    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test
+    COMMAND connected_masses_test
+    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running SOPOT tests"
 )
