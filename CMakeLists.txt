@@ -92,6 +92,19 @@ target_link_libraries(connected_masses_validation_test sopot_core sopot_physics)
 target_compile_features(connected_masses_validation_test PRIVATE cxx_std_20)
 add_test(NAME connected_masses_validation_test COMMAND connected_masses_validation_test)
 
+# Experimental: Field-based component architecture
+add_executable(simple_reactor_demo experimental/simple_reactor_demo.cpp)
+target_include_directories(simple_reactor_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
+target_compile_features(simple_reactor_demo PRIVATE cxx_std_20)
+
+add_executable(system_builder_demo experimental/system_builder_demo.cpp)
+target_include_directories(system_builder_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
+target_compile_features(system_builder_demo PRIVATE cxx_std_20)
+
+add_executable(auto_system_demo experimental/auto_system_demo.cpp)
+target_include_directories(auto_system_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
+target_compile_features(auto_system_demo PRIVATE cxx_std_20)
+
 # Custom target to run all tests
 add_custom_target(run_tests
     COMMAND compile_time_test
