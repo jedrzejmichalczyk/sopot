@@ -144,27 +144,27 @@ private:
     ) const {
         // For each stateful component, extract its state value
         // and add provisions to cache
-        // This is a simplified version - full version would need component-specific logic
 
         size_t offset = 0;
         [&]<size_t... Is>(std::index_sequence<Is...>) {
             ([&] {
                 using Comp = nth_type_t<Is, Components...>;
 
-                if constexpr (Comp::StateSize == 1) {
-                    // Single-valued state
-                    T value = state[offset];
+                if constexpr (Comp::StateSize > 0) {
+                    if constexpr (Comp::StateSize == 1) {
+                        // Single-valued state
+                        T value = state[offset];
 
-                    // Add provisions based on state
-                    // For now, we assume component provides its state value
-                    if constexpr (HasProvisions<Comp>) {
-                        auto provs = getProvisionNames<Comp>();
-                        if (provs.size() > 0) {
-                            cache[std::string(provs[0])] = value;
+                        // Add provisions based on state
+                        if constexpr (HasProvisions<Comp>) {
+                            auto provs = getProvisionNames<Comp>();
+                            if (provs.size() > 0) {
+                                cache[std::string(provs[0])] = value;
+                            }
                         }
                     }
-
-                    offset += 1;
+                    // Increment offset for ALL stateful components
+                    offset += Comp::StateSize;
                 }
             }(), ...);
         }(std::make_index_sequence<NumComponents>{});
@@ -183,9 +183,7 @@ private:
         }
     }
 
-    // Execute a single component
-    // NOTE: This is an experimental placeholder implementation
-    // TODO: Implement full dependency injection and automatic derivative computation
+    // Execute a single component with automatic dependency injection
     template<size_t I>
     void executeComponentTyped(
         T t,
@@ -197,29 +195,85 @@ private:
         const auto& comp = std::get<I>(components);
 
         if constexpr (Comp::StateSize == 0) {
-            // Stateless component - compute provisions
-            auto depNames = getDependencyNames<Comp>();
-            auto provNames = getProvisionNames<Comp>();
-
-            // TODO: Implement dependency injection using variadic template magic
-            if constexpr (depNames.size() == 0) {
-                // No dependencies - just compute
-                // TODO: Call comp.compute() with appropriate arguments
-            }
+            // Stateless component - compute provisions and store in cache
+            executeStateless<I, Comp>(comp, t, cache);
         } else {
             // Stateful component - compute derivative
-            auto local = this->template extractLocalState<I>(state);
-            auto depNames = getDependencyNames<Comp>();
+            executeStateful<I, Comp>(comp, t, state, cache, derivatives);
+        }
+    }
 
-            // TODO: Get dependencies from cache and compute derivative with proper injection
+    // Execute stateless component: inject dependencies, compute, store provisions
+    template<size_t I, typename Comp>
+    void executeStateless(const Comp& comp, T t, std::map<std::string, T>& cache) const {
+        // Get dependency names
+        constexpr auto depNames = getDependencyNames<Comp>();
 
-            constexpr size_t offset = Base::template computeStateOffset<I>();
+        // Inject dependencies and call compute()
+        auto result = injectAndCall(
+            [&](auto... deps) { return comp.compute(t, deps...); },
+            depNames,
+            cache,
+            std::make_index_sequence<depNames.size()>{}
+        );
 
-            // PLACEHOLDER: Returns zero derivative - not implemented yet
-            if constexpr (Comp::StateSize == 1) {
-                derivatives[offset] = T{};  // Placeholder zero derivative
+        // Store provisions in cache
+        constexpr auto provNames = getProvisionNames<Comp>();
+        storeProvisions<Comp>(result, provNames, cache, std::make_index_sequence<provNames.size()>{});
+    }
+
+    // Execute stateful component: compute derivative
+    template<size_t I, typename Comp>
+    void executeStateful(
+        const Comp& comp,
+        T t,
+        const std::array<T, TotalStateSize>& state,
+        std::map<std::string, T>& cache,
+        std::array<T, TotalStateSize>& derivatives
+    ) const {
+        auto local = Base::template extractLocalState<I>(state);
+        constexpr auto depNames = getDependencyNames<Comp>();
+
+        // Inject dependencies and compute derivative
+        auto deriv = injectAndCall(
+            [&](auto... deps) { return comp.computeDerivative(t, local, deps...); },
+            depNames,
+            cache,
+            std::make_index_sequence<depNames.size()>{}
+        );
+
+        // Store derivative
+        constexpr size_t offset = Base::template computeStateOffset<I>();
+        if constexpr (Comp::StateSize == 1) {
+            derivatives[offset] = deriv;
+        } else {
+            // Multi-state component
+            for (size_t i = 0; i < Comp::StateSize; ++i) {
+                derivatives[offset + i] = deriv[i];
             }
         }
+    }
+
+    // Generic dependency injection and function calling
+    template<typename Func, size_t N, size_t... Is>
+    auto injectAndCall(
+        Func&& func,
+        const std::array<std::string_view, N>& depNames,
+        const std::map<std::string, T>& cache,
+        std::index_sequence<Is...>
+    ) const {
+        return func(cache.at(std::string(depNames[Is]))...);
+    }
+
+    // Store provisions from FieldBundle into cache
+    template<typename Comp, typename ProvisionsBundle, size_t N, size_t... Is>
+    void storeProvisions(
+        const ProvisionsBundle& provs,
+        const std::array<std::string_view, N>& provNames,
+        std::map<std::string, T>& cache,
+        std::index_sequence<Is...>
+    ) const {
+        ((cache[std::string(provNames[Is])] = provs.template get<Is>().value), ...);
     }
 
     // Runtime dispatch to compile-time execution

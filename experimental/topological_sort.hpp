@@ -28,10 +28,12 @@ constexpr TopologicalSortResult<N> topologicalSort(
     std::array<int, N> inDegree{};
 
     // Compute in-degrees
-    for (size_t j = 0; j < N; ++j) {
-        for (size_t i = 0; i < N; ++i) {
+    // adj[i][j] = true means "i depends on j" → edge from j to i
+    // So this is an incoming edge to i
+    for (size_t i = 0; i < N; ++i) {
+        for (size_t j = 0; j < N; ++j) {
             if (adj[i][j]) {
-                inDegree[j]++;  // Edge from i to j means j has incoming edge
+                inDegree[i]++;  // i depends on j, so i has an incoming edge
             }
         }
     }
@@ -47,9 +49,10 @@ constexpr TopologicalSortResult<N> topologicalSort(
                 visited[i] = true;
                 found = true;
 
-                // Decrease in-degree of dependent nodes
+                // Decrease in-degree of nodes that depend on i
+                // If adj[j][i] is true, then j depends on i, so decrement j's in-degree
                 for (size_t j = 0; j < N; ++j) {
-                    if (adj[i][j]) {  // Edge from i to j, so decrement j's in-degree
+                    if (adj[j][i]) {
                         inDegree[j]--;
                     }
                 }

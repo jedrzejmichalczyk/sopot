@@ -42,6 +42,11 @@ public:
 
     T getInitialState() const { return m_initial; }
 
+    // Compute derivative: dx/dt = velocity
+    T computeDerivative(T /* t */, T /* local_pos */, T vel) const {
+        return vel;
+    }
+
 private:
     T m_initial;
 };
@@ -57,6 +62,11 @@ public:
     explicit VelocityComponent(T initial) : m_initial(initial) {}
 
     T getInitialState() const { return m_initial; }
+
+    // Compute derivative: dv/dt = acceleration
+    T computeDerivative(T /* t */, T /* local_vel */, T accel) const {
+        return accel;
+    }
 
 private:
     T m_initial;
@@ -74,6 +84,11 @@ public:
 
     T getForce() const { return m_force; }
 
+    // Compute provisions: return force value
+    Provides compute(T /* t */) const {
+        return Provides{Field<physics::Force, "force">{.value = m_force}};
+    }
+
 private:
     T m_force;
 };
@@ -90,6 +105,11 @@ public:
 
     T getMass() const { return m_mass; }
 
+    // Compute provisions: return mass value
+    Provides compute(T /* t */) const {
+        return Provides{Field<physics::Mass, "mass">{.value = m_mass}};
+    }
+
 private:
     T m_mass;
 };
@@ -104,6 +124,12 @@ public:
         Field<physics::Mass, "mass">
     >;
     using Provides = FieldBundle<Field<physics::Acceleration, "accel">>;
+
+    // Compute provisions: a = F/m
+    Provides compute(T /* t */, T force, T mass) const {
+        T accel = force / mass;
+        return Provides{Field<physics::Acceleration, "accel">{.value = accel}};
+    }
 };
 
 // ============================================================================
