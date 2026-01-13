@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:github": "VITE_BASE_PATH=/sopot/ npm run build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "deploy": "npm run build:github"
   },
   "dependencies": {
     "react": "^18.3.1",

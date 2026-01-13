@@ -10,6 +10,15 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT">
   <img src="https://img.shields.io/badge/Header--Only-Yes-brightgreen.svg" alt="Header Only">
   <img src="https://img.shields.io/badge/Dependencies-None-orange.svg" alt="No Dependencies">
+  <img src="https://img.shields.io/badge/WebAssembly-Ready-blueviolet.svg" alt="WebAssembly">
+</p>
+
+<p align="center">
+  <strong>🚀 <a href="https://jedrzejmichalczyk.github.io/sopot/">Try the Interactive 3D Demo!</a> 🚀</strong>
+</p>
+
+<p align="center">
+  <em>C++20 physics simulation compiled to WebAssembly, running in your browser with real-time 3D visualization</em>
 </p>
 
 ---
