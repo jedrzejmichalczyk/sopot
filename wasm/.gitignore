@@ -1,0 +1,26 @@
+# WebAssembly build outputs
+sopot.js
+sopot.wasm
+*.js.map
+*.wasm.map
+
+# CMake build directory
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Emscripten cache
+.emscripten_cache/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
