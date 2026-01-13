@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOPOT WebAssembly Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .panel h2 {
+            margin-bottom: 15px;
+            color: #2a5298;
+            font-size: 1.5em;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 12px 24px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .telemetry {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .telemetry-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .telemetry-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .telemetry-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #2a5298;
+        }
+
+        .telemetry-unit {
+            font-size: 0.7em;
+            color: #999;
+            margin-left: 5px;
+        }
+
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #667eea;
+            padding-left: 10px;
+        }
+
+        .log-entry.error {
+            border-left-color: #dc3545;
+            color: #ff6b6b;
+        }
+
+        .log-entry.success {
+            border-left-color: #28a745;
+            color: #51cf66;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .running {
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 SOPOT WebAssembly Demo</h1>
+            <p>C++20 Rocket Flight Simulation in Your Browser</p>
+        </header>
+
+        <div class="content">
+            <div id="status" class="status info">
+                Loading WebAssembly module...
+            </div>
+
+            <div class="grid">
+                <!-- Configuration Panel -->
+                <div class="panel">
+                    <h2>⚙️ Configuration</h2>
+
+                    <div class="control-group">
+                        <label for="elevation">Launch Elevation (°)</label>
+                        <input type="number" id="elevation" value="85" min="0" max="90" step="1">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="azimuth">Launch Azimuth (°)</label>
+                        <input type="number" id="azimuth" value="0" min="0" max="360" step="1">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="diameter">Rocket Diameter (m)</label>
+                        <input type="number" id="diameter" value="0.16" min="0.01" max="1" step="0.01">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="timestep">Timestep (s)</label>
+                        <input type="number" id="timestep" value="0.01" min="0.001" max="0.1" step="0.001">
+                    </div>
+
+                    <div class="control-group">
+                        <label for="dataPath">Data Path (prototype)</label>
+                        <input type="text" id="dataPath" value="../data/" placeholder="../data/">
+                    </div>
+
+                    <button id="btnInit" class="btn-primary">Initialize Simulation</button>
+                </div>
+
+                <!-- Control Panel -->
+                <div class="panel">
+                    <h2>🎮 Controls</h2>
+
+                    <div style="margin: 20px 0;">
+                        <button id="btnStep" class="btn-success" disabled>Single Step</button>
+                        <button id="btnRun" class="btn-success" disabled>Run</button>
+                        <button id="btnPause" class="btn-warning" disabled>Pause</button>
+                        <button id="btnReset" class="btn-danger" disabled>Reset</button>
+                    </div>
+
+                    <div class="control-group">
+                        <label for="speed">Playback Speed: <span id="speedLabel">1x</span></label>
+                        <input type="range" id="speed" min="0.1" max="10" step="0.1" value="1" style="width: 100%;">
+                    </div>
+                </div>
+
+                <!-- Telemetry Panel -->
+                <div class="panel">
+                    <h2>📊 Telemetry</h2>
+                    <div class="telemetry">
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Time</div>
+                            <div class="telemetry-value">
+                                <span id="time">0.00</span>
+                                <span class="telemetry-unit">s</span>
+                            </div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Altitude</div>
+                            <div class="telemetry-value">
+                                <span id="altitude">0</span>
+                                <span class="telemetry-unit">m</span>
+                            </div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Speed</div>
+                            <div class="telemetry-value">
+                                <span id="speed-value">0</span>
+                                <span class="telemetry-unit">m/s</span>
+                            </div>
+                        </div>
+                        <div class="telemetry-item">
+                            <div class="telemetry-label">Mass</div>
+                            <div class="telemetry-value">
+                                <span id="mass">0</span>
+                                <span class="telemetry-unit">kg</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Log Panel -->
+                <div class="panel">
+                    <h2>📝 Event Log</h2>
+                    <div class="log" id="log"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Load the WebAssembly module
+        import createSopotModule from './sopot.js';
+
+        let Module = null;
+        let simulator = null;
+        let isRunning = false;
+        let animationFrameId = null;
+        let lastFrameTime = 0;
+
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const logEl = document.getElementById('log');
+        const btnInit = document.getElementById('btnInit');
+        const btnStep = document.getElementById('btnStep');
+        const btnRun = document.getElementById('btnRun');
+        const btnPause = document.getElementById('btnPause');
+        const btnReset = document.getElementById('btnReset');
+        const speedSlider = document.getElementById('speed');
+        const speedLabel = document.getElementById('speedLabel');
+
+        // Initialize the module
+        async function init() {
+            try {
+                log('Loading WebAssembly module...');
+                Module = await createSopotModule();
+                log('Module loaded successfully!', 'success');
+                setStatus('Ready to initialize simulation', 'success');
+                btnInit.disabled = false;
+            } catch (error) {
+                log(`Failed to load module: ${error}`, 'error');
+                setStatus('Failed to load WebAssembly module', 'error');
+            }
+        }
+
+        // Initialize the simulator
+        btnInit.addEventListener('click', () => {
+            try {
+                log('Creating simulator instance...');
+                simulator = new Module.RocketSimulator();
+
+                const elevation = parseFloat(document.getElementById('elevation').value);
+                const azimuth = parseFloat(document.getElementById('azimuth').value);
+                const diameter = parseFloat(document.getElementById('diameter').value);
+                const timestep = parseFloat(document.getElementById('timestep').value);
+                const dataPath = document.getElementById('dataPath').value;
+
+                log(`Configuration: elevation=${elevation}°, azimuth=${azimuth}°, diameter=${diameter}m`);
+
+                simulator.setLauncher(elevation, azimuth);
+                simulator.setDiameter(diameter);
+                simulator.setTimestep(timestep);
+
+                log('Loading data files...');
+                log('NOTE: File loading requires data files to be served via HTTP');
+                log('For this prototype, using placeholder data');
+
+                // In a real implementation, we'd load CSV data here
+                // For now, we'll just setup without external data
+                log('Setting up simulation system...');
+                simulator.setup();
+
+                log(`State dimension: ${simulator.getStateDimension()}`, 'success');
+                log('Simulation initialized successfully!', 'success');
+
+                setStatus('Simulation ready', 'success');
+                btnStep.disabled = false;
+                btnRun.disabled = false;
+                btnReset.disabled = false;
+
+                updateTelemetry();
+            } catch (error) {
+                log(`Initialization failed: ${error}`, 'error');
+                setStatus('Initialization failed', 'error');
+            }
+        });
+
+        // Single step
+        btnStep.addEventListener('click', () => {
+            if (!simulator) return;
+            try {
+                const shouldContinue = simulator.step();
+                updateTelemetry();
+
+                if (!shouldContinue) {
+                    log('Simulation complete (rocket landed)', 'success');
+                    setStatus('Simulation complete', 'success');
+                }
+            } catch (error) {
+                log(`Step failed: ${error}`, 'error');
+            }
+        });
+
+        // Run simulation
+        btnRun.addEventListener('click', () => {
+            if (!simulator || isRunning) return;
+
+            isRunning = true;
+            btnRun.disabled = true;
+            btnPause.disabled = false;
+            btnStep.disabled = true;
+            setStatus('Running simulation...', 'info');
+            statusEl.classList.add('running');
+
+            lastFrameTime = performance.now();
+            animate();
+        });
+
+        // Pause simulation
+        btnPause.addEventListener('click', () => {
+            isRunning = false;
+            btnRun.disabled = false;
+            btnPause.disabled = true;
+            btnStep.disabled = false;
+            setStatus('Simulation paused', 'info');
+            statusEl.classList.remove('running');
+
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        });
+
+        // Reset simulation
+        btnReset.addEventListener('click', () => {
+            if (!simulator) return;
+
+            try {
+                isRunning = false;
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+
+                simulator.reset();
+                updateTelemetry();
+
+                log('Simulation reset', 'success');
+                setStatus('Simulation reset', 'success');
+                statusEl.classList.remove('running');
+
+                btnRun.disabled = false;
+                btnPause.disabled = true;
+                btnStep.disabled = false;
+            } catch (error) {
+                log(`Reset failed: ${error}`, 'error');
+            }
+        });
+
+        // Speed slider
+        speedSlider.addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            speedLabel.textContent = `${speed.toFixed(1)}x`;
+        });
+
+        // Animation loop
+        function animate() {
+            if (!isRunning) return;
+
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastFrameTime) / 1000; // Convert to seconds
+            lastFrameTime = currentTime;
+
+            const playbackSpeed = parseFloat(speedSlider.value);
+            const stepsToRun = Math.max(1, Math.floor(playbackSpeed));
+
+            try {
+                for (let i = 0; i < stepsToRun; i++) {
+                    const shouldContinue = simulator.step();
+
+                    if (!shouldContinue) {
+                        isRunning = false;
+                        btnRun.disabled = false;
+                        btnPause.disabled = true;
+                        btnStep.disabled = false;
+                        setStatus('Simulation complete (rocket landed)', 'success');
+                        statusEl.classList.remove('running');
+                        log(`Flight completed at t=${simulator.getTime().toFixed(2)}s`, 'success');
+                        return;
+                    }
+                }
+
+                updateTelemetry();
+            } catch (error) {
+                log(`Simulation error: ${error}`, 'error');
+                isRunning = false;
+                return;
+            }
+
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // Update telemetry display
+        function updateTelemetry() {
+            if (!simulator || !simulator.isInitialized()) return;
+
+            try {
+                document.getElementById('time').textContent = simulator.getTime().toFixed(2);
+                document.getElementById('altitude').textContent = simulator.getAltitude().toFixed(1);
+                document.getElementById('speed-value').textContent = simulator.getSpeed().toFixed(1);
+                document.getElementById('mass').textContent = simulator.getMass().toFixed(2);
+            } catch (error) {
+                console.error('Telemetry update error:', error);
+            }
+        }
+
+        // Logging functions
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function setStatus(message, type = 'info') {
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Start initialization
+        init();
+    </script>
+</body>
+</html>
