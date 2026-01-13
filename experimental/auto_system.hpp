@@ -99,33 +99,7 @@ public:
         std::cout << std::endl;
 
         // Dependencies for each component
-        [&]<size_t... Is>(std::index_sequence<Is...>) {
-            ([&] {
-                using Comp = nth_type_t<Is, Components...>;
-                std::cout << "Component [" << Is << "]:" << std::endl;
-                std::cout << "  StateSize: " << Comp::StateSize << std::endl;
-
-                if constexpr (HasDependencies<Comp>) {
-                    auto deps = getDependencyNames<Comp>();
-                    std::cout << "  Dependencies: ";
-                    for (size_t i = 0; i < deps.size(); ++i) {
-                        std::cout << deps[i];
-                        if (i < deps.size() - 1) std::cout << ", ";
-                    }
-                    std::cout << std::endl;
-                }
-
-                if constexpr (HasProvisions<Comp>) {
-                    auto provs = getProvisionNames<Comp>();
-                    std::cout << "  Provisions: ";
-                    for (size_t i = 0; i < provs.size(); ++i) {
-                        std::cout << provs[i];
-                        if (i < provs.size() - 1) std::cout << ", ";
-                    }
-                    std::cout << std::endl;
-                }
-            }(), ...);
-        }(std::make_index_sequence<NumComponents>{});
+        printComponentInfoImpl<0>();
 
         std::cout << std::endl;
         printDependencyGraph();
@@ -137,37 +111,85 @@ private:
     std::array<size_t, NumComponents> m_execOrder;
     bool m_hasCycle;
 
+    // Helper: Print component info recursively
+    template<size_t I>
+    void printComponentInfoImpl() const {
+        if constexpr (I < NumComponents) {
+            using Comp = nth_type_t<I, Components...>;
+            std::cout << "Component [" << I << "]:" << std::endl;
+            std::cout << "  StateSize: " << Comp::StateSize << std::endl;
+
+            if constexpr (HasDependencies<Comp>) {
+                auto deps = getDependencyNames<Comp>();
+                std::cout << "  Dependencies: ";
+                for (size_t i = 0; i < deps.size(); ++i) {
+                    std::cout << deps[i];
+                    if (i < deps.size() - 1) std::cout << ", ";
+                }
+                std::cout << std::endl;
+            }
+
+            if constexpr (HasProvisions<Comp>) {
+                auto provs = getProvisionNames<Comp>();
+                std::cout << "  Provisions: ";
+                for (size_t i = 0; i < provs.size(); ++i) {
+                    std::cout << provs[i];
+                    if (i < provs.size() - 1) std::cout << ", ";
+                }
+                std::cout << std::endl;
+            }
+
+            printComponentInfoImpl<I + 1>();
+        }
+    }
+
+    // Helper: Populate cache for component I
+    template<size_t I>
+    void populateCacheForComponent(
+        const std::array<T, TotalStateSize>& state,
+        std::map<std::string, T>& cache,
+        size_t& offset
+    ) const {
+        using Comp = nth_type_t<I, Components...>;
+
+        if constexpr (Comp::StateSize > 0) {
+            if constexpr (Comp::StateSize == 1) {
+                // Single-valued state
+                T value = state[offset];
+
+                // Add provisions based on state
+                if constexpr (HasProvisions<Comp>) {
+                    auto provs = getProvisionNames<Comp>();
+                    if (provs.size() > 0) {
+                        cache[std::string(provs[0])] = value;
+                    }
+                }
+            }
+            // Increment offset for ALL stateful components
+            offset += Comp::StateSize;
+        }
+    }
+
+    // Helper: Process all components recursively
+    template<size_t I = 0>
+    void populateCacheImpl(
+        const std::array<T, TotalStateSize>& state,
+        std::map<std::string, T>& cache,
+        size_t& offset
+    ) const {
+        if constexpr (I < NumComponents) {
+            populateCacheForComponent<I>(state, cache, offset);
+            populateCacheImpl<I + 1>(state, cache, offset);
+        }
+    }
+
     // Populate cache with state-based provisions
     void populateCacheFromState(
         const std::array<T, TotalStateSize>& state,
         std::map<std::string, T>& cache
     ) const {
-        // For each stateful component, extract its state value
-        // and add provisions to cache
-
         size_t offset = 0;
-        [&]<size_t... Is>(std::index_sequence<Is...>) {
-            ([&] {
-                using Comp = nth_type_t<Is, Components...>;
-
-                if constexpr (Comp::StateSize > 0) {
-                    if constexpr (Comp::StateSize == 1) {
-                        // Single-valued state
-                        T value = state[offset];
-
-                        // Add provisions based on state
-                        if constexpr (HasProvisions<Comp>) {
-                            auto provs = getProvisionNames<Comp>();
-                            if (provs.size() > 0) {
-                                cache[std::string(provs[0])] = value;
-                            }
-                        }
-                    }
-                    // Increment offset for ALL stateful components
-                    offset += Comp::StateSize;
-                }
-            }(), ...);
-        }(std::make_index_sequence<NumComponents>{});
+        populateCacheImpl(state, cache, offset);
     }
 
     // Execute components in topological order
@@ -276,6 +298,24 @@ private:
         ((cache[std::string(provNames[Is])] = provs.template get<Is>().value), ...);
     }
 
+    // Helper: Execute component recursively
+    template<size_t I = 0>
+    void executeComponentImpl(
+        size_t compIdx,
+        T t,
+        const std::array<T, TotalStateSize>& state,
+        std::map<std::string, T>& cache,
+        std::array<T, TotalStateSize>& derivatives
+    ) const {
+        if constexpr (I < NumComponents) {
+            if (compIdx == I) {
+                executeComponentTyped<I>(t, state, cache, derivatives);
+            } else {
+                executeComponentImpl<I + 1>(compIdx, t, state, cache, derivatives);
+            }
+        }
+    }
+
     // Runtime dispatch to compile-time execution
     void executeComponent(
         size_t compIdx,
@@ -284,13 +324,7 @@ private:
         std::map<std::string, T>& cache,
         std::array<T, TotalStateSize>& derivatives
     ) const {
-        [&]<size_t... Is>(std::index_sequence<Is...>) {
-            ([&] {
-                if (compIdx == Is) {
-                    executeComponentTyped<Is>(t, state, cache, derivatives);
-                }
-            }(), ...);
-        }(std::make_index_sequence<NumComponents>{});
+        executeComponentImpl(compIdx, t, state, cache, derivatives);
     }
 };
 
