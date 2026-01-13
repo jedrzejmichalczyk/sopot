@@ -31,7 +31,7 @@ constexpr TopologicalSortResult<N> topologicalSort(
     for (size_t j = 0; j < N; ++j) {
         for (size_t i = 0; i < N; ++i) {
             if (adj[i][j]) {
-                inDegree[i]++;
+                inDegree[j]++;  // Edge from i to j means j has incoming edge
             }
         }
     }
@@ -49,7 +49,7 @@ constexpr TopologicalSortResult<N> topologicalSort(
 
                 // Decrease in-degree of dependent nodes
                 for (size_t j = 0; j < N; ++j) {
-                    if (adj[j][i]) {
+                    if (adj[i][j]) {  // Edge from i to j, so decrement j's in-degree
                         inDegree[j]--;
                     }
                 }

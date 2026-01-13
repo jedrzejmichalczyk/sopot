@@ -124,7 +124,10 @@ private:
                 if constexpr (I + 1 < sizeof...(Fields)) {
                     return finder.template operator()<I + 1>();
                 } else {
-                    static_assert(I < sizeof...(Fields), "Field not found in bundle");
+                    // Use a dependent false to trigger compile error with better message
+                    []<bool flag = false>() {
+                        static_assert(flag, "Field not found in bundle - check Tag and Name");
+                    }();
                 }
             }
         };
@@ -143,7 +146,10 @@ private:
                 if constexpr (I + 1 < sizeof...(Fields)) {
                     return finder.template operator()<I + 1>();
                 } else {
-                    static_assert(I < sizeof...(Fields), "Field not found in bundle");
+                    // Use a dependent false to trigger compile error with better message
+                    []<bool flag = false>() {
+                        static_assert(flag, "Field not found in bundle - check Tag and Name");
+                    }();
                 }
             }
         };

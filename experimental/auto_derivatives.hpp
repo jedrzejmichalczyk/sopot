@@ -79,6 +79,8 @@ public:
 
 private:
     // Step 1: Add state-derived provisions to cache
+    // NOTE: Placeholder implementation - does not populate cache yet
+    // TODO: Use reflection/introspection to automatically extract provisions from state
     void populateCacheFromState(
         const std::array<T, totalStateSize()>& state,
         ProvisionCache<T>& cache
@@ -91,35 +93,38 @@ private:
                     // Stateful component - extract local state
                     auto local = Base::template extractLocalState<Is>(state);
 
-                    // If component provides based on state, add to cache
-                    // For now, we'll handle this manually per component type
-                    // In full implementation, we'd use reflection/introspection
+                    // TODO: If component provides based on state, add to cache
+                    // TODO: Implement automatic provision extraction
                 }
             }(), ...);
         }(std::make_index_sequence<NumComponents>{});
     }
 
     // Step 2: Execute stateless components to populate provisions
+    // NOTE: Placeholder implementation - does not execute components yet
+    // TODO: Use topological sort to determine execution order
+    // TODO: Automatically execute stateless components with dependency injection
     void executeStatelessComponents(
         T t,
         const std::array<T, totalStateSize()>& state,
         ProvisionCache<T>& cache
     ) const {
-        // For now, manual execution order
-        // In full implementation, use topological sort
+        // TODO: Implement automatic execution order using topological sort
 
-        (void)t;
-        (void)state;
-        (void)cache;
+        (void)t;      // Suppress unused parameter warning
+        (void)state;  // Suppress unused parameter warning
+        (void)cache;  // Suppress unused parameter warning
 
-        // Example: Execute in order
+        // Example execution order (not implemented):
         // Component 4: ConstantForce -> provides "force"
         // Component 1: ConstantMass -> provides "mass"
         // Component 2: NewtonSecondLaw -> uses force, mass -> provides "accel"
-        // etc.
     }
 
     // Step 3: Compute derivatives for stateful components
+    // NOTE: Placeholder implementation - does not compute derivatives yet
+    // TODO: Implement automatic dependency injection from cache
+    // TODO: Automatically call component derivative computation methods
     void computeStatefulDerivatives(
         T t,
         const std::array<T, totalStateSize()>& state,
@@ -137,13 +142,11 @@ private:
                     auto local = Base::template extractLocalState<Is>(state);
                     const auto& comp = std::get<Is>(components);
 
-                    // Get dependencies from cache
-                    // For now, manual - will be automatic in full implementation
-
-                    // Compute derivative
+                    // TODO: Get dependencies from cache automatically
+                    // TODO: Inject dependencies and compute derivative:
                     // auto deriv = comp.computeDerivative(t, local, ...deps...);
 
-                    // Store in derivatives array
+                    // TODO: Store in derivatives array:
                     // derivatives[offset] = deriv;
 
                     offset += Comp::StateSize;
@@ -151,9 +154,9 @@ private:
             }(), ...);
         }(std::make_index_sequence<NumComponents>{});
 
-        (void)t;
-        (void)state;
-        (void)cache;
+        (void)t;      // Suppress unused parameter warning
+        (void)state;  // Suppress unused parameter warning
+        (void)cache;  // Suppress unused parameter warning
     }
 };
 

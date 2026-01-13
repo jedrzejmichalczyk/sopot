@@ -105,14 +105,16 @@ public:
     }
 
 private:
+    // NOTE: Placeholder method - not yet implemented
+    // TODO: Implement dependency extraction and adjacency matrix population
     template<size_t I, typename Comp, typename Dependencies = typename Comp::Dependencies>
     static constexpr void checkDependencies(
         std::array<std::array<bool, NumComponents>, NumComponents>& adj
     ) {
-        // Extract fields from Dependencies bundle
-        // For now, we'll handle this in the System class
-        // This is a placeholder for the full implementation
-        (void)adj;
+        // TODO: Extract fields from Dependencies bundle
+        // TODO: Build adjacency matrix based on component dependencies
+        // Currently handled in DependencyGraphBuilder in field_reflection.hpp
+        (void)adj;  // Suppress unused parameter warning
     }
 };
 

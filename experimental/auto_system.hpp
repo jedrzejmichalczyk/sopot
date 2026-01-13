@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include <stdexcept>
 
 namespace sopot::experimental {
 
@@ -29,24 +30,21 @@ public:
         // Build dependency graph at construction
         m_graph = DependencyGraphBuilder<Components...>::buildGraph();
 
+        // Compile-time cycle detection
+        constexpr auto graph = DependencyGraphBuilder<Components...>::buildGraph();
+        constexpr auto sortResult = topologicalSort<NumComponents>(graph);
+        static_assert(!sortResult.hasCycle,
+            "Circular dependency detected in component graph! Check component dependencies.");
+
         // Compute execution order via topological sort
         m_execOrder = getExecutionOrder<NumComponents>(m_graph);
-
-        // Check for cycles
-        auto sortResult = topologicalSort<NumComponents>(m_graph);
-        if (sortResult.hasCycle) {
-            std::cerr << "ERROR: Circular dependency detected!" << std::endl;
-            m_hasCycle = true;
-        } else {
-            m_hasCycle = false;
-        }
+        m_hasCycle = false;
     }
 
     // Main function: Compute all derivatives AUTOMATICALLY!
     auto computeDerivatives(T t, const std::array<T, TotalStateSize>& state) const {
         if (m_hasCycle) {
-            std::cerr << "Cannot compute derivatives: circular dependency!" << std::endl;
-            return std::array<T, TotalStateSize>{};
+            throw std::runtime_error("Cannot compute derivatives: circular dependency detected!");
         }
 
         std::array<T, TotalStateSize> derivatives{};
@@ -186,6 +184,8 @@ private:
     }
 
     // Execute a single component
+    // NOTE: This is an experimental placeholder implementation
+    // TODO: Implement full dependency injection and automatic derivative computation
     template<size_t I>
     void executeComponentTyped(
         T t,
@@ -201,26 +201,23 @@ private:
             auto depNames = getDependencyNames<Comp>();
             auto provNames = getProvisionNames<Comp>();
 
-            // For simple cases, manually inject dependencies
-            // Full implementation would use variadic template magic
+            // TODO: Implement dependency injection using variadic template magic
             if constexpr (depNames.size() == 0) {
                 // No dependencies - just compute
-                // This is a placeholder for actual computation
-                // Real implementation would call comp.compute() appropriately
+                // TODO: Call comp.compute() with appropriate arguments
             }
         } else {
             // Stateful component - compute derivative
             auto local = this->template extractLocalState<I>(state);
             auto depNames = getDependencyNames<Comp>();
 
-            // Get dependencies from cache and compute derivative
-            // This is simplified - full version needs proper dependency injection
+            // TODO: Get dependencies from cache and compute derivative with proper injection
 
             constexpr size_t offset = Base::template computeStateOffset<I>();
 
-            // For now, return zero derivative as placeholder
+            // PLACEHOLDER: Returns zero derivative - not implemented yet
             if constexpr (Comp::StateSize == 1) {
-                derivatives[offset] = T{};
+                derivatives[offset] = T{};  // Placeholder zero derivative
             }
         }
     }

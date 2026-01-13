@@ -1,6 +1,7 @@
 #pragma once
 
 #include "field_based_component_simple.hpp"
+#include "system_builder.hpp"
 #include <string_view>
 #include <array>
 
@@ -105,8 +106,8 @@ public:
                 auto depNames = getDependencyNames<Comp>();
 
                 for (auto name : depNames) {
-                    if (findProvider(name) == NotFound ||
-                        findProvider(name) == NotFound - 1) {
+                    size_t provider = findProvider(name);
+                    if (provider == NotFound || provider == NotFound - 1) {
                         satisfied = false;
                     }
                 }
