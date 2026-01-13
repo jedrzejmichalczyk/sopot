@@ -212,30 +212,30 @@ public:
 
     val getPosition() const {
         auto pos = m_rocket.getPosition(m_state);
-        return val::object(val::object{
-            {"x", pos.x},
-            {"y", pos.y},
-            {"z", pos.z}
-        });
+        val result = val::object();
+        result.set("x", pos.x);
+        result.set("y", pos.y);
+        result.set("z", pos.z);
+        return result;
     }
 
     val getVelocity() const {
         auto vel = m_rocket.getVelocity(m_state);
-        return val::object{
-            {"x", vel.x},
-            {"y", vel.y},
-            {"z", vel.z}
-        };
+        val result = val::object();
+        result.set("x", vel.x);
+        result.set("y", vel.y);
+        result.set("z", vel.z);
+        return result;
     }
 
     val getQuaternion() const {
         auto q = m_rocket.getQuaternion(m_state);
-        return val::object{
-            {"q1", q.q1},
-            {"q2", q.q2},
-            {"q3", q.q3},
-            {"q4", q.q4}
-        };
+        val result = val::object();
+        result.set("q1", q.q1);
+        result.set("q2", q.q2);
+        result.set("q3", q.q3);
+        result.set("q4", q.q4);
+        return result;
     }
 
 private:

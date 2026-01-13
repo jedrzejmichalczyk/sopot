@@ -11,9 +11,11 @@
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
+#include <emscripten/emscripten.h>
 #include "../rocket/rocket.hpp"
 #include <memory>
 #include <string>
+#include <stdexcept>
 
 using namespace emscripten;
 using namespace sopot;
@@ -107,10 +109,13 @@ public:
      * @param mass Array of mass values [kg]
      */
     void loadMassData(const val& time_js, const val& mass_js) {
-        // For now, we'll use file-based loading
-        // In a full implementation, we'd adapt the components to accept vectors
-        // This is a placeholder - full implementation in Phase 2
-        emscripten_log(EM_LOG_WARN, "loadMassData: Using placeholder - full implementation needed");
+        // TODO: Phase 2 - Implement array-based data loading
+        // Need to adapt RocketBody component to accept std::vector instead of file paths
+        throw std::runtime_error(
+            "loadMassData() is not yet implemented. "
+            "Please use loadMassDataFromPath() for Phase 1 prototype, "
+            "or wait for Phase 2 array-based API."
+        );
     }
 
     /**
@@ -119,7 +124,13 @@ public:
      * @param thrust Array of thrust values [N]
      */
     void loadEngineData(const val& time_js, const val& thrust_js) {
-        emscripten_log(EM_LOG_WARN, "loadEngineData: Using placeholder - full implementation needed");
+        // TODO: Phase 2 - Implement array-based data loading
+        // Need to adapt InterpolatedEngine component to accept std::vector instead of file paths
+        throw std::runtime_error(
+            "loadEngineData() is not yet implemented. "
+            "Please use loadEngineDataFromPath() for Phase 1 prototype, "
+            "or wait for Phase 2 array-based API."
+        );
     }
 
     /**

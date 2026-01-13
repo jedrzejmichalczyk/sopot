@@ -27,7 +27,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     -s WASM=1
     -s ALLOW_MEMORY_GROWTH=1
     -s MODULARIZE=1
-    -s EXPORT_NAME=createSopotModule
+    -s EXPORT_NAME="createSopotModule"
     -s EXPORT_ES6=1
     -s ENVIRONMENT=web,worker
     -s NO_DISABLE_EXCEPTION_CATCHING

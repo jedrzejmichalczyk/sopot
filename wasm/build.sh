@@ -29,6 +29,25 @@ fi
 echo -e "${GREEN}Emscripten version:${NC}"
 emcc --version | head -n 1
 
+# Check Emscripten version for C++20 support (requires 3.1.0+)
+EMCC_VERSION=$(emcc --version | head -n 1 | grep -oP '\d+\.\d+\.\d+' | head -n 1)
+REQUIRED_VERSION="3.1.0"
+
+if [ -n "$EMCC_VERSION" ]; then
+    # Compare versions (requires sort -V)
+    if printf '%s\n' "$REQUIRED_VERSION" "$EMCC_VERSION" | sort -V -C 2>/dev/null; then
+        echo -e "${GREEN}Version check passed (>= ${REQUIRED_VERSION})${NC}"
+    else
+        echo -e "${YELLOW}Warning: Emscripten ${EMCC_VERSION} detected${NC}"
+        echo -e "${YELLOW}C++20 features require Emscripten ${REQUIRED_VERSION} or later${NC}"
+        echo -e "${YELLOW}Build may fail if version is too old. Consider upgrading.${NC}"
+        echo ""
+    fi
+else
+    echo -e "${YELLOW}Warning: Could not detect Emscripten version${NC}"
+    echo ""
+fi
+
 # Build mode (default: Release)
 BUILD_MODE="${1:-Release}"
 

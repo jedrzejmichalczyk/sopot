@@ -382,11 +382,26 @@
                 log('Creating simulator instance...');
                 simulator = new Module.RocketSimulator();
 
+                // Parse and validate configuration parameters
                 const elevation = parseFloat(document.getElementById('elevation').value);
                 const azimuth = parseFloat(document.getElementById('azimuth').value);
                 const diameter = parseFloat(document.getElementById('diameter').value);
                 const timestep = parseFloat(document.getElementById('timestep').value);
                 const dataPath = document.getElementById('dataPath').value;
+
+                // Input validation
+                if (isNaN(elevation) || elevation < 0 || elevation > 90) {
+                    throw new Error(`Invalid elevation angle: ${elevation}° (must be 0-90°)`);
+                }
+                if (isNaN(azimuth) || azimuth < 0 || azimuth > 360) {
+                    throw new Error(`Invalid azimuth angle: ${azimuth}° (must be 0-360°)`);
+                }
+                if (isNaN(diameter) || diameter <= 0 || diameter > 10) {
+                    throw new Error(`Invalid diameter: ${diameter}m (must be 0.01-10m)`);
+                }
+                if (isNaN(timestep) || timestep <= 0 || timestep > 1) {
+                    throw new Error(`Invalid timestep: ${timestep}s (must be 0.001-1s)`);
+                }
 
                 log(`Configuration: elevation=${elevation}°, azimuth=${azimuth}°, diameter=${diameter}m`);
 
@@ -413,8 +428,10 @@
 
                 updateTelemetry();
             } catch (error) {
-                log(`Initialization failed: ${error}`, 'error');
-                setStatus('Initialization failed', 'error');
+                const errorMsg = `Simulation initialization failed: ${error.message || error}`;
+                log(errorMsg, 'error');
+                setStatus('Initialization failed - check console for details', 'error');
+                console.error('Detailed error:', error);
             }
         });
 

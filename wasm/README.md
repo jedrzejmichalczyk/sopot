@@ -283,7 +283,7 @@ void loadDampingDataFromPath(const std::string& path)
 
 Load simulation data from CSV files. Path should end with `/`.
 
-**Note**: These methods require the browser to have file system access (via http server). In Phase 2, we'll add JavaScript array-based loading.
+**Note**: These methods require files to be served via an HTTP server, as browsers restrict local file access via the `file://` protocol for security reasons. The WebAssembly module can only load files that are accessible through HTTP/HTTPS. In Phase 2, we'll add JavaScript array-based loading that doesn't require file I/O.
 
 #### Initialization
 
