@@ -116,7 +116,6 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
   const animate = useCallback((currentTime: number) => {
     if (!simulator || !isRunning) return;
 
-    const deltaTime = (currentTime - lastFrameTimeRef.current) / 1000;
     lastFrameTimeRef.current = currentTime;
 
     try {

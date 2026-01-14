@@ -1,6 +1,6 @@
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Grid, Line, Sphere, Cone, Cylinder } from '@react-three/drei';
+import { OrbitControls, Grid, Line, Cone, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
 import type { SimulationState } from '../types/sopot';
 

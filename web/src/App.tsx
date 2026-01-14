@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { RocketVisualization3D } from './components/RocketVisualization3D';
 import { TelemetryPanel } from './components/TelemetryPanel';
