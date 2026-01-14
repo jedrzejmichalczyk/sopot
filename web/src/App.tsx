@@ -3,13 +3,16 @@ import * as THREE from 'three';
 import { RocketVisualization3D } from './components/RocketVisualization3D';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { ControlPanel } from './components/ControlPanel';
+import { PlotPanel } from './components/PlotPanel';
 import { useRocketSimulation } from './hooks/useRocketSimulation';
+import type { TimeSeriesData } from './types/sopot';
 
 function App() {
   const simulation = useRocketSimulation();
   const [trajectoryHistory, setTrajectoryHistory] = useState<
     Array<{ position: THREE.Vector3; time: number }>
   >([]);
+  const [timeSeries, setTimeSeries] = useState<TimeSeriesData | null>(null);
 
   // Track trajectory history
   useEffect(() => {
@@ -48,61 +51,97 @@ function App() {
     }
   }, [simulation.currentState, trajectoryHistory.length]);
 
+  // Fetch time-series data periodically when simulation is running
+  useEffect(() => {
+    if (!simulation.isRunning || !simulation.simulator) return;
+
+    const interval = setInterval(() => {
+      try {
+        const data = simulation.simulator!.getTimeSeries();
+        setTimeSeries(data);
+      } catch (error) {
+        console.error('Error fetching time series:', error);
+      }
+    }, 500); // Update plots every 500ms
+
+    return () => clearInterval(interval);
+  }, [simulation.isRunning, simulation.simulator]);
+
+  // Get final time-series data when simulation pauses or stops
+  useEffect(() => {
+    if (!simulation.isRunning && simulation.simulator && simulation.isInitialized) {
+      try {
+        const data = simulation.simulator.getTimeSeries();
+        setTimeSeries(data);
+      } catch (error) {
+        console.error('Error fetching time series:', error);
+      }
+    }
+  }, [simulation.isRunning, simulation.simulator, simulation.isInitialized]);
+
   return (
     <div style={styles.container}>
-      {/* Left Panel: Controls */}
-      <div style={styles.leftPanel}>
-        <ControlPanel
-          isReady={simulation.isReady}
-          isInitialized={simulation.isInitialized}
-          isRunning={simulation.isRunning}
-          error={simulation.error}
-          playbackSpeed={simulation.playbackSpeed}
-          onInitialize={simulation.initialize}
-          onStart={simulation.start}
-          onPause={simulation.pause}
-          onReset={simulation.reset}
-          onStep={simulation.step}
-          onPlaybackSpeedChange={simulation.setPlaybackSpeed}
-        />
-      </div>
-
-      {/* Center Panel: 3D Visualization */}
-      <div style={styles.centerPanel}>
-        {simulation.isInitialized ? (
-          <RocketVisualization3D
-            state={simulation.currentState}
-            trajectoryHistory={trajectoryHistory}
+      {/* Top section: 3-column layout */}
+      <div style={styles.topSection}>
+        {/* Left Panel: Controls */}
+        <div style={styles.leftPanel}>
+          <ControlPanel
+            isReady={simulation.isReady}
+            isInitialized={simulation.isInitialized}
+            isRunning={simulation.isRunning}
+            error={simulation.error}
+            playbackSpeed={simulation.playbackSpeed}
+            onInitialize={simulation.initialize}
+            onStart={simulation.start}
+            onPause={simulation.pause}
+            onReset={simulation.reset}
+            onStep={simulation.step}
+            onPlaybackSpeedChange={simulation.setPlaybackSpeed}
           />
-        ) : (
-          <div style={styles.placeholder}>
-            <div style={styles.placeholderContent}>
-              <h1 style={styles.placeholderTitle}>
-                🚀 SOPOT Rocket Simulation
-              </h1>
-              <p style={styles.placeholderText}>
-                C++20 Physics Simulation compiled to WebAssembly
-              </p>
-              <p style={styles.placeholderText}>
-                Initialize the simulation to begin
-              </p>
-              {!simulation.isReady && (
-                <div style={styles.loadingIndicator}>
-                  <div style={styles.spinner} />
-                  <p style={styles.loadingText}>Loading WebAssembly module...</p>
-                </div>
-              )}
+        </div>
+
+        {/* Center Panel: 3D Visualization */}
+        <div style={styles.centerPanel}>
+          {simulation.isInitialized ? (
+            <RocketVisualization3D
+              state={simulation.currentState}
+              trajectoryHistory={trajectoryHistory}
+            />
+          ) : (
+            <div style={styles.placeholder}>
+              <div style={styles.placeholderContent}>
+                <h1 style={styles.placeholderTitle}>
+                  🚀 SOPOT Rocket Simulation
+                </h1>
+                <p style={styles.placeholderText}>
+                  C++20 Physics Simulation compiled to WebAssembly
+                </p>
+                <p style={styles.placeholderText}>
+                  Initialize the simulation to begin
+                </p>
+                {!simulation.isReady && (
+                  <div style={styles.loadingIndicator}>
+                    <div style={styles.spinner} />
+                    <p style={styles.loadingText}>Loading WebAssembly module...</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Right Panel: Telemetry */}
+        <div style={styles.rightPanel}>
+          <TelemetryPanel
+            state={simulation.currentState}
+            isRunning={simulation.isRunning}
+          />
+        </div>
       </div>
 
-      {/* Right Panel: Telemetry */}
-      <div style={styles.rightPanel}>
-        <TelemetryPanel
-          state={simulation.currentState}
-          isRunning={simulation.isRunning}
-        />
+      {/* Bottom section: Plotting panel */}
+      <div style={styles.bottomSection}>
+        <PlotPanel timeSeries={timeSeries} />
       </div>
     </div>
   );
@@ -111,9 +150,20 @@ function App() {
 const styles = {
   container: {
     display: 'flex',
+    flexDirection: 'column' as const,
     width: '100vw',
     height: '100vh',
     backgroundColor: '#1a1a1a',
+  },
+  topSection: {
+    display: 'flex',
+    flex: 1,
+    minHeight: 0,
+  },
+  bottomSection: {
+    height: '300px',
+    minHeight: '200px',
+    maxHeight: '400px',
   },
   leftPanel: {
     width: '320px',

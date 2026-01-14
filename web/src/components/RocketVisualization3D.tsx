@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Line, Cone, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
@@ -10,10 +10,34 @@ interface RocketVisualization3DProps {
 }
 
 /**
- * Rocket mesh component with proper orientation
+ * Rocket mesh component with proper orientation - moves as one cohesive piece
  */
 function RocketMesh({ state }: { state: SimulationState | null }) {
   const groupRef = useRef<THREE.Group>(null);
+  const velocityArrowRef = useRef<THREE.ArrowHelper | null>(null);
+
+  // Create arrow helper once using useEffect to prevent memory leaks
+  useEffect(() => {
+    if (!velocityArrowRef.current) {
+      velocityArrowRef.current = new THREE.ArrowHelper(
+        new THREE.Vector3(1, 0, 0), // Initial direction
+        new THREE.Vector3(0, 0, 0), // Origin
+        1, // Initial length
+        0x00ff00, // Green color
+        0.3, // Head length
+        0.15 // Head width
+      );
+      velocityArrowRef.current.visible = false;
+    }
+
+    // Cleanup arrow on unmount
+    return () => {
+      if (velocityArrowRef.current) {
+        velocityArrowRef.current.dispose?.();
+        velocityArrowRef.current = null;
+      }
+    };
+  }, []);
 
   useFrame(() => {
     if (!groupRef.current || !state) return;
@@ -29,16 +53,33 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
     // SOPOT quaternion is body to ENU, Three.js expects x=right, y=up, z=back
     const q = state.quaternion;
     groupRef.current.quaternion.set(q.q2, q.q4, -q.q3, q.q1);
+
+    // Update velocity arrow direction and length
+    if (velocityArrowRef.current && state.speed > 0.1) {
+      // Velocity in ENU frame, convert to Three.js frame
+      const velDirection = new THREE.Vector3(
+        state.velocity.x,
+        state.velocity.z,
+        -state.velocity.y
+      ).normalize();
+
+      const arrowLength = Math.min(state.speed * 0.05, 5);
+      velocityArrowRef.current.setDirection(velDirection);
+      velocityArrowRef.current.setLength(arrowLength, 0.3, 0.15);
+      velocityArrowRef.current.visible = true;
+    } else if (velocityArrowRef.current) {
+      velocityArrowRef.current.visible = false;
+    }
   });
 
   return (
     <group ref={groupRef}>
-      {/* Rocket body */}
+      {/* Rocket body - metallic red cylinder */}
       <Cylinder args={[0.08, 0.08, 1.0, 16]} rotation={[Math.PI / 2, 0, 0]}>
         <meshStandardMaterial color="#cc0000" metalness={0.7} roughness={0.3} />
       </Cylinder>
 
-      {/* Nose cone */}
+      {/* Nose cone - white tip */}
       <Cone
         args={[0.08, 0.25, 16]}
         position={[0.625, 0, 0]}
@@ -47,7 +88,7 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
         <meshStandardMaterial color="#ffffff" metalness={0.5} roughness={0.5} />
       </Cone>
 
-      {/* Fins (4 fins) */}
+      {/* Fins (4 fins at 90° intervals) */}
       {[0, 90, 180, 270].map((angle, i) => {
         const rad = (angle * Math.PI) / 180;
         return (
@@ -62,19 +103,8 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
         );
       })}
 
-      {/* Velocity vector */}
-      {state && state.speed > 0.1 && (
-        <arrowHelper
-          args={[
-            new THREE.Vector3(1, 0, 0), // Direction (will be updated)
-            new THREE.Vector3(0, 0, 0), // Origin
-            Math.min(state.speed * 0.05, 5), // Length (scaled)
-            0x00ff00, // Color (green)
-            0.3, // Head length
-            0.15, // Head width
-          ]}
-        />
-      )}
+      {/* Velocity vector (green arrow) - positioned at rocket center */}
+      {velocityArrowRef.current && <primitive object={velocityArrowRef.current} />}
     </group>
   );
 }

@@ -25,6 +25,30 @@ export interface SimulationState {
   mass: number;
 }
 
+export interface TimeSeriesData {
+  time: number[];
+  kinematics: {
+    altitude: number[];
+    speed: number[];
+    pos_x: number[];
+    pos_y: number[];
+    pos_z: number[];
+    vel_x: number[];
+    vel_y: number[];
+    vel_z: number[];
+  };
+  dynamics: {
+    mass: number[];
+    accel_x: number[];
+    accel_y: number[];
+    accel_z: number[];
+  };
+  forces: {
+    thrust: number[];
+    gravity: number[];
+  };
+}
+
 export interface RocketSimulator {
   // Configuration
   setLauncher(elevation: number, azimuth: number): void;
@@ -64,6 +88,12 @@ export interface RocketSimulator {
   getVelocity(): Vector3;
   getQuaternion(): Quaternion;
   getFullState(): SimulationState;
+
+  // Time-series data retrieval
+  getTimeSeries(): TimeSeriesData;
+  getHistorySize(): number;
+  setRecordHistory(enable: boolean): void;
+  clearHistory(): void;
 
   // Utility
   getStateDimension(): number;
