@@ -211,16 +211,16 @@ private:
         // Guard against division by zero with minimum mass threshold
         double safe_mass = std::max(mass, MIN_MASS_THRESHOLD);
 
-        auto total_force = m_rocket.queryStateFunction<dynamics::TotalForceENU>(m_state);
+        auto total_force = m_rocket.queryStateFunction<rocket::dynamics::TotalForceENU>(m_state);
         m_history.accel_x.push_back(total_force.x / safe_mass);
         m_history.accel_y.push_back(total_force.y / safe_mass);
         m_history.accel_z.push_back(total_force.z / safe_mass);
 
         // Forces
         auto thrust = m_rocket.queryStateFunction<propulsion::ThrustForceBody>(m_state);
-        m_history.thrust_magnitude.push_back(thrust.magnitude());
+        m_history.thrust_magnitude.push_back(thrust.norm());
 
-        double g = m_rocket.queryStateFunction<dynamics::GravityAcceleration>(m_state);
+        double g = m_rocket.queryStateFunction<rocket::dynamics::GravityAcceleration>(m_state);
         m_history.gravity_magnitude.push_back(g);
     }
 
