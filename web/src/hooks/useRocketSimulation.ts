@@ -47,8 +47,11 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
     const loadModule = async () => {
       try {
         // Import the SOPOT WebAssembly module
+        // Use base URL to handle GitHub Pages deployment path
+        const basePath = import.meta.env.BASE_URL || '/';
+        const moduleUrl = `${basePath}sopot.js`;
         // @ts-ignore - Dynamic import of WebAssembly
-        const createSopotModule = await import('/sopot.js');
+        const createSopotModule = await import(/* @vite-ignore */ moduleUrl);
 
         if (!mounted) return;
 
