@@ -92,6 +92,11 @@ target_link_libraries(connected_masses_validation_test sopot_core sopot_physics)
 target_compile_features(connected_masses_validation_test PRIVATE cxx_std_20)
 add_test(NAME connected_masses_validation_test COMMAND connected_masses_validation_test)
 
+add_executable(grid_2d_test tests/grid_2d_test.cpp)
+target_link_libraries(grid_2d_test sopot_core sopot_physics)
+target_compile_features(grid_2d_test PRIVATE cxx_std_20)
+add_test(NAME grid_2d_test COMMAND grid_2d_test)
+
 # Experimental: Field-based component architecture
 add_executable(simple_reactor_demo experimental/simple_reactor_demo.cpp)
 target_include_directories(simple_reactor_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
@@ -118,7 +123,8 @@ add_custom_target(run_tests
     COMMAND rocket_flight_test
     COMMAND connected_masses_test
     COMMAND connected_masses_validation_test
-    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test
+    COMMAND grid_2d_test
+    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running SOPOT tests"
 )

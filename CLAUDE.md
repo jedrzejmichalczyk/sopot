@@ -2,7 +2,10 @@
 
 ## Project Overview
 
-SOPOT (Obviously Physics, Obviously Templates) is a C++20 compile-time physics simulation framework with zero runtime overhead, automatic differentiation, and type-safe component composition. It's designed for rocket flight simulation with LQR control design capabilities.
+SOPOT (Obviously Physics, Obviously Templates) is a C++20 compile-time physics simulation framework with zero runtime overhead, automatic differentiation, and type-safe component composition. The framework is domain-agnostic and currently supports:
+- **Rocket flight simulation** (6-DOF with aerodynamics, propulsion, atmosphere)
+- **1D mass-spring systems** (coupled oscillators, chains)
+- **2D mass-spring grids** (cloth-like simulations, membranes)
 
 ## Build Commands
 
@@ -28,6 +31,17 @@ sopot/
 │   ├── scalar.hpp           # Scalar concept, value_of()
 │   ├── state_function_tags.hpp  # Base state function tags
 │   └── solver.hpp           # RK4 integrator
+├── physics/                 # Generic physics components
+│   ├── coupled_oscillator/  # 1D mass-spring systems (2 masses)
+│   └── connected_masses/    # Arbitrary 1D/2D mass-spring networks
+│       ├── indexed_point_mass.hpp       # 1D point mass (2 states)
+│       ├── indexed_point_mass_2d.hpp    # 2D point mass (4 states)
+│       ├── indexed_spring.hpp           # 1D spring
+│       ├── indexed_spring_2d.hpp        # 2D spring with damping
+│       ├── force_aggregator_2d.hpp      # Force collection for 2D
+│       ├── grid_2d.hpp                  # 2D grid connectivity helpers
+│       ├── connectivity_matrix.hpp      # 1D system builder
+│       └── connectivity_matrix_2d.hpp   # 2D system builder
 ├── rocket/                  # Rocket simulation components
 │   ├── rocket_tags.hpp      # Rocket-specific state function tags
 │   ├── vector3.hpp          # 3D vector with autodiff support
