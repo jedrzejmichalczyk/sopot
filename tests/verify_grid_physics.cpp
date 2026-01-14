@@ -209,8 +209,8 @@ void test_energy_conservation() {
     PE_initial += 0.5 * 20.0 * ext * ext;
 
     // Spring 2-3
-    dx = state[2*4+0] - state[3*4+0];
-    dy = state[2*4+1] - state[3*4+1];
+    dx = state[3*4+0] - state[2*4+0];
+    dy = state[3*4+1] - state[2*4+1];
     ext = std::sqrt(dx*dx + dy*dy) - 1.0;
     PE_initial += 0.5 * 20.0 * ext * ext;
 
@@ -262,8 +262,8 @@ void test_energy_conservation() {
         PE += 0.5 * 20.0 * ext * ext;
 
         // Spring 2-3
-        dx = state[2*4+0] - state[3*4+0];
-        dy = state[2*4+1] - state[3*4+1];
+        dx = state[3*4+0] - state[2*4+0];
+        dy = state[3*4+1] - state[2*4+1];
         ext = std::sqrt(dx*dx + dy*dy) - 1.0;
         PE += 0.5 * 20.0 * ext * ext;
 
