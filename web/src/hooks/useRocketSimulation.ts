@@ -16,6 +16,7 @@ export interface UseRocketSimulationReturn {
   isRunning: boolean;
   currentState: SimulationState | null;
   error: string | null;
+  simulator: RocketSimulator | null;
 
   // Actions
   initialize: (config: SimulationConfig) => Promise<void>;
@@ -258,6 +259,7 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
     isRunning,
     currentState,
     error,
+    simulator,
     initialize,
     start,
     pause,

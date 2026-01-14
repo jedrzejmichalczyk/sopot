@@ -94,12 +94,57 @@ private:
     double m_dt{0.01};  // Default timestep: 10ms
     bool m_initialized{false};
     bool m_demo_mode{false};
+    bool m_record_history{true};  // Enable time-series recording
 
     // Demo mode parameters
     static constexpr double DEMO_THRUST = 1500.0;      // N (thrust force)
     static constexpr double DEMO_BURN_TIME = 3.5;      // seconds
     static constexpr double DEMO_MASS = 20.0;          // kg (initial)
     static constexpr double DEMO_MASS_FLOW = 1.5;      // kg/s
+
+    // Time-series data storage
+    struct TimeSeriesData {
+        // Time
+        std::vector<double> time;
+
+        // Kinematics
+        std::vector<double> altitude;
+        std::vector<double> speed;
+        std::vector<double> pos_x, pos_y, pos_z;
+        std::vector<double> vel_x, vel_y, vel_z;
+
+        // Dynamics
+        std::vector<double> mass;
+        std::vector<double> accel_x, accel_y, accel_z;
+
+        // Forces
+        std::vector<double> thrust_magnitude;
+        std::vector<double> gravity_magnitude;
+
+        void clear() {
+            time.clear();
+            altitude.clear(); speed.clear();
+            pos_x.clear(); pos_y.clear(); pos_z.clear();
+            vel_x.clear(); vel_y.clear(); vel_z.clear();
+            mass.clear();
+            accel_x.clear(); accel_y.clear(); accel_z.clear();
+            thrust_magnitude.clear();
+            gravity_magnitude.clear();
+        }
+
+        void reserve(size_t n) {
+            time.reserve(n);
+            altitude.reserve(n); speed.reserve(n);
+            pos_x.reserve(n); pos_y.reserve(n); pos_z.reserve(n);
+            vel_x.reserve(n); vel_y.reserve(n); vel_z.reserve(n);
+            mass.reserve(n);
+            accel_x.reserve(n); accel_y.reserve(n); accel_z.reserve(n);
+            thrust_magnitude.reserve(n);
+            gravity_magnitude.reserve(n);
+        }
+    };
+
+    TimeSeriesData m_history;
 
     // Helper: Apply demo thrust acceleration to derivatives
     // State layout: [0]=time, [1-3]=pos, [4-6]=vel, [7-10]=quat, [11-13]=omega
@@ -126,6 +171,43 @@ private:
         derivs[4] += accel * bx_e;  // East acceleration
         derivs[5] += accel * bx_n;  // North acceleration
         derivs[6] += accel * bx_u;  // Up acceleration
+    }
+
+    // Helper: Record current state to time-series history
+    void recordState() {
+        if (!m_record_history || !m_initialized) return;
+
+        m_history.time.push_back(m_time);
+
+        // Kinematics
+        auto pos = m_rocket.getPosition(m_state);
+        m_history.pos_x.push_back(pos.x);
+        m_history.pos_y.push_back(pos.y);
+        m_history.pos_z.push_back(pos.z);
+
+        auto vel = m_rocket.getVelocity(m_state);
+        m_history.vel_x.push_back(vel.x);
+        m_history.vel_y.push_back(vel.y);
+        m_history.vel_z.push_back(vel.z);
+
+        m_history.altitude.push_back(m_rocket.getAltitude(m_state));
+        m_history.speed.push_back(m_rocket.getSpeed(m_state));
+
+        // Dynamics
+        m_history.mass.push_back(m_rocket.getMass(m_state));
+
+        auto total_force = m_rocket.queryStateFunction<dynamics::TotalForceENU>(m_state);
+        double mass = m_rocket.getMass(m_state);
+        m_history.accel_x.push_back(total_force.x / mass);
+        m_history.accel_y.push_back(total_force.y / mass);
+        m_history.accel_z.push_back(total_force.z / mass);
+
+        // Forces
+        auto thrust = m_rocket.queryStateFunction<propulsion::ThrustForceBody>(m_state);
+        m_history.thrust_magnitude.push_back(thrust.magnitude());
+
+        double g = m_rocket.queryStateFunction<dynamics::GravityAcceleration>(m_state);
+        m_history.gravity_magnitude.push_back(g);
     }
 
     // Helper: RK4 single step (manual implementation to avoid external dependencies)
@@ -161,6 +243,9 @@ private:
         }
 
         m_time += dt;
+
+        // Record state to history
+        recordState();
     }
 
 public:
@@ -385,6 +470,10 @@ public:
         }
         m_state = m_rocket.getInitialState();
         m_time = 0.0;
+        m_history.clear();
+
+        // Reserve space for typical flight (assume 100 seconds at 100Hz = 10k points)
+        m_history.reserve(10000);
     }
 
     //=========================================================================
@@ -528,6 +617,70 @@ public:
     }
 
     //=========================================================================
+    // TIME-SERIES DATA RETRIEVAL
+    //=========================================================================
+
+    /**
+     * Get time-series data as JavaScript arrays
+     * Returns an object with all available state function histories
+     */
+    val getTimeSeries() const {
+        val result = val::object();
+
+        // Convert C++ vectors to JavaScript arrays
+        result.set("time", val::array(m_history.time.begin(), m_history.time.end()));
+
+        // Kinematics
+        val kinematics = val::object();
+        kinematics.set("altitude", val::array(m_history.altitude.begin(), m_history.altitude.end()));
+        kinematics.set("speed", val::array(m_history.speed.begin(), m_history.speed.end()));
+        kinematics.set("pos_x", val::array(m_history.pos_x.begin(), m_history.pos_x.end()));
+        kinematics.set("pos_y", val::array(m_history.pos_y.begin(), m_history.pos_y.end()));
+        kinematics.set("pos_z", val::array(m_history.pos_z.begin(), m_history.pos_z.end()));
+        kinematics.set("vel_x", val::array(m_history.vel_x.begin(), m_history.vel_x.end()));
+        kinematics.set("vel_y", val::array(m_history.vel_y.begin(), m_history.vel_y.end()));
+        kinematics.set("vel_z", val::array(m_history.vel_z.begin(), m_history.vel_z.end()));
+        result.set("kinematics", kinematics);
+
+        // Dynamics
+        val dynamics = val::object();
+        dynamics.set("mass", val::array(m_history.mass.begin(), m_history.mass.end()));
+        dynamics.set("accel_x", val::array(m_history.accel_x.begin(), m_history.accel_x.end()));
+        dynamics.set("accel_y", val::array(m_history.accel_y.begin(), m_history.accel_y.end()));
+        dynamics.set("accel_z", val::array(m_history.accel_z.begin(), m_history.accel_z.end()));
+        result.set("dynamics", dynamics);
+
+        // Forces
+        val forces = val::object();
+        forces.set("thrust", val::array(m_history.thrust_magnitude.begin(), m_history.thrust_magnitude.end()));
+        forces.set("gravity", val::array(m_history.gravity_magnitude.begin(), m_history.gravity_magnitude.end()));
+        result.set("forces", forces);
+
+        return result;
+    }
+
+    /**
+     * Get number of recorded data points
+     */
+    size_t getHistorySize() const {
+        return m_history.time.size();
+    }
+
+    /**
+     * Enable/disable time-series recording
+     */
+    void setRecordHistory(bool enable) {
+        m_record_history = enable;
+    }
+
+    /**
+     * Clear time-series history
+     */
+    void clearHistory() {
+        m_history.clear();
+    }
+
+    //=========================================================================
     // UTILITY
     //=========================================================================
 
@@ -558,7 +711,8 @@ public:
                        std::to_string(m_state[5]) + "," +
                        std::to_string(m_state[6]) + "]" +
             " alt_fn=" + std::to_string(getAltitude()) +
-            " demo=" + (m_demo_mode ? "ON" : "OFF");
+            " demo=" + (m_demo_mode ? "ON" : "OFF") +
+            " hist_size=" + std::to_string(m_history.time.size());
         return info;
     }
 };
@@ -611,6 +765,12 @@ EMSCRIPTEN_BINDINGS(sopot_module) {
         .function("getVelocity", &RocketSimulator::getVelocity)
         .function("getQuaternion", &RocketSimulator::getQuaternion)
         .function("getFullState", &RocketSimulator::getFullState)
+
+        // Time-series data retrieval
+        .function("getTimeSeries", &RocketSimulator::getTimeSeries)
+        .function("getHistorySize", &RocketSimulator::getHistorySize)
+        .function("setRecordHistory", &RocketSimulator::setRecordHistory)
+        .function("clearHistory", &RocketSimulator::clearHistory)
 
         // Utility
         .function("getStateDimension", &RocketSimulator::getStateDimension)
