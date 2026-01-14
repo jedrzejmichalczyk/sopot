@@ -1,24 +1,40 @@
 import { useState, useEffect } from 'react';
 import * as THREE from 'three';
+import { SimulationSelector, SimulationType } from './components/SimulationSelector';
 import { RocketVisualization3D } from './components/RocketVisualization3D';
+import { Grid2DVisualization } from './components/Grid2DVisualization';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { ControlPanel } from './components/ControlPanel';
+import { Grid2DControlPanel } from './components/Grid2DControlPanel';
 import { PlotPanel } from './components/PlotPanel';
 import { useRocketSimulation } from './hooks/useRocketSimulation';
+import { useGrid2DSimulation } from './hooks/useGrid2DSimulation';
 import type { TimeSeriesData } from './types/sopot';
 
 function App() {
-  const simulation = useRocketSimulation();
+  const [simulationType, setSimulationType] = useState<SimulationType>('rocket');
+  const [showVelocities, setShowVelocities] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+
+  // Note: Both hooks are instantiated to maintain React hook call order,
+  // but inactive simulations are reset when switching types to free resources.
+  // The rocket WASM module loads on mount for the primary simulation type.
+  const rocketSim = useRocketSimulation();
+  const gridSim = useGrid2DSimulation(5, 5);
+
   const [trajectoryHistory, setTrajectoryHistory] = useState<
     Array<{ position: THREE.Vector3; time: number }>
   >([]);
   const [timeSeries, setTimeSeries] = useState<TimeSeriesData | null>(null);
 
-  // Track trajectory history
-  useEffect(() => {
-    if (!simulation.currentState) return;
+  // Get the active simulation based on type
+  const activeSim = simulationType === 'rocket' ? rocketSim : gridSim;
 
-    const { position, time } = simulation.currentState;
+  // Track trajectory history (rocket only)
+  useEffect(() => {
+    if (simulationType !== 'rocket' || !rocketSim.currentState) return;
+
+    const { position, time } = rocketSim.currentState;
 
     // Convert ENU to Three.js coordinates
     const threePosition = new THREE.Vector3(
@@ -28,7 +44,6 @@ function App() {
     );
 
     setTrajectoryHistory((prev) => {
-      // Limit history to last 1000 points to prevent memory issues
       const maxPoints = 1000;
       const newHistory = [...prev, { position: threePosition, time }];
 
@@ -38,47 +53,126 @@ function App() {
 
       return newHistory;
     });
-  }, [simulation.currentState]);
+  }, [simulationType, rocketSim.currentState]);
 
   // Reset trajectory when simulation resets
   useEffect(() => {
     if (
-      simulation.currentState &&
-      simulation.currentState.time < 0.1 &&
+      simulationType === 'rocket' &&
+      rocketSim.currentState &&
+      rocketSim.currentState.time < 0.1 &&
       trajectoryHistory.length > 10
     ) {
       setTrajectoryHistory([]);
     }
-  }, [simulation.currentState, trajectoryHistory.length]);
+  }, [simulationType, rocketSim.currentState, trajectoryHistory.length]);
 
-  // Fetch time-series data periodically when simulation is running
+  // Fetch time-series data periodically when rocket simulation is running
   useEffect(() => {
-    if (!simulation.isRunning || !simulation.simulator) return;
+    if (simulationType !== 'rocket' || !rocketSim.isRunning || !rocketSim.simulator) return;
 
     const interval = setInterval(() => {
       try {
-        const data = simulation.simulator!.getTimeSeries();
+        const data = rocketSim.simulator!.getTimeSeries();
         console.log('[PlotPanel] Time series data points:', data?.time?.length || 0);
         setTimeSeries(data);
       } catch (error) {
         console.error('Error fetching time series:', error);
       }
-    }, 500); // Update plots every 500ms
+    }, 500);
 
     return () => clearInterval(interval);
-  }, [simulation.isRunning, simulation.simulator]);
+  }, [simulationType, rocketSim.isRunning, rocketSim.simulator]);
 
-  // Get final time-series data when simulation pauses or stops
+  // Get final time-series data when rocket simulation pauses
   useEffect(() => {
-    if (!simulation.isRunning && simulation.simulator && simulation.isInitialized) {
+    if (
+      simulationType === 'rocket' &&
+      !rocketSim.isRunning &&
+      rocketSim.simulator &&
+      rocketSim.isInitialized
+    ) {
       try {
-        const data = simulation.simulator.getTimeSeries();
+        const data = rocketSim.simulator.getTimeSeries();
         setTimeSeries(data);
       } catch (error) {
         console.error('Error fetching time series:', error);
       }
     }
-  }, [simulation.isRunning, simulation.simulator, simulation.isInitialized]);
+  }, [simulationType, rocketSim.isRunning, rocketSim.simulator, rocketSim.isInitialized]);
+
+  // Handle simulation type change - reset both simulations
+  const handleSimulationTypeChange = (type: SimulationType) => {
+    console.log(`[App] Switching simulation type to: ${type}`);
+
+    // Pause current simulation
+    if (rocketSim.isRunning) rocketSim.pause();
+    if (gridSim.isRunning) gridSim.pause();
+
+    // Reset the simulation we're switching away from to free resources
+    if (simulationType === 'rocket' && rocketSim.isInitialized) {
+      rocketSim.reset();
+    } else if (simulationType === 'grid2d' && gridSim.isInitialized) {
+      gridSim.reset();
+    }
+
+    setSimulationType(type);
+    setTrajectoryHistory([]);
+    setTimeSeries(null);
+  };
+
+  // Render center panel based on simulation type
+  const renderVisualization = () => {
+    if (simulationType === 'rocket') {
+      if (rocketSim.isInitialized) {
+        return (
+          <RocketVisualization3D
+            state={rocketSim.currentState}
+            trajectoryHistory={trajectoryHistory}
+          />
+        );
+      }
+      return renderPlaceholder('🚀 SOPOT Rocket Simulation', rocketSim.isReady);
+    } else {
+      if (gridSim.isInitialized) {
+        return (
+          <Grid2DVisualization
+            state={gridSim.currentState}
+            showVelocities={showVelocities}
+            showGrid={showGrid}
+          />
+        );
+      }
+      return renderPlaceholder('🎨 SOPOT 2D Grid Simulation', gridSim.isReady);
+    }
+  };
+
+  const renderPlaceholder = (title: string, isReady: boolean) => {
+    // Use accurate description based on simulation type
+    const description = simulationType === 'rocket'
+      ? 'C++20 Physics Simulation compiled to WebAssembly'
+      : 'High-performance physics simulation engine';
+
+    const loadingText = simulationType === 'rocket'
+      ? 'Loading WebAssembly module...'
+      : 'Loading simulation engine...';
+
+    return (
+      <div style={styles.placeholder}>
+        <div style={styles.placeholderContent}>
+          <h1 style={styles.placeholderTitle}>{title}</h1>
+          <p style={styles.placeholderText}>{description}</p>
+          <p style={styles.placeholderText}>Initialize the simulation to begin</p>
+          {!isReady && (
+            <div style={styles.loadingIndicator}>
+              <div style={styles.spinner} />
+              <p style={styles.loadingText}>{loadingText}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={styles.container}>
@@ -86,64 +180,87 @@ function App() {
       <div style={styles.topSection}>
         {/* Left Panel: Controls */}
         <div style={styles.leftPanel}>
-          <ControlPanel
-            isReady={simulation.isReady}
-            isInitialized={simulation.isInitialized}
-            isRunning={simulation.isRunning}
-            error={simulation.error}
-            playbackSpeed={simulation.playbackSpeed}
-            onInitialize={simulation.initialize}
-            onStart={simulation.start}
-            onPause={simulation.pause}
-            onReset={simulation.reset}
-            onStep={simulation.step}
-            onPlaybackSpeedChange={simulation.setPlaybackSpeed}
+          <SimulationSelector
+            currentSimulation={simulationType}
+            onSimulationChange={handleSimulationTypeChange}
+            disabled={activeSim.isRunning}
           />
-        </div>
 
-        {/* Center Panel: 3D Visualization */}
-        <div style={styles.centerPanel}>
-          {simulation.isInitialized ? (
-            <RocketVisualization3D
-              state={simulation.currentState}
-              trajectoryHistory={trajectoryHistory}
+          {simulationType === 'rocket' ? (
+            <ControlPanel
+              isReady={rocketSim.isReady}
+              isInitialized={rocketSim.isInitialized}
+              isRunning={rocketSim.isRunning}
+              error={rocketSim.error}
+              playbackSpeed={rocketSim.playbackSpeed}
+              onInitialize={rocketSim.initialize}
+              onStart={rocketSim.start}
+              onPause={rocketSim.pause}
+              onReset={rocketSim.reset}
+              onStep={rocketSim.step}
+              onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
             />
           ) : (
-            <div style={styles.placeholder}>
-              <div style={styles.placeholderContent}>
-                <h1 style={styles.placeholderTitle}>
-                  🚀 SOPOT Rocket Simulation
-                </h1>
-                <p style={styles.placeholderText}>
-                  C++20 Physics Simulation compiled to WebAssembly
-                </p>
-                <p style={styles.placeholderText}>
-                  Initialize the simulation to begin
-                </p>
-                {!simulation.isReady && (
-                  <div style={styles.loadingIndicator}>
-                    <div style={styles.spinner} />
-                    <p style={styles.loadingText}>Loading WebAssembly module...</p>
-                  </div>
-                )}
-              </div>
-            </div>
+            <Grid2DControlPanel
+              isReady={gridSim.isReady}
+              isInitialized={gridSim.isInitialized}
+              isRunning={gridSim.isRunning}
+              error={gridSim.error}
+              playbackSpeed={gridSim.playbackSpeed}
+              onInitialize={gridSim.initialize}
+              onStart={gridSim.start}
+              onPause={gridSim.pause}
+              onReset={gridSim.reset}
+              onStep={gridSim.step}
+              onPlaybackSpeedChange={gridSim.setPlaybackSpeed}
+              showVelocities={showVelocities}
+              showGrid={showGrid}
+              onShowVelocitiesChange={setShowVelocities}
+              onShowGridChange={setShowGrid}
+            />
           )}
         </div>
 
-        {/* Right Panel: Telemetry */}
+        {/* Center Panel: Visualization */}
+        <div style={styles.centerPanel}>{renderVisualization()}</div>
+
+        {/* Right Panel: Telemetry (rocket only for now) */}
         <div style={styles.rightPanel}>
-          <TelemetryPanel
-            state={simulation.currentState}
-            isRunning={simulation.isRunning}
-          />
+          {simulationType === 'rocket' ? (
+            <TelemetryPanel
+              state={rocketSim.currentState}
+              isRunning={rocketSim.isRunning}
+            />
+          ) : (
+            <div style={styles.telemetryPlaceholder}>
+              <h3 style={styles.telemetryTitle}>Grid Info</h3>
+              {gridSim.currentState && (
+                <div style={styles.gridInfo}>
+                  <div style={styles.infoRow}>
+                    <span>Time:</span>
+                    <span>{gridSim.currentState.time.toFixed(3)}s</span>
+                  </div>
+                  <div style={styles.infoRow}>
+                    <span>Grid Size:</span>
+                    <span>{gridSim.currentState.rows}×{gridSim.currentState.cols}</span>
+                  </div>
+                  <div style={styles.infoRow}>
+                    <span>Masses:</span>
+                    <span>{gridSim.currentState.positions.length}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Bottom section: Plotting panel */}
-      <div style={styles.bottomSection}>
-        <PlotPanel timeSeries={timeSeries} />
-      </div>
+      {/* Bottom section: Plotting panel (rocket only for now) */}
+      {simulationType === 'rocket' && (
+        <div style={styles.bottomSection}>
+          <PlotPanel timeSeries={timeSeries} />
+        </div>
+      )}
     </div>
   );
 }
@@ -224,6 +341,30 @@ const styles = {
   loadingText: {
     fontSize: '16px',
     opacity: 0.9,
+  },
+  telemetryPlaceholder: {
+    height: '100%',
+    backgroundColor: '#2c3e50',
+    color: '#ecf0f1',
+    padding: '20px',
+  },
+  telemetryTitle: {
+    margin: '0 0 20px 0',
+    fontSize: '20px',
+    fontWeight: 'bold' as const,
+  },
+  gridInfo: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '15px',
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '14px',
+    padding: '10px',
+    backgroundColor: '#34495e',
+    borderRadius: '4px',
   },
 };
 
