@@ -4,7 +4,10 @@
   "type": "module",
   "description": "SOPOT Rocket Simulation - Interactive 3D Web Interface",
   "scripts": {
-    "dev": "vite",
+    "copy-wasm": "cp ../wasm/sopot.js ../wasm/sopot.wasm public/ 2>/dev/null || echo 'Warning: WASM files not found. Run wasm/build.sh first.'",
+    "copy-wasm:verify": "npm run copy-wasm && ls -lh public/sopot.* 2>/dev/null || echo 'WASM files not copied'",
+    "prebuild": "npm run copy-wasm",
+    "dev": "npm run copy-wasm && vite",
     "build": "tsc && vite build",
     "build:github": "VITE_BASE_PATH=/sopot/ npm run build",
     "preview": "vite preview",

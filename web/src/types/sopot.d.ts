@@ -40,7 +40,7 @@ export interface RocketSimulator {
   loadAeroDataFromPath(path: string): void;
   loadDampingDataFromPath(path: string): void;
 
-  // Data loading (Phase 2 - arrays, not yet implemented)
+  // Data loading (Phase 2 - arrays, ✅ implemented)
   loadMassData(time: number[], mass: number[]): void;
   loadEngineData(time: number[], thrust: number[]): void;
 
