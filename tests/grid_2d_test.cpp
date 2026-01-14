@@ -211,10 +211,6 @@ void test_energy_conservation() {
     state[0] += 0.2;  // x position of mass 0
     state[1] += 0.3;  // y position of mass 0
 
-    // Calculate initial energy (kinetic = 0, potential from springs)
-    auto initial_kinetic = 0.0;
-    auto initial_potential = 0.0;
-
     // This is just a demonstration - full energy calculation would require
     // querying all springs, which we can't do easily with the current API
     std::cout << "Note: Full energy tracking would require additional API support\n";

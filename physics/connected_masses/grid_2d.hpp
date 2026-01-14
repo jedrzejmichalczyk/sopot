@@ -30,7 +30,7 @@ namespace sopot::connected_masses {
  * @return Vector of edge pairs (i, j) where i < j
  * @throws std::invalid_argument if rows or cols < 2
  */
-inline std::vector<std::pair<size_t, size_t>>
+[[nodiscard]] inline std::vector<std::pair<size_t, size_t>>
 makeGrid2DEdges(size_t rows, size_t cols, bool include_diagonals = false) {
     if (rows < 2) {
         throw std::invalid_argument("Grid must have at least 2 rows (got " +
@@ -145,14 +145,14 @@ constexpr auto makeGrid2DEdgesArray() {
 /**
  * @brief Helper to convert grid (row, col) to linear index
  */
-constexpr size_t gridIndex(size_t row, size_t col, size_t cols) {
+[[nodiscard]] constexpr size_t gridIndex(size_t row, size_t col, size_t cols) {
     return row * cols + col;
 }
 
 /**
  * @brief Helper to convert linear index to grid (row, col)
  */
-constexpr std::pair<size_t, size_t> gridCoords(size_t index, size_t cols) {
+[[nodiscard]] constexpr std::pair<size_t, size_t> gridCoords(size_t index, size_t cols) {
     return {index / cols, index % cols};
 }
 

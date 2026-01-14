@@ -30,6 +30,9 @@ template<size_t I, size_t J, Scalar T = double>
 class IndexedSpring2D final : public TypedComponent<0, T> {
     static_assert(I != J, "Spring cannot connect a mass to itself");
 
+    // Minimum length threshold to avoid division by zero
+    static constexpr double MIN_LENGTH_THRESHOLD = 1e-10;
+
 public:
     using Base = TypedComponent<0, T>;
     using typename Base::LocalState;
@@ -108,8 +111,8 @@ public:
         // Current length
         T length = sqrt(dx * dx + dy * dy);
 
-        // Avoid division by zero
-        T length_safe = length < T(1e-10) ? T(1e-10) : length;
+        // Avoid division by zero - use minimum threshold
+        T length_safe = length < T(MIN_LENGTH_THRESHOLD) ? T(MIN_LENGTH_THRESHOLD) : length;
 
         // Unit vector from I to J
         T ux = dx / length_safe;
