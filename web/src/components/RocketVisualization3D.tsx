@@ -50,9 +50,27 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
     );
 
     // Update orientation from quaternion
-    // SOPOT quaternion is body to ENU, Three.js expects x=right, y=up, z=back
+    // SOPOT quaternion convention: (q1, q2, q3, q4) where q4 is scalar, q1-q3 are vector
+    // SOPOT: body X points forward, quaternion transforms body->ENU
+    // Three.js: quaternion (x, y, z, w) where w is scalar
+    //
+    // Coordinate transformation ENU -> Three.js:
+    //   Three.js X = ENU X (East)
+    //   Three.js Y = ENU Z (Up)
+    //   Three.js Z = -ENU Y (South)
+    //
+    // The rocket mesh points along +X in local frame
+    // We need to transform the quaternion to account for the coordinate change
     const q = state.quaternion;
-    groupRef.current.quaternion.set(q.q2, q.q4, -q.q3, q.q1);
+
+    // Transform quaternion from ENU to Three.js frame
+    // Swap Y<->Z components and negate the new Z (old Y)
+    groupRef.current.quaternion.set(
+      q.q1,   // x component stays (East axis)
+      q.q3,   // y component = old z (Up axis)
+      -q.q2,  // z component = -old y (South axis)
+      q.q4    // w (scalar) stays
+    );
 
     // Update velocity arrow direction and length
     if (velocityArrowRef.current && state.speed > 0.1) {
