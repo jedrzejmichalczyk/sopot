@@ -47,26 +47,56 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
 
     const loadModule = async () => {
       try {
+        const startTime = performance.now();
+
         // Import the SOPOT WebAssembly module
         // Use base URL to handle GitHub Pages deployment path
         const basePath = import.meta.env.BASE_URL || '/';
         const moduleUrl = `${basePath}sopot.js`;
+
+        console.log(`[WASM] Loading module from: ${moduleUrl}`);
+
         // @ts-ignore - Dynamic import of WebAssembly
         const createSopotModule = await import(/* @vite-ignore */ moduleUrl);
 
         if (!mounted) return;
 
+        const loaderLoadTime = performance.now() - startTime;
+        console.log(`[WASM] Loader script loaded in ${loaderLoadTime.toFixed(2)}ms`);
+
+        const instantiateStartTime = performance.now();
         const moduleInstance = await createSopotModule.default();
+        const instantiateTime = performance.now() - instantiateStartTime;
+
+        const totalLoadTime = performance.now() - startTime;
 
         if (mounted) {
           setModule(moduleInstance);
-          console.log('SOPOT WebAssembly module loaded successfully');
+          console.log(`[WASM] Module instantiated in ${instantiateTime.toFixed(2)}ms`);
+          console.log(`[WASM] Total load time: ${totalLoadTime.toFixed(2)}ms`);
+
+          // Log metrics for monitoring
+          if (typeof window !== 'undefined' && (window as any).gtag) {
+            (window as any).gtag('event', 'wasm_load_complete', {
+              load_time_ms: Math.round(totalLoadTime),
+              loader_time_ms: Math.round(loaderLoadTime),
+              instantiate_time_ms: Math.round(instantiateTime),
+            });
+          }
         }
       } catch (err) {
         if (mounted) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           setError(`Failed to load WebAssembly module: ${errorMsg}`);
-          console.error('Module loading error:', err);
+          console.error('[WASM] Module loading error:', err);
+          console.error('[WASM] Stack trace:', err instanceof Error ? err.stack : 'N/A');
+
+          // Log error metrics
+          if (typeof window !== 'undefined' && (window as any).gtag) {
+            (window as any).gtag('event', 'wasm_load_error', {
+              error_message: errorMsg,
+            });
+          }
         }
       }
     };

@@ -16,10 +16,66 @@
 #include <memory>
 #include <string>
 #include <stdexcept>
+#include <algorithm>
+#include <cmath>
 
 using namespace emscripten;
 using namespace sopot;
 using namespace sopot::rocket;
+
+/**
+ * Helper: Convert JavaScript array to C++ vector
+ */
+template<typename T>
+std::vector<T> vecFromJSArray(const val& js_array) {
+    const unsigned length = js_array["length"].as<unsigned>();
+    std::vector<T> vec(length);
+    for (unsigned i = 0; i < length; ++i) {
+        vec[i] = js_array[i].as<T>();
+    }
+    return vec;
+}
+
+/**
+ * Helper: Write CSV file to Emscripten's virtual filesystem
+ */
+void writeCSV(const std::string& filepath,
+              const std::vector<std::string>& headers,
+              const std::vector<std::vector<double>>& columns) {
+    if (columns.empty() || columns[0].empty()) {
+        throw std::runtime_error("writeCSV: empty data");
+    }
+    if (headers.size() != columns.size()) {
+        throw std::runtime_error("writeCSV: headers and columns size mismatch");
+    }
+
+    // Build CSV content
+    std::string content;
+
+    // Write header row
+    for (size_t i = 0; i < headers.size(); ++i) {
+        if (i > 0) content += ",";
+        content += headers[i];
+    }
+    content += "\n";
+
+    // Write data rows
+    size_t num_rows = columns[0].size();
+    for (size_t row = 0; row < num_rows; ++row) {
+        for (size_t col = 0; col < columns.size(); ++col) {
+            if (col > 0) content += ",";
+            content += std::to_string(columns[col][row]);
+        }
+        content += "\n";
+    }
+
+    // Write to Emscripten's virtual filesystem using JavaScript
+    EM_ASM({
+        const content = UTF8ToString($0);
+        const path = UTF8ToString($1);
+        FS.writeFile(path, content);
+    }, content.c_str(), filepath.c_str());
+}
 
 /**
  * RocketSimulator: JavaScript-friendly wrapper around Rocket<double>
@@ -147,28 +203,113 @@ public:
      * @param mass Array of mass values [kg]
      */
     void loadMassData(const val& time_js, const val& mass_js) {
-        // TODO: Phase 2 - Implement array-based data loading
-        // Need to adapt RocketBody component to accept std::vector instead of file paths
-        throw std::runtime_error(
-            "loadMassData() is not yet implemented. "
-            "Please use loadMassDataFromPath() for Phase 1 prototype, "
-            "or wait for Phase 2 array-based API."
-        );
+        // Convert JavaScript arrays to C++ vectors
+        std::vector<double> time_vec = vecFromJSArray<double>(time_js);
+        std::vector<double> mass_vec = vecFromJSArray<double>(mass_js);
+
+        if (time_vec.size() != mass_vec.size()) {
+            throw std::runtime_error("loadMassData: time and mass arrays must have the same length");
+        }
+        if (time_vec.size() < 2) {
+            throw std::runtime_error("loadMassData: need at least 2 data points");
+        }
+
+        // Write CSV files to Emscripten's virtual filesystem
+        // This allows us to reuse the existing Rocket file-loading infrastructure
+        writeCSV("/tmp/sim_mass.csv", {"time", "mass"}, {time_vec, mass_vec});
+
+        // Write default constant values for CoG and inertia
+        // Users can call additional methods to customize these if needed
+        std::vector<double> default_times = {time_vec.front(), time_vec.back()};
+        writeCSV("/tmp/sim_cog.csv", {"time", "cog"}, {default_times, {1.5, 1.5}});
+        writeCSV("/tmp/sim_ix.csv", {"time", "ix"}, {default_times, {10.0, 10.0}});
+        writeCSV("/tmp/sim_iyz.csv", {"time", "iyz"}, {default_times, {100.0, 100.0}});
+
+        // Load from the virtual filesystem
+        m_rocket.loadMassData("/tmp/");
     }
 
     /**
-     * Load engine data from JavaScript arrays
+     * Load engine data from JavaScript arrays (simplified interface)
      * @param time Array of time points [s]
      * @param thrust Array of thrust values [N]
+     *
+     * This method creates a simplified engine model based on the thrust profile.
+     * It estimates reasonable engine parameters from the thrust curve.
      */
     void loadEngineData(const val& time_js, const val& thrust_js) {
-        // TODO: Phase 2 - Implement array-based data loading
-        // Need to adapt InterpolatedEngine component to accept std::vector instead of file paths
-        throw std::runtime_error(
-            "loadEngineData() is not yet implemented. "
-            "Please use loadEngineDataFromPath() for Phase 1 prototype, "
-            "or wait for Phase 2 array-based API."
-        );
+        // Convert JavaScript arrays to C++ vectors
+        std::vector<double> time_vec = vecFromJSArray<double>(time_js);
+        std::vector<double> thrust_vec = vecFromJSArray<double>(thrust_js);
+
+        if (time_vec.size() != thrust_vec.size()) {
+            throw std::runtime_error("loadEngineData: time and thrust arrays must have the same length");
+        }
+        if (time_vec.size() < 2) {
+            throw std::runtime_error("loadEngineData: need at least 2 data points");
+        }
+
+        // Generate simplified engine parameters from thrust profile
+        // These are reasonable defaults for a solid rocket motor
+        size_t n = time_vec.size();
+        std::vector<std::vector<double>> columns(8);
+
+        // Find max thrust to scale parameters
+        double max_thrust = *std::max_element(thrust_vec.begin(), thrust_vec.end());
+
+        for (size_t i = 0; i < n; ++i) {
+            double t = time_vec[i];
+            double F = thrust_vec[i];
+
+            // Estimate throat and exit diameters based on thrust
+            // F ≈ p_c * A_throat * CF, with CF ≈ 1.5-1.8 for typical solid motors
+            // Assume p_c ≈ 5 MPa, CF ≈ 1.6
+            double p_c = 5.0e6;  // Pa
+            double CF = 1.6;
+            double A_throat = (F > 0) ? F / (p_c * CF) : 1e-6;
+            double d_throat = 2.0 * std::sqrt(A_throat / 3.14159265359);
+
+            // Exit diameter (assume expansion ratio of 4-8)
+            double expansion_ratio = 6.0;
+            double d_exit = d_throat * std::sqrt(expansion_ratio);
+
+            // Column 0: time
+            columns[0].push_back(t);
+
+            // Column 1: throat_diameter [m]
+            columns[1].push_back(d_throat);
+
+            // Column 2: exit_diameter [m]
+            columns[2].push_back(d_exit);
+
+            // Column 3: combustion_pressure [Pa]
+            columns[3].push_back(p_c);
+
+            // Column 4: combustion_temp [K]
+            // Typical for solid propellants: 2500-3500 K
+            columns[4].push_back(3000.0);
+
+            // Column 5: gamma (ratio of specific heats)
+            // Typical for combustion products: 1.2-1.25
+            columns[5].push_back(1.24);
+
+            // Column 6: mol_mass [kg/mol]
+            // Typical for solid propellant combustion products: 0.020-0.030
+            columns[6].push_back(0.024);
+
+            // Column 7: efficiency
+            // Typical nozzle efficiency: 0.95-0.98
+            columns[7].push_back(0.96);
+        }
+
+        // Write engine CSV to virtual filesystem
+        writeCSV("/tmp/sim_engine.csv",
+                 {"time", "throat_d", "exit_d", "combustion_pressure",
+                  "combustion_temp", "gamma", "mol_mass", "efficiency"},
+                 columns);
+
+        // Load from the virtual filesystem
+        m_rocket.loadEngineData("/tmp/");
     }
 
     /**

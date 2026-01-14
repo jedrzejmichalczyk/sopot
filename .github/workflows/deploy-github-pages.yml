@@ -37,7 +37,7 @@ jobs:
       - name: Set up Emscripten
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: 'latest'
+          version: '3.1.51'  # Pinned version for reproducible builds
 
       - name: Verify Emscripten installation
         run: emcc --version
@@ -52,9 +52,63 @@ jobs:
           cd web
           npm ci
 
-      - name: Copy WebAssembly files to web public directory
+      - name: Copy and validate WebAssembly files
         run: |
+          # Copy WASM files
           cp wasm/sopot.js wasm/sopot.wasm web/public/
+
+          # Validate files exist and are not empty
+          if [ ! -f web/public/sopot.js ]; then
+            echo "ERROR: sopot.js not found in web/public/"
+            exit 1
+          fi
+
+          if [ ! -f web/public/sopot.wasm ]; then
+            echo "ERROR: sopot.wasm not found in web/public/"
+            exit 1
+          fi
+
+          if [ ! -s web/public/sopot.js ]; then
+            echo "ERROR: sopot.js is empty"
+            exit 1
+          fi
+
+          if [ ! -s web/public/sopot.wasm ]; then
+            echo "ERROR: sopot.wasm is empty"
+            exit 1
+          fi
+
+          echo "✅ WASM files copied and validated successfully"
+
+      - name: Report WASM metrics
+        run: |
+          echo "## 📊 WASM Build Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Size | Size (Human) |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|--------------|" >> $GITHUB_STEP_SUMMARY
+
+          # Get file sizes
+          WASM_SIZE=$(stat -f%z "wasm/sopot.wasm" 2>/dev/null || stat -c%s "wasm/sopot.wasm")
+          JS_SIZE=$(stat -f%z "wasm/sopot.js" 2>/dev/null || stat -c%s "wasm/sopot.js")
+
+          # Convert to human readable
+          WASM_HUMAN=$(ls -lh wasm/sopot.wasm | awk '{print $5}')
+          JS_HUMAN=$(ls -lh wasm/sopot.js | awk '{print $5}')
+
+          echo "| sopot.wasm | ${WASM_SIZE} bytes | ${WASM_HUMAN} |" >> $GITHUB_STEP_SUMMARY
+          echo "| sopot.js | ${JS_SIZE} bytes | ${JS_HUMAN} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Calculate total size
+          TOTAL_SIZE=$((WASM_SIZE + JS_SIZE))
+          TOTAL_MB=$(echo "scale=2; ${TOTAL_SIZE} / 1024 / 1024" | bc)
+          echo "**Total Size:** ${TOTAL_SIZE} bytes (${TOTAL_MB} MB)" >> $GITHUB_STEP_SUMMARY
+
+          # Warning if WASM is too large
+          if [ $WASM_SIZE -gt 2000000 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Warning:** WASM module is larger than 2 MB. Consider optimization." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Build web application
         env:
