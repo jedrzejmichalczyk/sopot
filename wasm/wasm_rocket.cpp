@@ -102,6 +102,10 @@ private:
     static constexpr double DEMO_MASS = 20.0;          // kg (initial)
     static constexpr double DEMO_MASS_FLOW = 1.5;      // kg/s
 
+    // Maximum history size to prevent unbounded memory growth
+    static constexpr size_t MAX_HISTORY_SIZE = 50000;  // ~500s at 100Hz or ~5000s at 10Hz
+    static constexpr double MIN_MASS_THRESHOLD = 0.1;  // kg, minimum mass to prevent division by zero
+
     // Time-series data storage
     struct TimeSeriesData {
         // Time
@@ -177,6 +181,13 @@ private:
     void recordState() {
         if (!m_record_history || !m_initialized) return;
 
+        // Check maximum history size to prevent unbounded memory growth
+        if (m_history.time.size() >= MAX_HISTORY_SIZE) {
+            // Stop recording when limit is reached
+            // Alternative: implement circular buffer by removing oldest entry
+            return;
+        }
+
         m_history.time.push_back(m_time);
 
         // Kinematics
@@ -194,13 +205,16 @@ private:
         m_history.speed.push_back(m_rocket.getSpeed(m_state));
 
         // Dynamics
-        m_history.mass.push_back(m_rocket.getMass(m_state));
+        double mass = m_rocket.getMass(m_state);
+        m_history.mass.push_back(mass);
+
+        // Guard against division by zero with minimum mass threshold
+        double safe_mass = std::max(mass, MIN_MASS_THRESHOLD);
 
         auto total_force = m_rocket.queryStateFunction<dynamics::TotalForceENU>(m_state);
-        double mass = m_rocket.getMass(m_state);
-        m_history.accel_x.push_back(total_force.x / mass);
-        m_history.accel_y.push_back(total_force.y / mass);
-        m_history.accel_z.push_back(total_force.z / mass);
+        m_history.accel_x.push_back(total_force.x / safe_mass);
+        m_history.accel_y.push_back(total_force.y / safe_mass);
+        m_history.accel_z.push_back(total_force.z / safe_mass);
 
         // Forces
         auto thrust = m_rocket.queryStateFunction<propulsion::ThrustForceBody>(m_state);
@@ -474,6 +488,9 @@ public:
 
         // Reserve space for typical flight (assume 100 seconds at 100Hz = 10k points)
         m_history.reserve(10000);
+
+        // Record initial state at t=0
+        recordState();
     }
 
     //=========================================================================

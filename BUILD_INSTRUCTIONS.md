@@ -59,7 +59,7 @@ The following enhancements have been implemented:
 
 1. **Navigate to the WASM directory**:
    ```bash
-   cd /home/user/sopot/wasm
+   cd <project_root>/wasm
    ```
 
 2. **Run the build script**:
@@ -82,7 +82,7 @@ The following enhancements have been implemented:
 If the build script doesn't work, you can build manually:
 
 ```bash
-cd /home/user/sopot/wasm
+cd <project_root>/wasm
 
 emcc -std=c++20 \
   -O3 \
@@ -112,7 +112,7 @@ emcc -std=c++20 \
 
 1. **Navigate to the web directory**:
    ```bash
-   cd /home/user/sopot/web
+   cd <project_root>/web
    ```
 
 2. **Install dependencies** (first time only):

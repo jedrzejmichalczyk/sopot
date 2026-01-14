@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Line, Cone, Cylinder } from '@react-three/drei';
 import * as THREE from 'three';
@@ -15,6 +15,29 @@ interface RocketVisualization3DProps {
 function RocketMesh({ state }: { state: SimulationState | null }) {
   const groupRef = useRef<THREE.Group>(null);
   const velocityArrowRef = useRef<THREE.ArrowHelper | null>(null);
+
+  // Create arrow helper once using useEffect to prevent memory leaks
+  useEffect(() => {
+    if (!velocityArrowRef.current) {
+      velocityArrowRef.current = new THREE.ArrowHelper(
+        new THREE.Vector3(1, 0, 0), // Initial direction
+        new THREE.Vector3(0, 0, 0), // Origin
+        1, // Initial length
+        0x00ff00, // Green color
+        0.3, // Head length
+        0.15 // Head width
+      );
+      velocityArrowRef.current.visible = false;
+    }
+
+    // Cleanup arrow on unmount
+    return () => {
+      if (velocityArrowRef.current) {
+        velocityArrowRef.current.dispose?.();
+        velocityArrowRef.current = null;
+      }
+    };
+  }, []);
 
   useFrame(() => {
     if (!groupRef.current || !state) return;
@@ -81,21 +104,7 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
       })}
 
       {/* Velocity vector (green arrow) - positioned at rocket center */}
-      {state && state.speed > 0.1 && (
-        <primitive
-          object={
-            velocityArrowRef.current ||
-            (velocityArrowRef.current = new THREE.ArrowHelper(
-              new THREE.Vector3(1, 0, 0),
-              new THREE.Vector3(0, 0, 0),
-              1,
-              0x00ff00,
-              0.3,
-              0.15
-            ))
-          }
-        />
-      )}
+      {velocityArrowRef.current && <primitive object={velocityArrowRef.current} />}
     </group>
   );
 }

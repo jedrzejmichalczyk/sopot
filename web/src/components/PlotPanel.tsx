@@ -9,30 +9,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-
-interface TimeSeriesData {
-  time: number[];
-  kinematics: {
-    altitude: number[];
-    speed: number[];
-    pos_x: number[];
-    pos_y: number[];
-    pos_z: number[];
-    vel_x: number[];
-    vel_y: number[];
-    vel_z: number[];
-  };
-  dynamics: {
-    mass: number[];
-    accel_x: number[];
-    accel_y: number[];
-    accel_z: number[];
-  };
-  forces: {
-    thrust: number[];
-    gravity: number[];
-  };
-}
+import type { TimeSeriesData } from '../types/sopot';
 
 interface PlotPanelProps {
   timeSeries: TimeSeriesData | null;
@@ -45,6 +22,11 @@ type PlotType =
   | 'acceleration'
   | 'mass'
   | 'forces';
+
+interface ChartDataPoint {
+  time: number;
+  [key: string]: number;
+}
 
 interface PlotConfig {
   id: PlotType;
@@ -151,7 +133,7 @@ const PLOT_CONFIGS: PlotConfig[] = [
   {
     id: 'forces',
     title: 'Force Magnitudes',
-    yLabel: 'Force (N) / Acceleration (m/s²)',
+    yLabel: 'Thrust (N) and Gravity (m/s²)',
     lines: [
       {
         dataKey: 'thrust',
@@ -169,16 +151,34 @@ const PLOT_CONFIGS: PlotConfig[] = [
   },
 ];
 
-function formatChartData(timeSeries: TimeSeriesData, config: PlotConfig) {
+function formatChartData(timeSeries: TimeSeriesData, config: PlotConfig): ChartDataPoint[] {
   const length = timeSeries.time.length;
-  const chartData: any[] = [];
+
+  // Validate all data arrays have consistent lengths
+  const allArrays = [
+    timeSeries.time,
+    ...config.lines.map(line => line.extractData(timeSeries))
+  ];
+
+  const hasConsistentLength = allArrays.every(arr => arr.length === length);
+  if (!hasConsistentLength) {
+    console.warn('Inconsistent data array lengths detected');
+  }
+
+  // Pre-extract all data arrays outside the loop for performance
+  const extractedData = config.lines.map((line) => ({
+    dataKey: line.dataKey,
+    values: line.extractData(timeSeries),
+  }));
+
+  const chartData: ChartDataPoint[] = [];
 
   for (let i = 0; i < length; i++) {
-    const point: any = { time: timeSeries.time[i] };
+    const point: ChartDataPoint = { time: timeSeries.time[i] };
 
-    config.lines.forEach((line) => {
-      const values = line.extractData(timeSeries);
-      point[line.dataKey] = values[i];
+    extractedData.forEach(({ dataKey, values }) => {
+      // Handle missing data gracefully
+      point[dataKey] = i < values.length ? values[i] : 0;
     });
 
     chartData.push(point);
