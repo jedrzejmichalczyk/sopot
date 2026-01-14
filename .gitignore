@@ -22,6 +22,16 @@ out/
 *.exe
 compile_time_test
 autodiff_test
+coupled_oscillator_test
+rocket_flight_test
+connected_masses_test
+connected_masses_validation_test
+grid_2d_test
+simple_reactor_demo
+system_builder_demo
+auto_system_demo
+reflect_two_masses
+wasm_exact_test
 
 # CMake
 CMakeCache.txt
@@ -34,6 +44,9 @@ Makefile
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated output files
+*.csv
 
 # Internal organization files (not published)
 org/
