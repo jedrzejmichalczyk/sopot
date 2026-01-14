@@ -398,6 +398,28 @@ public:
     bool isInitialized() const {
         return m_initialized;
     }
+
+    // Debug: get raw state value at index
+    double getStateAt(size_t index) const {
+        if (!m_initialized || index >= m_state.size()) return -999.0;
+        return m_state[index];
+    }
+
+    // Debug: return string with state info
+    std::string getDebugInfo() const {
+        if (!m_initialized) return "Not initialized";
+
+        std::string info = "t=" + std::to_string(m_time) +
+            " pos=[" + std::to_string(m_state[1]) + "," +
+                       std::to_string(m_state[2]) + "," +
+                       std::to_string(m_state[3]) + "]" +
+            " vel=[" + std::to_string(m_state[4]) + "," +
+                       std::to_string(m_state[5]) + "," +
+                       std::to_string(m_state[6]) + "]" +
+            " alt_fn=" + std::to_string(getAltitude()) +
+            " demo=" + (m_demo_mode ? "ON" : "OFF");
+        return info;
+    }
 };
 
 //=============================================================================
@@ -451,5 +473,9 @@ EMSCRIPTEN_BINDINGS(sopot_module) {
 
         // Utility
         .function("getStateDimension", &RocketSimulator::getStateDimension)
-        .function("isInitialized", &RocketSimulator::isInitialized);
+        .function("isInitialized", &RocketSimulator::isInitialized)
+
+        // Debug
+        .function("getStateAt", &RocketSimulator::getStateAt)
+        .function("getDebugInfo", &RocketSimulator::getDebugInfo);
 }

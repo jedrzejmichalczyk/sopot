@@ -68,6 +68,10 @@ export interface RocketSimulator {
   // Utility
   getStateDimension(): number;
   isInitialized(): boolean;
+
+  // Debug
+  getStateAt(index: number): number;
+  getDebugInfo(): string;
 }
 
 export interface SopotModule {

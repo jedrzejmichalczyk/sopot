@@ -127,13 +127,23 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
 
       let shouldContinue = true;
       for (let i = 0; i < stepsToRun && shouldContinue; i++) {
+        // Debug: log state before step
+        if (simulator.getTime() < 0.1) {
+          console.log('Before step:', simulator.getDebugInfo());
+        }
+
         shouldContinue = simulator.step();
+
+        // Debug: log state after step
+        if (simulator.getTime() < 0.1) {
+          console.log('After step:', simulator.getDebugInfo(), 'continue:', shouldContinue);
+        }
 
         if (!shouldContinue) {
           // Simulation ended (rocket landed)
           isRunningRef.current = false;
           setIsRunning(false);
-          console.log('Simulation complete at t =', simulator.getTime());
+          console.log('Simulation ended at t =', simulator.getTime(), simulator.getDebugInfo());
           break;
         }
       }
