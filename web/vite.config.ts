@@ -13,6 +13,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     assetsDir: 'assets',
+    rollupOptions: {
+      external: ['/sopot.js'],
+    },
   },
   publicDir: 'public',
 });
