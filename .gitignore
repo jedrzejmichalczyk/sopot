@@ -27,6 +27,8 @@ rocket_flight_test
 connected_masses_test
 connected_masses_validation_test
 grid_2d_test
+verify_grid_physics
+verify_damping
 simple_reactor_demo
 system_builder_demo
 auto_system_demo
