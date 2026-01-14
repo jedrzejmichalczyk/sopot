@@ -56,6 +56,10 @@ function createMockGrid2DSimulator(rows: number, cols: number): Grid2DSimulator 
           const dx = positions[idx2].x - positions[idx1].x;
           const dy = positions[idx2].y - positions[idx1].y;
           const length = Math.sqrt(dx * dx + dy * dy);
+
+          // Guard against zero-length springs to prevent NaN propagation
+          if (length < 1e-10) continue;
+
           const extension = length - restLength;
 
           const fx = (stiffness * extension * dx) / length;
@@ -84,6 +88,10 @@ function createMockGrid2DSimulator(rows: number, cols: number): Grid2DSimulator 
           const dx = positions[idx2].x - positions[idx1].x;
           const dy = positions[idx2].y - positions[idx1].y;
           const length = Math.sqrt(dx * dx + dy * dy);
+
+          // Guard against zero-length springs to prevent NaN propagation
+          if (length < 1e-10) continue;
+
           const extension = length - restLength;
 
           const fx = (stiffness * extension * dx) / length;
@@ -183,9 +191,13 @@ export function useGrid2DSimulation(rows = 5, cols = 5) {
     if (!simulatorRef.current) return;
 
     console.log('[Grid2D] Resetting simulation');
-    simulatorRef.current.reset();
-    setCurrentState(simulatorRef.current.getState());
     setIsRunning(false);
+
+    // Destroy and recreate to properly clean up resources
+    simulatorRef.current.destroy();
+    simulatorRef.current = null;
+    setCurrentState(null);
+    setIsInitialized(false);
   }, []);
 
   const start = useCallback(() => {

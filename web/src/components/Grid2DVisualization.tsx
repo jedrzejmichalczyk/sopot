@@ -62,8 +62,16 @@ export function Grid2DVisualization({
 
     // Add padding
     const padding = 50;
-    const rangeX = maxX - minX || 1;
-    const rangeY = maxY - minY || 1;
+
+    // Use grid-based fallback for better scaling when points are collinear
+    // Estimate grid spacing from number of rows/cols
+    const estimatedSpacing = Math.max(
+      (maxX - minX) / (state.cols - 1 || 1),
+      (maxY - minY) / (state.rows - 1 || 1)
+    ) || 0.5; // Default to 0.5 if spacing can't be estimated
+
+    const rangeX = Math.max(maxX - minX, estimatedSpacing);
+    const rangeY = Math.max(maxY - minY, estimatedSpacing);
     const scaleX = (dimensions.width - 2 * padding) / rangeX;
     const scaleY = (dimensions.height - 2 * padding) / rangeY;
     const scale = Math.min(scaleX, scaleY);

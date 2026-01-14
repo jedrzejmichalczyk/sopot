@@ -16,6 +16,9 @@ function App() {
   const [showVelocities, setShowVelocities] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
 
+  // Note: Both hooks are instantiated to maintain React hook call order,
+  // but inactive simulations are reset when switching types to free resources.
+  // The rocket WASM module loads on mount for the primary simulation type.
   const rocketSim = useRocketSimulation();
   const gridSim = useGrid2DSimulation(5, 5);
 
@@ -106,6 +109,13 @@ function App() {
     if (rocketSim.isRunning) rocketSim.pause();
     if (gridSim.isRunning) gridSim.pause();
 
+    // Reset the simulation we're switching away from to free resources
+    if (simulationType === 'rocket' && rocketSim.isInitialized) {
+      rocketSim.reset();
+    } else if (simulationType === 'grid2d' && gridSim.isInitialized) {
+      gridSim.reset();
+    }
+
     setSimulationType(type);
     setTrajectoryHistory([]);
     setTimeSeries(null);
@@ -137,23 +147,32 @@ function App() {
     }
   };
 
-  const renderPlaceholder = (title: string, isReady: boolean) => (
-    <div style={styles.placeholder}>
-      <div style={styles.placeholderContent}>
-        <h1 style={styles.placeholderTitle}>{title}</h1>
-        <p style={styles.placeholderText}>
-          C++20 Physics Simulation compiled to WebAssembly
-        </p>
-        <p style={styles.placeholderText}>Initialize the simulation to begin</p>
-        {!isReady && (
-          <div style={styles.loadingIndicator}>
-            <div style={styles.spinner} />
-            <p style={styles.loadingText}>Loading WebAssembly module...</p>
-          </div>
-        )}
+  const renderPlaceholder = (title: string, isReady: boolean) => {
+    // Use accurate description based on simulation type
+    const description = simulationType === 'rocket'
+      ? 'C++20 Physics Simulation compiled to WebAssembly'
+      : 'High-performance physics simulation engine';
+
+    const loadingText = simulationType === 'rocket'
+      ? 'Loading WebAssembly module...'
+      : 'Loading simulation engine...';
+
+    return (
+      <div style={styles.placeholder}>
+        <div style={styles.placeholderContent}>
+          <h1 style={styles.placeholderTitle}>{title}</h1>
+          <p style={styles.placeholderText}>{description}</p>
+          <p style={styles.placeholderText}>Initialize the simulation to begin</p>
+          {!isReady && (
+            <div style={styles.loadingIndicator}>
+              <div style={styles.spinner} />
+              <p style={styles.loadingText}>{loadingText}</p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={styles.container}>
