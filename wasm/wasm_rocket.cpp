@@ -51,13 +51,15 @@ private:
         if (!m_demo_mode || t > DEMO_BURN_TIME) return;
 
         // Get current attitude quaternion from state
+        // SOPOT convention: q1,q2,q3 = vector part, q4 = scalar part
         double q1 = m_state[7], q2 = m_state[8], q3 = m_state[9], q4 = m_state[10];
 
         // Thrust is along body X axis, rotate to ENU frame
-        // Body X in ENU = quaternion rotation of (1,0,0)
-        double bx_e = 1.0 - 2.0*(q3*q3 + q4*q4);
-        double bx_n = 2.0*(q2*q3 + q1*q4);
-        double bx_u = 2.0*(q2*q4 - q1*q3);
+        // First column of rotation matrix R (body X in reference frame)
+        // From quaternion.hpp to_rotation_matrix():
+        double bx_e = q4*q4 + q1*q1 - q2*q2 - q3*q3;  // East component
+        double bx_n = 2.0*(q1*q2 + q3*q4);             // North component
+        double bx_u = 2.0*(q1*q3 - q2*q4);             // Up component
 
         // Current mass (decreasing during burn)
         double mass = DEMO_MASS - DEMO_MASS_FLOW * t;
