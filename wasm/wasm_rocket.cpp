@@ -37,10 +37,43 @@ private:
     double m_time{0.0};
     double m_dt{0.01};  // Default timestep: 10ms
     bool m_initialized{false};
+    bool m_demo_mode{false};
+
+    // Demo mode parameters
+    static constexpr double DEMO_THRUST = 1500.0;      // N (thrust force)
+    static constexpr double DEMO_BURN_TIME = 3.5;      // seconds
+    static constexpr double DEMO_MASS = 20.0;          // kg (initial)
+    static constexpr double DEMO_MASS_FLOW = 1.5;      // kg/s
+
+    // Helper: Apply demo thrust acceleration to derivatives
+    // State layout: [0]=time, [1-3]=pos, [4-6]=vel, [7-10]=quat, [11-13]=omega
+    void applyDemoThrust(std::vector<double>& derivs, double t) const {
+        if (!m_demo_mode || t > DEMO_BURN_TIME) return;
+
+        // Get current attitude quaternion from state
+        double q1 = m_state[7], q2 = m_state[8], q3 = m_state[9], q4 = m_state[10];
+
+        // Thrust is along body X axis, rotate to ENU frame
+        // Body X in ENU = quaternion rotation of (1,0,0)
+        double bx_e = 1.0 - 2.0*(q3*q3 + q4*q4);
+        double bx_n = 2.0*(q2*q3 + q1*q4);
+        double bx_u = 2.0*(q2*q4 - q1*q3);
+
+        // Current mass (decreasing during burn)
+        double mass = DEMO_MASS - DEMO_MASS_FLOW * t;
+        if (mass < 5.0) mass = 5.0;  // Minimum dry mass
+
+        // Thrust acceleration in ENU
+        double accel = DEMO_THRUST / mass;
+        derivs[4] += accel * bx_e;  // East acceleration
+        derivs[5] += accel * bx_n;  // North acceleration
+        derivs[6] += accel * bx_u;  // Up acceleration
+    }
 
     // Helper: RK4 single step (manual implementation to avoid external dependencies)
     void rk4Step(double dt) {
         auto k1 = m_rocket.computeDerivatives(m_time, m_state);
+        applyDemoThrust(k1, m_time);
 
         // Compute k2 = f(t + dt/2, y + k1*dt/2)
         std::vector<double> temp_state(m_state.size());
@@ -48,18 +81,21 @@ private:
             temp_state[i] = m_state[i] + 0.5 * dt * k1[i];
         }
         auto k2 = m_rocket.computeDerivatives(m_time + 0.5 * dt, temp_state);
+        applyDemoThrust(k2, m_time + 0.5 * dt);
 
         // Compute k3 = f(t + dt/2, y + k2*dt/2)
         for (size_t i = 0; i < m_state.size(); ++i) {
             temp_state[i] = m_state[i] + 0.5 * dt * k2[i];
         }
         auto k3 = m_rocket.computeDerivatives(m_time + 0.5 * dt, temp_state);
+        applyDemoThrust(k3, m_time + 0.5 * dt);
 
         // Compute k4 = f(t + dt, y + k3*dt)
         for (size_t i = 0; i < m_state.size(); ++i) {
             temp_state[i] = m_state[i] + dt * k3[i];
         }
         auto k4 = m_rocket.computeDerivatives(m_time + dt, temp_state);
+        applyDemoThrust(k4, m_time + dt);
 
         // Update: y_{n+1} = y_n + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
         for (size_t i = 0; i < m_state.size(); ++i) {
@@ -131,6 +167,23 @@ public:
             "Please use loadEngineDataFromPath() for Phase 1 prototype, "
             "or wait for Phase 2 array-based API."
         );
+    }
+
+    /**
+     * Load demo data with hardcoded values for a simple sounding rocket
+     * This allows the demo to work without any external data files
+     */
+    void loadDemoData() {
+        // Demo rocket parameters (typical small sounding rocket):
+        // - Mass: 15 kg dry, 20 kg wet (5 kg propellant)
+        // - Thrust: ~800 N for 3 seconds
+        // - Diameter: 0.16 m
+
+        // Note: Since we can't easily set up interpolators without the internal
+        // API, we'll use constant values. The RocketBody already has defaults.
+        // For a proper demo, we'd need to expose array-based loading.
+
+        m_demo_mode = true;
     }
 
     /**
@@ -363,6 +416,9 @@ EMSCRIPTEN_BINDINGS(sopot_module) {
         // Data loading (arrays - Phase 2)
         .function("loadMassData", &RocketSimulator::loadMassData)
         .function("loadEngineData", &RocketSimulator::loadEngineData)
+
+        // Demo data (embedded, no external files needed)
+        .function("loadDemoData", &RocketSimulator::loadDemoData)
 
         // Data loading (file paths - prototype only)
         .function("loadMassDataFromPath", &RocketSimulator::loadMassDataFromPath)

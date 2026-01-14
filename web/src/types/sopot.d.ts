@@ -31,6 +31,9 @@ export interface RocketSimulator {
   setDiameter(diameter: number): void;
   setTimestep(dt: number): void;
 
+  // Demo data (embedded, no external files needed)
+  loadDemoData(): void;
+
   // Data loading (Phase 1 - file paths)
   loadMassDataFromPath(path: string): void;
   loadEngineDataFromPath(path: string): void;

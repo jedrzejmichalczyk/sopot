@@ -39,6 +39,7 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
 
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number>(0);
+  const isRunningRef = useRef(false);
 
   // Load WebAssembly module on mount
   useEffect(() => {
@@ -96,9 +97,8 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
       sim.setDiameter(config.diameter);
       sim.setTimestep(config.timestep);
 
-      // Load data if path provided
-      // Note: For demo, we'll skip file loading
-      // In production, you'd load from public/ directory or embedded data
+      // Load demo data (embedded in WASM, no external files needed)
+      sim.loadDemoData();
 
       // Initialize the simulation system
       sim.setup();
@@ -115,9 +115,9 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
     }
   }, [module]);
 
-  // Animation loop
+  // Animation loop - uses ref to avoid stale closure
   const animate = useCallback((currentTime: number) => {
-    if (!simulator || !isRunning) return;
+    if (!simulator || !isRunningRef.current) return;
 
     lastFrameTimeRef.current = currentTime;
 
@@ -131,6 +131,7 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
 
         if (!shouldContinue) {
           // Simulation ended (rocket landed)
+          isRunningRef.current = false;
           setIsRunning(false);
           console.log('Simulation complete at t =', simulator.getTime());
           break;
@@ -140,27 +141,30 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
       // Update state for visualization
       setCurrentState(simulator.getFullState());
 
-      if (shouldContinue) {
+      if (shouldContinue && isRunningRef.current) {
         animationFrameRef.current = requestAnimationFrame(animate);
       }
     } catch (err) {
       console.error('Animation error:', err);
+      isRunningRef.current = false;
       setIsRunning(false);
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [simulator, isRunning, playbackSpeed]);
+  }, [simulator, playbackSpeed]);
 
   // Start simulation
   const start = useCallback(() => {
-    if (!simulator || isRunning) return;
+    if (!simulator || isRunningRef.current) return;
 
+    isRunningRef.current = true;
     setIsRunning(true);
     lastFrameTimeRef.current = performance.now();
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [simulator, isRunning, animate]);
+  }, [simulator, animate]);
 
   // Pause simulation
   const pause = useCallback(() => {
+    isRunningRef.current = false;
     setIsRunning(false);
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
