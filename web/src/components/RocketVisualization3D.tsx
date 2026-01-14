@@ -92,34 +92,38 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
 
   return (
     <group ref={groupRef}>
-      {/* Rocket body - metallic red cylinder */}
-      <Cylinder args={[0.08, 0.08, 1.0, 16]} rotation={[Math.PI / 2, 0, 0]}>
-        <meshStandardMaterial color="#cc0000" metalness={0.7} roughness={0.3} />
-      </Cylinder>
+      {/* Inner group rotated so rocket points up (+Y) by default */}
+      {/* The outer group receives the physics quaternion */}
+      <group rotation={[0, 0, Math.PI / 2]}>
+        {/* Rocket body - metallic red cylinder */}
+        <Cylinder args={[0.08, 0.08, 1.0, 16]} rotation={[Math.PI / 2, 0, 0]}>
+          <meshStandardMaterial color="#cc0000" metalness={0.7} roughness={0.3} />
+        </Cylinder>
 
-      {/* Nose cone - white tip */}
-      <Cone
-        args={[0.08, 0.25, 16]}
-        position={[0.625, 0, 0]}
-        rotation={[0, 0, -Math.PI / 2]}
-      >
-        <meshStandardMaterial color="#ffffff" metalness={0.5} roughness={0.5} />
-      </Cone>
+        {/* Nose cone - white tip */}
+        <Cone
+          args={[0.08, 0.25, 16]}
+          position={[0.625, 0, 0]}
+          rotation={[0, 0, -Math.PI / 2]}
+        >
+          <meshStandardMaterial color="#ffffff" metalness={0.5} roughness={0.5} />
+        </Cone>
 
-      {/* Fins (4 fins at 90° intervals) */}
-      {[0, 90, 180, 270].map((angle, i) => {
-        const rad = (angle * Math.PI) / 180;
-        return (
-          <mesh
-            key={i}
-            position={[-0.4, Math.cos(rad) * 0.12, Math.sin(rad) * 0.12]}
-            rotation={[0, rad, 0]}
-          >
-            <boxGeometry args={[0.15, 0.02, 0.15]} />
-            <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
-          </mesh>
-        );
-      })}
+        {/* Fins (4 fins at 90° intervals) */}
+        {[0, 90, 180, 270].map((angle, i) => {
+          const rad = (angle * Math.PI) / 180;
+          return (
+            <mesh
+              key={i}
+              position={[-0.4, Math.cos(rad) * 0.12, Math.sin(rad) * 0.12]}
+              rotation={[0, rad, 0]}
+            >
+              <boxGeometry args={[0.15, 0.02, 0.15]} />
+              <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
+            </mesh>
+          );
+        })}
+      </group>
 
       {/* Velocity vector (green arrow) - positioned at rocket center */}
       {velocityArrowRef.current && <primitive object={velocityArrowRef.current} />}
