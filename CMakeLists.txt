@@ -105,6 +105,11 @@ add_executable(auto_system_demo experimental/auto_system_demo.cpp)
 target_include_directories(auto_system_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
 target_compile_features(auto_system_demo PRIVATE cxx_std_20)
 
+# Reflection-based API prototype
+add_executable(reflect_two_masses examples/reflect_two_masses.cpp)
+target_include_directories(reflect_two_masses PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(reflect_two_masses PRIVATE cxx_std_20)
+
 # Custom target to run all tests
 add_custom_target(run_tests
     COMMAND compile_time_test

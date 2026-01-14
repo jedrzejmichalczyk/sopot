@@ -58,6 +58,7 @@ function App() {
     const interval = setInterval(() => {
       try {
         const data = simulation.simulator!.getTimeSeries();
+        console.log('[PlotPanel] Time series data points:', data?.time?.length || 0);
         setTimeSeries(data);
       } catch (error) {
         console.error('Error fetching time series:', error);
