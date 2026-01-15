@@ -14,6 +14,7 @@
 #include <memory>
 #include <vector>
 #include <cmath>
+#include <utility>
 
 using namespace emscripten;
 using namespace sopot;
@@ -73,29 +74,43 @@ private:
         m_time += dt;
     }
 
+    // Physics systems for each grid size (non-static to avoid cross-instance contamination)
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))> system_3x3;
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))> system_4x4;
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))> system_5x5;
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))> system_6x6;
+
     // Step functions for each grid size
     void step3x3() {
-        static auto system = makeGrid2DSystem<double, 3, 3, false>(
-            m_mass, m_spacing, m_stiffness, m_damping);
-        rk4Step(system, m_dt);
+        if (!system_3x3) {
+            system_3x3 = std::make_unique<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))>(
+                makeGrid2DSystem<double, 3, 3, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        }
+        rk4Step(*system_3x3, m_dt);
     }
 
     void step4x4() {
-        static auto system = makeGrid2DSystem<double, 4, 4, false>(
-            m_mass, m_spacing, m_stiffness, m_damping);
-        rk4Step(system, m_dt);
+        if (!system_4x4) {
+            system_4x4 = std::make_unique<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))>(
+                makeGrid2DSystem<double, 4, 4, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        }
+        rk4Step(*system_4x4, m_dt);
     }
 
     void step5x5() {
-        static auto system = makeGrid2DSystem<double, 5, 5, false>(
-            m_mass, m_spacing, m_stiffness, m_damping);
-        rk4Step(system, m_dt);
+        if (!system_5x5) {
+            system_5x5 = std::make_unique<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))>(
+                makeGrid2DSystem<double, 5, 5, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        }
+        rk4Step(*system_5x5, m_dt);
     }
 
     void step6x6() {
-        static auto system = makeGrid2DSystem<double, 6, 6, false>(
-            m_mass, m_spacing, m_stiffness, m_damping);
-        rk4Step(system, m_dt);
+        if (!system_6x6) {
+            system_6x6 = std::make_unique<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))>(
+                makeGrid2DSystem<double, 6, 6, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        }
+        rk4Step(*system_6x6, m_dt);
     }
 
 public:
