@@ -42,7 +42,8 @@ private:
     bool m_initialized{false};
 
     // We store derivatives function pointer based on grid size
-    enum class GridSize { G3x3, G4x4, G5x5, G6x6, G8x8, G10x10 };
+    // Limited to 6x6 to keep WASM compilation time reasonable
+    enum class GridSize { G3x3, G4x4, G5x5, G6x6 };
     GridSize m_grid_size{GridSize::G5x5};
 
     // Template-based systems for different grid sizes
@@ -97,18 +98,6 @@ private:
         rk4Step(system, m_dt);
     }
 
-    void step8x8() {
-        static auto system = makeGrid2DSystem<double, 8, 8, false>(
-            m_mass, m_spacing, m_stiffness, m_damping);
-        rk4Step(system, m_dt);
-    }
-
-    void step10x10() {
-        static auto system = makeGrid2DSystem<double, 10, 10, false>(
-            m_mass, m_spacing, m_stiffness, m_damping);
-        rk4Step(system, m_dt);
-    }
-
 public:
     Grid2DSimulator() = default;
 
@@ -117,7 +106,7 @@ public:
     //=========================================================================
 
     /**
-     * Set grid dimensions (must be one of: 3x3, 4x4, 5x5, 6x6, 8x8, 10x10)
+     * Set grid dimensions (must be one of: 3x3, 4x4, 5x5, 6x6)
      */
     void setGridSize(int rows, int cols) {
         if (rows != cols) {
@@ -132,10 +121,8 @@ public:
             case 4:  m_grid_size = GridSize::G4x4; break;
             case 5:  m_grid_size = GridSize::G5x5; break;
             case 6:  m_grid_size = GridSize::G6x6; break;
-            case 8:  m_grid_size = GridSize::G8x8; break;
-            case 10: m_grid_size = GridSize::G10x10; break;
             default:
-                throw std::runtime_error("Grid size must be 3, 4, 5, 6, 8, or 10");
+                throw std::runtime_error("Grid size must be 3, 4, 5, or 6");
         }
     }
 
@@ -217,8 +204,6 @@ public:
             case GridSize::G4x4:  step4x4(); break;
             case GridSize::G5x5:  step5x5(); break;
             case GridSize::G6x6:  step6x6(); break;
-            case GridSize::G8x8:  step8x8(); break;
-            case GridSize::G10x10: step10x10(); break;
         }
     }
 
