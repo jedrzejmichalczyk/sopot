@@ -8,36 +8,84 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# ============================================================================
+# Compilation time optimizations
+# ============================================================================
+
+# Enable ccache if available (speeds up recompilation)
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    message(STATUS "Using ccache for faster recompilation")
+endif()
+
 # Platform-specific compiler flags
 if(MSVC)
     add_compile_options(/W4 /permissive-)
     add_compile_options("$<$<CONFIG:Release>:/O2>")
+    # MSVC template compilation optimizations
+    add_compile_options(/bigobj)  # Increase object file section limit
+    add_compile_options(/constexpr:depth2048)  # Increase constexpr evaluation depth
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
     add_compile_options("$<$<CONFIG:Release>:-O3>")
     add_compile_options("$<$<CONFIG:Debug>:-O0;-g>")
+
+    # GCC/Clang template compilation optimizations
+    add_compile_options(-ftemplate-depth=2048)  # Increase template instantiation depth
+
+    # Optional: Enable compilation time tracing (Clang only)
+    # Uncomment to generate time-trace JSON files for analysis
+    # add_compile_options($<$<CXX_COMPILER_ID:Clang>:-ftime-trace>)
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+# ============================================================================
+# Explicit template instantiation libraries
+# These precompile common template instantiations to speed up builds
+# ============================================================================
+
+# Core instantiations (Dual numbers, TypedComponent, etc.)
+add_library(sopot_core_inst STATIC src/core_instantiations.cpp)
+target_include_directories(sopot_core_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(sopot_core_inst PRIVATE cxx_std_20)
+
+# Rocket instantiations (Vector3, Quaternion, rocket components)
+add_library(sopot_rocket_inst STATIC src/rocket_instantiations.cpp)
+target_include_directories(sopot_rocket_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(sopot_rocket_inst PUBLIC sopot_core_inst)
+target_compile_features(sopot_rocket_inst PRIVATE cxx_std_20)
+
+# Physics instantiations (mass-spring systems)
+add_library(sopot_physics_inst STATIC src/physics_instantiations.cpp)
+target_include_directories(sopot_physics_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(sopot_physics_inst PUBLIC sopot_core_inst)
+target_compile_features(sopot_physics_inst PRIVATE cxx_std_20)
+
+# ============================================================================
+# Header-only library interfaces (for compatibility)
+# ============================================================================
 
 # Header-only core library
 add_library(sopot_core INTERFACE)
 target_include_directories(sopot_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(sopot_core INTERFACE sopot_core_inst)
 
 # Header-only physics library
 add_library(sopot_physics INTERFACE)
 target_include_directories(sopot_physics INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/physics)
-target_link_libraries(sopot_physics INTERFACE sopot_core)
+target_link_libraries(sopot_physics INTERFACE sopot_core sopot_physics_inst)
 
 # Header-only rocket library
 add_library(sopot_rocket INTERFACE)
 target_include_directories(sopot_rocket INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/rocket
     ${CMAKE_CURRENT_SOURCE_DIR}/io)
-target_link_libraries(sopot_rocket INTERFACE sopot_core)
+target_link_libraries(sopot_rocket INTERFACE sopot_core sopot_rocket_inst)
 
 set(ROCKET_HEADERS
     rocket/rocket.hpp
@@ -129,8 +177,53 @@ add_custom_target(run_tests
     COMMENT "Running SOPOT tests"
 )
 
+# ============================================================================
+# Additional compilation time optimizations
+# ============================================================================
+
+# Enable unity builds for faster compilation (optional, can be enabled with -DCMAKE_UNITY_BUILD=ON)
+# This combines multiple source files into single translation units
+# Uncomment to enable by default:
+# set(CMAKE_UNITY_BUILD ON)
+
+# Apply precompiled headers to all test executables
+set(TEST_TARGETS
+    compile_time_test
+    autodiff_test
+    coupled_oscillator_test
+    rocket_flight_test
+    connected_masses_test
+    connected_masses_validation_test
+    grid_2d_test
+)
+
+# First target creates the PCH, others reuse it
+foreach(target ${TEST_TARGETS})
+    if(target STREQUAL "compile_time_test")
+        # First test creates the precompiled header
+        target_precompile_headers(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core/pch.hpp)
+    else()
+        # Subsequent tests reuse the PCH
+        target_precompile_headers(${target} REUSE_FROM compile_time_test)
+    endif()
+endforeach()
+
 message(STATUS "SOPOT Configuration:")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Architecture: Pure compile-time dispatch")
 message(STATUS "  Performance: Zero runtime overhead")
+message(STATUS "")
+message(STATUS "Compilation Optimizations:")
+message(STATUS "  Precompiled headers: Enabled")
+message(STATUS "  Explicit instantiations: Enabled")
+if(CCACHE_PROGRAM)
+    message(STATUS "  ccache: Enabled (${CCACHE_PROGRAM})")
+else()
+    message(STATUS "  ccache: Not found (install ccache for faster rebuilds)")
+endif()
+if(CMAKE_UNITY_BUILD)
+    message(STATUS "  Unity builds: Enabled")
+else()
+    message(STATUS "  Unity builds: Disabled (enable with -DCMAKE_UNITY_BUILD=ON)")
+endif()
