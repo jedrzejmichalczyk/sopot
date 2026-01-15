@@ -20,7 +20,8 @@ set(SOURCES
 )
 
 # Emscripten-specific compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
+# Increase template depth limits for large grid systems (10x10 grid = 380+ components)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -ftemplate-depth=1024 -fconstexpr-depth=1024 -fbracket-depth=1024")
 
 # Emscripten link flags
 set(EMSCRIPTEN_LINK_FLAGS
