@@ -86,7 +86,7 @@ else
         OPT_FLAGS="-O0 -g -s ASSERTIONS=1 -s SAFE_HEAP=1"
     fi
 
-    # Build command
+    # Build command - includes both rocket and grid2d
     emcc -std=c++20 \
         $OPT_FLAGS \
         -lembind \
@@ -100,6 +100,7 @@ else
         -fexceptions \
         -I.. \
         wasm_rocket.cpp \
+        wasm_grid2d.cpp \
         -o sopot.js
 fi
 
