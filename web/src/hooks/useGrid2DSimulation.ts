@@ -25,36 +25,51 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   const [rows] = useState(defaultRows);
   const [cols] = useState(defaultCols);
 
-  // Load WASM module
+  // Load WASM module (same approach as useRocketSimulation)
   useEffect(() => {
+    let mounted = true;
+
     const loadModule = async () => {
       try {
-        // Check if module is available (loaded in index.html)
-        if (typeof window !== 'undefined' && window.createSopotModule) {
-          console.log('[Grid2D] Loading WASM module...');
-          const module = await window.createSopotModule();
-          moduleRef.current = module;
+        console.log('[Grid2D] Loading WASM module...');
 
-          // Check if Grid2DSimulator is available
-          if (module.Grid2DSimulator) {
-            console.log('[Grid2D] WASM module loaded with Grid2DSimulator');
-            setIsReady(true);
-          } else {
-            console.warn('[Grid2D] Grid2DSimulator not found in WASM module');
-            setError('Grid2DSimulator not available. Rebuild WASM module.');
-          }
+        // Use base URL to handle GitHub Pages deployment path
+        const basePath = import.meta.env.BASE_URL || '/';
+        const moduleUrl = `${basePath}sopot.js`;
+
+        console.log(`[Grid2D] Loading from: ${moduleUrl}`);
+
+        // @ts-ignore - Dynamic import of WebAssembly
+        const createSopotModule = await import(/* @vite-ignore */ moduleUrl);
+
+        if (!mounted) return;
+
+        const module = await createSopotModule.default();
+
+        if (!mounted) return;
+
+        moduleRef.current = module;
+
+        // Check if Grid2DSimulator is available
+        if (module.Grid2DSimulator) {
+          console.log('[Grid2D] WASM module loaded with Grid2DSimulator');
+          setIsReady(true);
         } else {
-          console.warn('[Grid2D] WASM module not loaded yet, retrying...');
-          // Retry after a short delay
-          setTimeout(loadModule, 500);
+          console.warn('[Grid2D] Grid2DSimulator not found in WASM module');
+          setError('Grid2DSimulator not available. Rebuild WASM module.');
         }
       } catch (err) {
+        if (!mounted) return;
         console.error('[Grid2D] Failed to load WASM module:', err);
-        setError('Failed to load physics engine');
+        setError(`Failed to load physics engine: ${err instanceof Error ? err.message : String(err)}`);
       }
     };
 
     loadModule();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Convert WASM state to visualization state
