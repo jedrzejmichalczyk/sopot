@@ -147,8 +147,6 @@ export interface Grid2DSimulator {
   getState(): Grid2DWasmState;
   getMassPosition(row: number, col: number): { x: number; y: number };
   getKineticEnergy(): number;
-  getMomentum(): { px: number; py: number };
-  getCenterOfMass(): { x: number; y: number };
 }
 
 export interface SopotModule {

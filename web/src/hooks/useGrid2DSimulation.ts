@@ -175,9 +175,6 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   useEffect(() => {
     if (!isRunning || !simulatorRef.current) return;
 
-    let stepCount = 0;
-    const diagnosticInterval = 200; // Log every 200 steps (~1 second)
-
     const animate = (currentTime: number) => {
       const deltaTime = (currentTime - lastTimeRef.current) / 1000;
       lastTimeRef.current = currentTime;
@@ -187,21 +184,6 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
         const numSteps = Math.max(1, Math.floor(deltaTime * playbackSpeed / 0.005));
         for (let i = 0; i < Math.min(numSteps, 20); i++) {
           simulatorRef.current.step();
-          stepCount++;
-
-          // Log diagnostics periodically (with error handling for older WASM versions)
-          if (stepCount % diagnosticInterval === 0) {
-            try {
-              const t = simulatorRef.current.getTime();
-              const mom = simulatorRef.current.getMomentum?.() || { px: 0, py: 0 };
-              const com = simulatorRef.current.getCenterOfMass?.() || { x: 0, y: 0 };
-              const ke = simulatorRef.current.getKineticEnergy?.() || 0;
-
-              console.log(`[Grid2D Physics] t=${t.toFixed(2)}s | Momentum: (${mom.px.toFixed(6)}, ${mom.py.toFixed(6)}) | CoM: (${com.x.toFixed(4)}, ${com.y.toFixed(4)}) | KE: ${ke.toFixed(3)}`);
-            } catch (err) {
-              console.warn('[Grid2D Physics] Diagnostics not available:', err);
-            }
-          }
         }
         setCurrentState(wasmToVizState(simulatorRef.current));
       }

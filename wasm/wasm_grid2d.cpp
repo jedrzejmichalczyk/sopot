@@ -318,51 +318,6 @@ public:
         }
         return ke;
     }
-
-    /**
-     * Compute total momentum
-     */
-    val getMomentum() const {
-        val result = val::object();
-        if (!m_initialized) {
-            result.set("px", 0.0);
-            result.set("py", 0.0);
-            return result;
-        }
-
-        double px = 0.0, py = 0.0;
-        size_t num_masses = m_rows * m_cols;
-        for (size_t i = 0; i < num_masses; ++i) {
-            px += m_mass * m_state[i * 4 + 2];  // mass * vx
-            py += m_mass * m_state[i * 4 + 3];  // mass * vy
-        }
-        result.set("px", px);
-        result.set("py", py);
-        return result;
-    }
-
-    /**
-     * Compute center of mass position
-     */
-    val getCenterOfMass() const {
-        val result = val::object();
-        if (!m_initialized) {
-            result.set("x", 0.0);
-            result.set("y", 0.0);
-            return result;
-        }
-
-        double total_mass = m_mass * m_rows * m_cols;
-        double cx = 0.0, cy = 0.0;
-        size_t num_masses = m_rows * m_cols;
-        for (size_t i = 0; i < num_masses; ++i) {
-            cx += m_mass * m_state[i * 4 + 0];  // mass * x
-            cy += m_mass * m_state[i * 4 + 1];  // mass * y
-        }
-        result.set("x", cx / total_mass);
-        result.set("y", cy / total_mass);
-        return result;
-    }
 };
 
 //=============================================================================
@@ -400,7 +355,5 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
         .function("getVelocities", &Grid2DSimulator::getVelocities)
         .function("getState", &Grid2DSimulator::getState)
         .function("getMassPosition", &Grid2DSimulator::getMassPosition)
-        .function("getKineticEnergy", &Grid2DSimulator::getKineticEnergy)
-        .function("getMomentum", &Grid2DSimulator::getMomentum)
-        .function("getCenterOfMass", &Grid2DSimulator::getCenterOfMass);
+        .function("getKineticEnergy", &Grid2DSimulator::getKineticEnergy);
 }
