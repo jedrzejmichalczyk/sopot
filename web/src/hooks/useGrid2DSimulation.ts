@@ -189,14 +189,18 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
           simulatorRef.current.step();
           stepCount++;
 
-          // Log diagnostics periodically
+          // Log diagnostics periodically (with error handling for older WASM versions)
           if (stepCount % diagnosticInterval === 0) {
-            const t = simulatorRef.current.getTime();
-            const mom = simulatorRef.current.getMomentum();
-            const com = simulatorRef.current.getCenterOfMass();
-            const ke = simulatorRef.current.getKineticEnergy();
+            try {
+              const t = simulatorRef.current.getTime();
+              const mom = simulatorRef.current.getMomentum?.() || { px: 0, py: 0 };
+              const com = simulatorRef.current.getCenterOfMass?.() || { x: 0, y: 0 };
+              const ke = simulatorRef.current.getKineticEnergy?.() || 0;
 
-            console.log(`[Grid2D Physics] t=${t.toFixed(2)}s | Momentum: (${mom.px.toFixed(6)}, ${mom.py.toFixed(6)}) | CoM: (${com.x.toFixed(4)}, ${com.y.toFixed(4)}) | KE: ${ke.toFixed(3)}`);
+              console.log(`[Grid2D Physics] t=${t.toFixed(2)}s | Momentum: (${mom.px.toFixed(6)}, ${mom.py.toFixed(6)}) | CoM: (${com.x.toFixed(4)}, ${com.y.toFixed(4)}) | KE: ${ke.toFixed(3)}`);
+            } catch (err) {
+              console.warn('[Grid2D Physics] Diagnostics not available:', err);
+            }
           }
         }
         setCurrentState(wasmToVizState(simulatorRef.current));
