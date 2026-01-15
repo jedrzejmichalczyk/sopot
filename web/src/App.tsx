@@ -186,39 +186,41 @@ function App() {
             disabled={activeSim.isRunning}
           />
 
-          {simulationType === 'rocket' ? (
-            <ControlPanel
-              isReady={rocketSim.isReady}
-              isInitialized={rocketSim.isInitialized}
-              isRunning={rocketSim.isRunning}
-              error={rocketSim.error}
-              playbackSpeed={rocketSim.playbackSpeed}
-              onInitialize={rocketSim.initialize}
-              onStart={rocketSim.start}
-              onPause={rocketSim.pause}
-              onReset={rocketSim.reset}
-              onStep={rocketSim.step}
-              onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
-            />
-          ) : (
-            <Grid2DControlPanel
-              isReady={gridSim.isReady}
-              isInitialized={gridSim.isInitialized}
-              isRunning={gridSim.isRunning}
-              error={gridSim.error}
-              playbackSpeed={gridSim.playbackSpeed}
-              onInitialize={gridSim.initialize}
-              onStart={gridSim.start}
-              onPause={gridSim.pause}
-              onReset={gridSim.reset}
-              onStep={gridSim.step}
-              onPlaybackSpeedChange={gridSim.setPlaybackSpeed}
-              showVelocities={showVelocities}
-              showGrid={showGrid}
-              onShowVelocitiesChange={setShowVelocities}
-              onShowGridChange={setShowGrid}
-            />
-          )}
+          <div style={styles.controlPanelWrapper}>
+            {simulationType === 'rocket' ? (
+              <ControlPanel
+                isReady={rocketSim.isReady}
+                isInitialized={rocketSim.isInitialized}
+                isRunning={rocketSim.isRunning}
+                error={rocketSim.error}
+                playbackSpeed={rocketSim.playbackSpeed}
+                onInitialize={rocketSim.initialize}
+                onStart={rocketSim.start}
+                onPause={rocketSim.pause}
+                onReset={rocketSim.reset}
+                onStep={rocketSim.step}
+                onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
+              />
+            ) : (
+              <Grid2DControlPanel
+                isReady={gridSim.isReady}
+                isInitialized={gridSim.isInitialized}
+                isRunning={gridSim.isRunning}
+                error={gridSim.error}
+                playbackSpeed={gridSim.playbackSpeed}
+                onInitialize={gridSim.initialize}
+                onStart={gridSim.start}
+                onPause={gridSim.pause}
+                onReset={gridSim.reset}
+                onStep={gridSim.step}
+                onPlaybackSpeedChange={gridSim.setPlaybackSpeed}
+                showVelocities={showVelocities}
+                showGrid={showGrid}
+                onShowVelocitiesChange={setShowVelocities}
+                onShowGridChange={setShowGrid}
+              />
+            )}
+          </div>
         </div>
 
         {/* Center Panel: Visualization */}
@@ -287,7 +289,14 @@ const styles = {
     width: '320px',
     height: '100%',
     borderRight: '2px solid #34495e',
+    display: 'flex',
+    flexDirection: 'column' as const,
     overflow: 'hidden',
+  },
+  controlPanelWrapper: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'auto',
   },
   centerPanel: {
     flex: 1,
