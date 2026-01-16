@@ -28,6 +28,7 @@
 - **🚀 WebAssembly Ready** - Run C++20 physics in the browser with [interactive 3D demo](https://jedrzejmichalczyk.github.io/sopot/)
 - **Zero Runtime Overhead** - All state function dispatch resolved at compile time
 - **Automatic Differentiation** - Forward-mode autodiff for Jacobian computation
+- **Symbolic CAS** - Compile-time computer algebra for automatic constraint Jacobians
 - **Type-Safe Units** - Compile-time dimensional analysis prevents unit errors
 - **Modular Components** - Compose ODE systems from reusable building blocks
 - **Header-Only** - Just include and use, no linking required
@@ -51,6 +52,7 @@
 - [Features](#features)
   - [Compile-Time Dispatch](#compile-time-dispatch)
   - [Automatic Differentiation](#automatic-differentiation)
+  - [Symbolic CAS](#symbolic-cas)
   - [Type-Safe Units](#type-safe-units)
   - [WebAssembly Integration](#webassembly-integration)
 - [Architecture](#architecture)
@@ -168,6 +170,38 @@ auto [A, B] = linearizer.linearize(t, x0, u0);
 // A = df/dx, B = df/du - ready for LQR design
 ```
 
+### Symbolic CAS
+
+Compile-time computer algebra system for automatic constraint Jacobian derivation:
+
+```cpp
+#include "physics/constraints/symbolic/named_expression.hpp"
+
+using namespace sopot::symbolic;
+using namespace sopot::symbolic::cartesian::two_body_2d;
+
+// Define constraints using named symbols - reads like math!
+auto g1 = sq(x1) + sq(y1);              // Rod 1: x₁² + y₁² = L₁²
+auto g2 = sq(x2 - x1) + sq(y2 - y1);    // Rod 2: (x₂-x₁)² + (y₂-y₁)² = L₂²
+
+// Jacobian computed at COMPILE TIME via template metaprogramming
+using J = Jacobian<4, decltype(g1)::type, decltype(g2)::type>;
+
+std::array<double, 4> pos = {0.6, -0.8, 1.4, -1.4};
+auto jacobian = J::eval(pos);  // 2x4 Jacobian, zero runtime differentiation overhead
+```
+
+**Supported operations:**
+- Arithmetic: `+`, `-`, `*`, `/`, `sq()`, `pow<N>()`
+- Trigonometric: `sin()`, `cos()`, `sqrt()`
+- Automatic differentiation rules: product, quotient, chain rule
+- Gradient, Jacobian, and Hessian computation
+
+**Use cases:**
+- Constrained dynamics (pendulums, linkages)
+- Holonomic constraints with Baumgarte stabilization
+- Any algebraic constraint g(q) = 0
+
 ### Type-Safe Units
 
 Compile-time dimensional analysis catches unit errors before runtime:
@@ -250,8 +284,17 @@ sopot/
 │   ├── linearization.hpp         # System linearization
 │   └── solver.hpp                # RK4 integrator
 │
-├── physics/                      # Example components
-│   └── harmonic_oscillator.hpp
+├── physics/                      # Physics components
+│   ├── coupled_oscillator/       # Mass-spring systems
+│   ├── connected_masses/         # 1D/2D mass-spring networks
+│   ├── pendulum/                 # Double pendulum (Lagrangian & Cartesian)
+│   │   ├── double_pendulum.hpp   # Generalized coordinates
+│   │   ├── cartesian_pendulum.hpp # Cartesian with Baumgarte
+│   │   └── named_constraint_pendulum.hpp # Using named CAS
+│   └── constraints/symbolic/     # Compile-time CAS ⭐ NEW
+│       ├── expression.hpp        # Expression templates
+│       ├── differentiation.hpp   # Symbolic differentiation
+│       └── named_expression.hpp  # Named variables API
 │
 ├── rocket/                       # 6DOF rocket simulation
 │   ├── vector3.hpp               # 3D vector (autodiff-compatible)
@@ -319,6 +362,30 @@ public:
         return T(0.5) * m_k * x * x;
     }
 };
+```
+
+### Double Pendulum with Constraints
+
+```cpp
+#include "physics/pendulum/double_pendulum.hpp"
+
+using namespace sopot::pendulum;
+
+// Lagrangian formulation - 4 states: θ₁, θ₂, ω₁, ω₂
+DoublePendulum<double> pendulum(
+    /*m1=*/1.0, /*m2=*/1.0,
+    /*L1=*/1.0, /*L2=*/1.0,
+    /*g=*/9.81,
+    /*θ1_0=*/M_PI/4, /*θ2_0=*/M_PI/6  // Initial angles
+);
+
+auto system = makeTypedODESystem<double>(pendulum);
+auto solver = createRK4Solver();
+auto trajectory = solver.solve(system, 0.0, 20.0, 0.001);
+
+// Query state functions
+double energy = system.computeStateFunction<system::TotalEnergy>(state);
+auto pos1 = system.computeStateFunction<mass1::CartesianPosition>(state);
 ```
 
 ### 6DOF Rocket Simulation

@@ -242,3 +242,139 @@ The codebase has two parallel hierarchies:
 3. **Type safe** - Wrong tag = compile error, not runtime bug
 4. **Extensible** - Add new state functions without modifying core
 5. **Encapsulated** - Components don't know each other's state layout
+
+---
+
+## Compile-Time CAS (Computer Algebra System)
+
+### Purpose
+
+For constrained dynamics (pendulums, linkages, etc.), we need constraint Jacobians:
+- Constraint: g(q) = 0
+- Jacobian: J = ∂g/∂q
+
+Manual derivation is error-prone. SOPOT provides a **compile-time CAS** that derives Jacobians automatically via template metaprogramming.
+
+### Architecture
+
+```
+physics/constraints/symbolic/
+├── expression.hpp        # Expression template types
+├── differentiation.hpp   # Symbolic differentiation rules
+└── named_expression.hpp  # Ergonomic named variable API
+```
+
+### Expression Templates
+
+Expressions are **types**, not values. The entire expression tree is encoded in the type system:
+
+```cpp
+// Var<I> represents variable x_i
+using x = Var<0>;
+using y = Var<1>;
+
+// Add<L, R> represents L + R
+using expr = Add<Mul<x, x>, y>;  // x² + y
+
+// Evaluation happens at runtime, but structure is compile-time
+std::array<double, 2> vars = {3.0, 2.0};
+double result = eval<expr>(vars);  // = 11
+```
+
+### Symbolic Differentiation
+
+Differentiation rules are implemented as template specializations:
+
+```cpp
+// d/dx(const) = 0
+template<int N, int D, size_t I>
+struct Diff<Const<N, D>, I> { using type = Zero; };
+
+// d/dx(x_j) = δ_ij (Kronecker delta)
+template<size_t J, size_t I>
+struct Diff<Var<J>, I> { using type = std::conditional_t<I==J, One, Zero>; };
+
+// Product rule: d/dx(f·g) = f·(dg/dx) + (df/dx)·g
+template<typename L, typename R, size_t I>
+struct Diff<Mul<L, R>, I> {
+    using type = Add<Mul<L, Diff_t<R, I>>, Mul<Diff_t<L, I>, R>>;
+};
+
+// Chain rule: d/dx(sin(f)) = cos(f) · df/dx
+template<typename E, size_t I>
+struct Diff<Sin<E>, I> {
+    using type = Mul<Cos<E>, Diff_t<E, I>>;
+};
+```
+
+### Named Expressions
+
+For ergonomics, `named_expression.hpp` provides named variables:
+
+```cpp
+// Instead of:
+using g1 = Add<Square<Var<0>>, Square<Var<1>>>;
+
+// Write:
+namespace tb = symbolic::cartesian::two_body_2d;
+auto g1 = sq(tb::x1) + sq(tb::y1);  // Same compiled type!
+```
+
+### Jacobian Generation
+
+```cpp
+// Define constraints
+auto g1 = sq(x1) + sq(y1);           // x₁² + y₁²
+auto g2 = sq(x2-x1) + sq(y2-y1);     // (x₂-x₁)² + (y₂-y₁)²
+
+// Jacobian type is computed at compile time
+using J = Jacobian<4, decltype(g1)::type, decltype(g2)::type>;
+
+// Evaluation is runtime, but no symbolic work needed
+auto jacobian = J::eval(position);  // Returns 2x4 matrix
+```
+
+### Supported Operations
+
+| Category | Operations |
+|----------|------------|
+| Arithmetic | `Add`, `Sub`, `Mul`, `Div`, `Neg`, `Pow<E, N>` |
+| Trigonometric | `Sin`, `Cos` |
+| Other | `Sqrt`, `Square` (alias for `Pow<E, 2>`) |
+| Constants | `Const<N, D>`, `Zero`, `One`, `Two` |
+
+### Constraint Types Supported
+
+- **Holonomic constraints**: g(q) = 0 (position-only)
+- **Distance constraints**: |r₁ - r₂|² - L² = 0
+- **Angle constraints**: via sin/cos
+- **Polynomial constraints**: any degree
+- **Algebraic constraints**: involving ratios
+
+### Integration with Components
+
+The `SymbolicCartesianPendulum` demonstrates using CAS in a component:
+
+```cpp
+template<Scalar T>
+class SymbolicCartesianPendulum : public TypedComponent<8, T> {
+    // Constraints defined symbolically
+    using g1_type = Add<Square<Var<0>>, Square<Var<1>>>;
+    using g2_type = Add<Square<Sub<Var<2>, Var<0>>>, Square<Sub<Var<3>, Var<1>>>>;
+
+    // Jacobian computed at compile time
+    using ConstraintJacobian = Jacobian<4, g1_type, g2_type>;
+
+    // In derivatives(), use the Jacobian
+    auto J = ConstraintJacobian::eval(position);
+    // ... use J for Baumgarte stabilization
+};
+```
+
+### Benefits
+
+1. **Zero symbolic overhead at runtime** - All differentiation at compile time
+2. **Type-safe** - Invalid expressions won't compile
+3. **Readable** - Named expressions look like mathematical notation
+4. **Autodiff compatible** - Works with `Dual<T, N>` for nested derivatives
+5. **Extensible** - Add new operations by adding template specializations
