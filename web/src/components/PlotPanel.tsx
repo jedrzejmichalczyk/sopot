@@ -232,14 +232,14 @@ export function PlotPanel({ timeSeries }: PlotPanelProps) {
             data={chartData}
             margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#34495e" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-tertiary)" />
             <XAxis
               dataKey="time"
-              stroke="#ecf0f1"
+              stroke="var(--text-primary)"
               label={{ value: 'Time (s)', position: 'insideBottom', offset: -5 }}
             />
             <YAxis
-              stroke="#ecf0f1"
+              stroke="var(--text-primary)"
               label={{
                 value: selectedConfig.yLabel,
                 angle: -90,
@@ -248,11 +248,11 @@ export function PlotPanel({ timeSeries }: PlotPanelProps) {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#2c3e50',
-                border: '1px solid #34495e',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--bg-tertiary)',
                 borderRadius: '4px',
               }}
-              labelStyle={{ color: '#ecf0f1' }}
+              labelStyle={{ color: 'var(--text-primary)' }}
             />
             <Legend />
             {selectedConfig.lines.map((line) => (
@@ -292,28 +292,28 @@ const styles = {
     flexDirection: 'column' as const,
     width: '100%',
     height: '100%',
-    backgroundColor: '#2c3e50',
-    borderTop: '2px solid #34495e',
+    backgroundColor: 'var(--bg-secondary)',
+    borderTop: '2px solid var(--bg-tertiary)',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px 20px',
-    backgroundColor: '#34495e',
+    backgroundColor: 'var(--bg-tertiary)',
     borderBottom: '1px solid #4a5f7f',
   },
   title: {
     margin: 0,
     fontSize: '16px',
     fontWeight: 'bold' as const,
-    color: '#ecf0f1',
+    color: 'var(--text-primary)',
   },
   select: {
     padding: '6px 12px',
     fontSize: '14px',
-    backgroundColor: '#2c3e50',
-    color: '#ecf0f1',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
     border: '1px solid #4a5f7f',
     borderRadius: '4px',
     cursor: 'pointer',
@@ -328,12 +328,12 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     padding: '8px 20px',
-    backgroundColor: '#34495e',
+    backgroundColor: 'var(--bg-tertiary)',
     borderTop: '1px solid #4a5f7f',
   },
   infoText: {
     fontSize: '12px',
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
   },
   placeholder: {
     display: 'flex',
@@ -342,7 +342,7 @@ const styles = {
     height: '100%',
   },
   placeholderText: {
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
     fontSize: '14px',
   },
 };

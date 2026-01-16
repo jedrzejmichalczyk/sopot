@@ -46,7 +46,7 @@ export function Grid2DVisualization({
     if (!ctx) return;
 
     // Clear canvas
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = 'var(--bg-primary)';
     ctx.fillRect(0, 0, dimensions.width, dimensions.height);
 
     // Calculate bounds for scaling
@@ -84,7 +84,7 @@ export function Grid2DVisualization({
 
     // Draw grid edges (springs)
     if (showGrid) {
-      ctx.strokeStyle = '#34495e';
+      ctx.strokeStyle = 'var(--bg-tertiary)';
       ctx.lineWidth = 1;
 
       const { rows, cols } = state;
@@ -122,7 +122,7 @@ export function Grid2DVisualization({
 
     // Draw velocity vectors
     if (showVelocities && state.velocities) {
-      ctx.strokeStyle = '#3498db';
+      ctx.strokeStyle = 'var(--accent-cyan)';
       ctx.lineWidth = 2;
 
       const velocityScale = 0.1; // Scale factor for velocity visualization
@@ -165,7 +165,7 @@ export function Grid2DVisualization({
       const y = toCanvasY(pos.y);
 
       // Mass point
-      ctx.fillStyle = '#e74c3c';
+      ctx.fillStyle = 'var(--accent-red)';
       ctx.beginPath();
       ctx.arc(x, y, 4, 0, 2 * Math.PI);
       ctx.fill();
@@ -178,7 +178,7 @@ export function Grid2DVisualization({
     });
 
     // Draw time display
-    ctx.fillStyle = '#ecf0f1';
+    ctx.fillStyle = 'var(--text-primary)';
     ctx.font = '16px monospace';
     ctx.fillText(`t = ${state.time.toFixed(3)}s`, 10, 25);
 
@@ -210,7 +210,7 @@ const styles = {
     position: 'relative' as const,
     width: '100%',
     height: '100%',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: 'var(--bg-primary)',
     overflow: 'hidden',
   },
   canvas: {
@@ -230,7 +230,7 @@ const styles = {
     pointerEvents: 'none' as const,
   },
   placeholderText: {
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
     fontSize: '18px',
     fontWeight: 'bold' as const,
   },

@@ -18,15 +18,17 @@ export function SimulationSelector({
   const simulations = [
     {
       type: 'rocket' as SimulationType,
-      emoji: '🚀',
+      label: 'RKTFLT',
       title: 'Rocket Flight',
-      description: '6-DOF rocket simulation with aerodynamics',
+      description: '6-DOF trajectory simulation with aerodynamics',
+      subsystem: 'PROPULSION',
     },
     {
       type: 'grid2d' as SimulationType,
-      emoji: '🎨',
-      title: '2D Grid',
-      description: 'Mass-spring cloth/membrane simulation',
+      label: 'GRID2D',
+      title: '2D Mass-Spring Grid',
+      description: 'Deformable membrane physics simulation',
+      subsystem: 'STRUCTURAL',
     },
   ];
 
@@ -45,7 +47,7 @@ export function SimulationSelector({
               onMouseEnter={() => setHoveredType(sim.type)}
               onMouseLeave={() => setHoveredType(null)}
               disabled={disabled}
-              className="touch-button card"
+              className="touch-button mission-panel corner-accent"
               style={{
                 ...styles.card,
                 ...(isSelected ? styles.cardSelected : {}),
@@ -53,13 +55,14 @@ export function SimulationSelector({
                 ...(disabled ? styles.cardDisabled : {}),
               }}
             >
-              <div style={styles.emoji}>{sim.emoji}</div>
+              <div style={styles.labelContainer}>
+                <div className="technical-label" style={styles.label}>{sim.label}</div>
+                <div style={styles.subsystem}>{sim.subsystem}</div>
+              </div>
               <div style={styles.cardTitle}>{sim.title}</div>
               <div style={styles.cardDescription}>{sim.description}</div>
               {isSelected && (
-                <div style={styles.selectedIndicator}>
-                  <span style={styles.checkmark}>✓</span> Active
-                </div>
+                <div className="status-indicator active" style={styles.statusDot}></div>
               )}
             </button>
           );
@@ -72,74 +75,77 @@ export function SimulationSelector({
 const styles = {
   container: {
     padding: '20px',
-    borderBottom: '1px solid #34495e',
+    borderBottom: '1px solid var(--border-color)',
+    background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
   },
   header: {
     margin: '0 0 15px 0',
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: 600,
-    color: '#ecf0f1',
+    color: 'var(--text-secondary)',
     textTransform: 'uppercase' as const,
-    letterSpacing: '1px',
+    letterSpacing: '2px',
   },
   cardContainer: {
     display: 'flex',
-    gap: '10px',
+    gap: '12px',
     flexDirection: 'column' as const,
   },
   card: {
-    padding: '15px',
-    backgroundColor: '#2c3e50',
-    border: '2px solid #34495e',
-    borderRadius: '8px',
+    padding: '16px',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.25s ease',
     textAlign: 'left' as const,
     position: 'relative' as const,
   },
   cardSelected: {
-    backgroundColor: '#34495e',
-    borderColor: '#3498db',
-    boxShadow: '0 0 10px rgba(52, 152, 219, 0.3)',
+    borderColor: 'var(--accent-cyan)',
+    boxShadow: '0 0 16px rgba(0, 212, 255, 0.4), inset 0 1px 0 rgba(0, 212, 255, 0.2)',
   },
   cardHovered: {
     transform: 'translateY(-2px)',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.4)',
   },
   cardDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
     cursor: 'not-allowed',
   },
-  emoji: {
-    fontSize: '32px',
-    marginBottom: '8px',
+  labelContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  },
+  label: {
+    fontSize: '14px',
+    color: 'var(--accent-cyan)',
+    padding: '4px 8px',
+    background: 'rgba(0, 212, 255, 0.1)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    borderRadius: '4px',
+  },
+  subsystem: {
+    fontSize: '9px',
+    color: 'var(--text-secondary)',
+    letterSpacing: '1.5px',
+    fontWeight: 600,
+    textTransform: 'uppercase' as const,
   },
   cardTitle: {
     fontSize: '16px',
-    fontWeight: 'bold' as const,
-    color: '#ecf0f1',
-    marginBottom: '4px',
+    fontWeight: 600,
+    color: 'var(--text-primary)',
+    marginBottom: '6px',
+    letterSpacing: '0.3px',
   },
   cardDescription: {
     fontSize: '12px',
-    color: '#95a5a6',
-    lineHeight: '1.4',
+    color: 'var(--text-secondary)',
+    lineHeight: '1.5',
   },
-  selectedIndicator: {
+  statusDot: {
     position: 'absolute' as const,
-    top: '10px',
-    right: '10px',
-    backgroundColor: '#27ae60',
-    color: '#fff',
-    fontSize: '11px',
-    padding: '4px 8px',
-    borderRadius: '12px',
-    fontWeight: 'bold' as const,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
-  checkmark: {
-    fontSize: '12px',
+    top: '12px',
+    right: '12px',
   },
 };

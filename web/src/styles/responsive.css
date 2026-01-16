@@ -1,5 +1,6 @@
 /**
- * SOPOT Responsive Design System
+ * SOPOT Aerospace Engineering Interface
+ * Mission Control Inspired Design System
  * Mobile-first responsive styles with touch-optimized controls
  */
 
@@ -7,17 +8,24 @@
    VARIABLES & THEME
    ============================================ */
 :root {
-  /* Colors */
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2c3e50;
-  --bg-tertiary: #34495e;
-  --text-primary: #ecf0f1;
-  --text-secondary: #95a5a6;
-  --border-color: #34495e;
-  --accent-blue: #3498db;
-  --accent-green: #2ecc71;
-  --accent-red: #e74c3c;
-  --accent-orange: #f39c12;
+  /* Aerospace Color Palette - Mission Control Inspired */
+  --bg-primary: #0a0e14;        /* Space black */
+  --bg-secondary: #141b24;      /* Mission control panel */
+  --bg-tertiary: #1a2332;       /* Card backgrounds */
+  --text-primary: #c5d4e8;      /* Light technical blue-gray */
+  --text-secondary: #7a8a9e;    /* Medium technical gray */
+  --border-color: #2a3f5f;      /* Steel blue borders */
+  --accent-cyan: #00d4ff;       /* Telemetry data (primary accent) */
+  --accent-green: #00ff88;      /* Go/Success status */
+  --accent-amber: #ffaa00;      /* Warning/Caution */
+  --accent-red: #ff3b3b;        /* Critical/Danger */
+
+  /* Technical grid overlay */
+  --grid-color: rgba(42, 63, 95, 0.3);
+  --grid-highlight: rgba(0, 212, 255, 0.1);
+
+  /* Monospace font for technical displays */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
 
   /* Spacing */
   --spacing-xs: 4px;
@@ -122,7 +130,7 @@ body {
   }
 
   .mobile-nav-button.active {
-    color: var(--accent-blue);
+    color: var(--accent-cyan);
   }
 
   .mobile-nav-button:active {
@@ -377,19 +385,21 @@ body {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--accent-blue);
+  background: var(--accent-cyan);
   cursor: pointer;
   transition: all var(--transition-fast);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
 }
 
 .touch-slider::-moz-range-thumb {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--accent-blue);
+  background: var(--accent-cyan);
   cursor: pointer;
   border: none;
   transition: all var(--transition-fast);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
 }
 
 @media (max-width: 767px) {
@@ -536,7 +546,7 @@ body {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--accent-cyan);
   outline-offset: 2px;
 }
 
@@ -590,4 +600,185 @@ select:focus-visible {
   .center-panel {
     width: 100% !important;
   }
+}
+
+/* ============================================
+   AEROSPACE ENGINEERING THEME
+   ============================================ */
+
+/* Technical grid background pattern */
+.technical-grid {
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 20px 20px;
+  position: relative;
+}
+
+.technical-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 0%, var(--bg-primary) 100%);
+  pointer-events: none;
+}
+
+/* Mission control panel styling */
+.mission-panel {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--border-color);
+  box-shadow:
+    inset 0 1px 0 rgba(0, 212, 255, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Data readout styling (monospace technical text) */
+.data-readout {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--accent-cyan);
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+/* Status indicator lights */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-indicator.active {
+  background-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.status-indicator.standby {
+  background-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.status-indicator.inactive {
+  background-color: var(--text-secondary);
+  color: var(--text-secondary);
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Technical label styling */
+.technical-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Mission control button variants */
+.btn-primary {
+  background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #00aa66 0%, #007744 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 12px rgba(0, 170, 102, 0.3);
+}
+
+.btn-success:hover {
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #cc8800 0%, #996600 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  box-shadow: 0 0 12px rgba(204, 136, 0, 0.3);
+}
+
+.btn-warning:hover {
+  box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #cc3333 0%, #992222 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 59, 59, 0.3);
+  box-shadow: 0 0 12px rgba(204, 51, 51, 0.3);
+}
+
+.btn-danger:hover {
+  box-shadow: 0 0 20px rgba(255, 59, 59, 0.5);
+}
+
+/* Telemetry value highlight */
+.telemetry-value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+/* Section dividers with technical styling */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border-color) 20%,
+    var(--border-color) 80%,
+    transparent 100%
+  );
+  margin: var(--spacing-lg) 0;
+}
+
+/* Corner accent decoration (mission control aesthetic) */
+.corner-accent {
+  position: relative;
+}
+
+.corner-accent::before,
+.corner-accent::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent-cyan);
+  opacity: 0.3;
+}
+
+.corner-accent::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.corner-accent::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
 }
