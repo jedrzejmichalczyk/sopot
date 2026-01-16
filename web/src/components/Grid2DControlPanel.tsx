@@ -73,6 +73,7 @@ export function Grid2DControlPanel({
           <button
             onClick={onInitialize}
             disabled={!isReady}
+            className="touch-button"
             style={{
               ...styles.button,
               ...styles.buttonPrimary,
@@ -85,6 +86,7 @@ export function Grid2DControlPanel({
           <div style={styles.buttonGroup}>
             <button
               onClick={isRunning ? onPause : onStart}
+              className="touch-button"
               style={{
                 ...styles.button,
                 ...styles.buttonPrimary,
@@ -94,6 +96,7 @@ export function Grid2DControlPanel({
             </button>
             <button
               onClick={onReset}
+              className="touch-button"
               style={{
                 ...styles.button,
                 ...styles.buttonSecondary,
@@ -104,6 +107,7 @@ export function Grid2DControlPanel({
             <button
               onClick={onStep}
               disabled={isRunning}
+              className="touch-button"
               style={{
                 ...styles.button,
                 ...styles.buttonSecondary,
@@ -125,6 +129,7 @@ export function Grid2DControlPanel({
               key={speed}
               onClick={() => onPlaybackSpeedChange(speed)}
               disabled={!isInitialized}
+              className="touch-button"
               style={{
                 ...styles.speedButton,
                 ...(playbackSpeed === speed ? styles.speedButtonActive : {}),

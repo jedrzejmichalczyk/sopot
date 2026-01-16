@@ -76,6 +76,7 @@ export function ControlPanel({
                 min={0}
                 max={90}
                 step={1}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -94,6 +95,7 @@ export function ControlPanel({
                 min={0}
                 max={360}
                 step={1}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -112,6 +114,7 @@ export function ControlPanel({
                 min={0.01}
                 max={1}
                 step={0.01}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -130,6 +133,7 @@ export function ControlPanel({
                 min={0.001}
                 max={0.1}
                 step={0.001}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -139,6 +143,7 @@ export function ControlPanel({
           <button
             onClick={handleInitialize}
             disabled={!isReady || isInitializing}
+            className="touch-button"
             style={{
               ...styles.button,
               ...styles.buttonPrimary,
@@ -166,6 +171,7 @@ export function ControlPanel({
               {!isRunning ? (
                 <button
                   onClick={onStart}
+                  className="touch-button"
                   style={{ ...styles.button, ...styles.buttonSuccess }}
                 >
                   ▶ Start
@@ -173,6 +179,7 @@ export function ControlPanel({
               ) : (
                 <button
                   onClick={onPause}
+                  className="touch-button"
                   style={{ ...styles.button, ...styles.buttonWarning }}
                 >
                   ⏸ Pause
@@ -182,6 +189,7 @@ export function ControlPanel({
               <button
                 onClick={onStep}
                 disabled={isRunning}
+                className="touch-button"
                 style={{
                   ...styles.button,
                   ...styles.buttonInfo,
@@ -193,6 +201,7 @@ export function ControlPanel({
 
               <button
                 onClick={onReset}
+                className="touch-button"
                 style={{ ...styles.button, ...styles.buttonDanger }}
               >
                 ⟲ Reset
@@ -213,6 +222,7 @@ export function ControlPanel({
                 onChange={(e) =>
                   onPlaybackSpeedChange(parseFloat(e.target.value))
                 }
+                className="touch-slider"
                 style={styles.slider}
                 disabled={!isInitialized}
               />

@@ -210,9 +210,10 @@ export function PlotPanel({ timeSeries }: PlotPanelProps) {
     <div style={styles.container}>
       {/* Plot selector */}
       <div style={styles.header}>
-        <h3 style={styles.title}>State Function Time Series</h3>
+        <h3 style={styles.title} className="section-title">State Function Time Series</h3>
         <select
           style={styles.select}
+          className="touch-input"
           value={selectedPlot}
           onChange={(e) => setSelectedPlot(e.target.value as PlotType)}
         >

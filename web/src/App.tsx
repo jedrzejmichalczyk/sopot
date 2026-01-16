@@ -10,11 +10,16 @@ import { PlotPanel } from './components/PlotPanel';
 import { useRocketSimulation } from './hooks/useRocketSimulation';
 import { useGrid2DSimulation } from './hooks/useGrid2DSimulation';
 import type { TimeSeriesData } from './types/sopot';
+import './styles/responsive.css';
+
+type MobilePanel = 'controls' | 'telemetry' | 'plots' | null;
 
 function App() {
   const [simulationType, setSimulationType] = useState<SimulationType>('rocket');
   const [showVelocities, setShowVelocities] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Note: Both hooks are instantiated to maintain React hook call order,
   // but inactive simulations are reset when switching types to free resources.
@@ -29,6 +34,21 @@ function App() {
 
   // Get the active simulation based on type
   const activeSim = simulationType === 'rocket' ? rocketSim : gridSim;
+
+  // Handle window resize for responsive layout
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Close mobile panel when switching to desktop
+      if (!mobile) {
+        setMobilePanel(null);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Track trajectory history (rocket only)
   useEffect(() => {
@@ -175,18 +195,141 @@ function App() {
   };
 
   return (
-    <div style={styles.container}>
-      {/* Top section: 3-column layout */}
-      <div style={styles.topSection}>
-        {/* Left Panel: Controls */}
-        <div style={styles.leftPanel}>
-          <SimulationSelector
-            currentSimulation={simulationType}
-            onSimulationChange={handleSimulationTypeChange}
-            disabled={activeSim.isRunning}
-          />
+    <div className="app-container">
+      {/* Mobile Navigation */}
+      {isMobile && (
+        <div className="mobile-nav mobile-only">
+          <button
+            className={`mobile-nav-button ${mobilePanel === 'controls' ? 'active' : ''}`}
+            onClick={() => setMobilePanel(mobilePanel === 'controls' ? null : 'controls')}
+          >
+            <span className="mobile-nav-icon">⚙️</span>
+            <span>Controls</span>
+          </button>
+          <button
+            className={`mobile-nav-button ${mobilePanel === 'telemetry' ? 'active' : ''}`}
+            onClick={() => setMobilePanel(mobilePanel === 'telemetry' ? null : 'telemetry')}
+            disabled={simulationType !== 'rocket'}
+          >
+            <span className="mobile-nav-icon">📊</span>
+            <span>Data</span>
+          </button>
+          {simulationType === 'rocket' && (
+            <button
+              className={`mobile-nav-button ${mobilePanel === 'plots' ? 'active' : ''}`}
+              onClick={() => setMobilePanel(mobilePanel === 'plots' ? null : 'plots')}
+            >
+              <span className="mobile-nav-icon">📈</span>
+              <span>Plots</span>
+            </button>
+          )}
+        </div>
+      )}
 
-          <div style={styles.controlPanelWrapper}>
+      {/* Main Layout */}
+      <div className="app-layout">
+        {/* Top section: 3-column layout (desktop/tablet) */}
+        <div className="top-section">
+          {/* Left Panel: Controls (desktop/tablet) */}
+          <div className="left-panel desktop-only" style={styles.leftPanel}>
+            <SimulationSelector
+              currentSimulation={simulationType}
+              onSimulationChange={handleSimulationTypeChange}
+              disabled={activeSim.isRunning}
+            />
+
+            <div style={styles.controlPanelWrapper}>
+              {simulationType === 'rocket' ? (
+                <ControlPanel
+                  isReady={rocketSim.isReady}
+                  isInitialized={rocketSim.isInitialized}
+                  isRunning={rocketSim.isRunning}
+                  error={rocketSim.error}
+                  playbackSpeed={rocketSim.playbackSpeed}
+                  onInitialize={rocketSim.initialize}
+                  onStart={rocketSim.start}
+                  onPause={rocketSim.pause}
+                  onReset={rocketSim.reset}
+                  onStep={rocketSim.step}
+                  onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
+                />
+              ) : (
+                <Grid2DControlPanel
+                  isReady={gridSim.isReady}
+                  isInitialized={gridSim.isInitialized}
+                  isRunning={gridSim.isRunning}
+                  error={gridSim.error}
+                  playbackSpeed={gridSim.playbackSpeed}
+                  onInitialize={gridSim.initialize}
+                  onStart={gridSim.start}
+                  onPause={gridSim.pause}
+                  onReset={gridSim.reset}
+                  onStep={gridSim.step}
+                  onPlaybackSpeedChange={gridSim.setPlaybackSpeed}
+                  showVelocities={showVelocities}
+                  showGrid={showGrid}
+                  onShowVelocitiesChange={setShowVelocities}
+                  onShowGridChange={setShowGrid}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Center Panel: Visualization */}
+          <div className="center-panel" style={styles.centerPanel}>
+            {renderVisualization()}
+          </div>
+
+          {/* Right Panel: Telemetry (desktop only) */}
+          <div className="right-panel desktop-only" style={styles.rightPanel}>
+            {simulationType === 'rocket' ? (
+              <TelemetryPanel
+                state={rocketSim.currentState}
+                isRunning={rocketSim.isRunning}
+              />
+            ) : (
+              <div style={styles.telemetryPlaceholder}>
+                <h3 style={styles.telemetryTitle}>Grid Info</h3>
+                {gridSim.currentState && (
+                  <div style={styles.gridInfo}>
+                    <div style={styles.infoRow}>
+                      <span>Time:</span>
+                      <span>{gridSim.currentState.time.toFixed(3)}s</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Grid Size:</span>
+                      <span>{gridSim.currentState.rows}×{gridSim.currentState.cols}</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Masses:</span>
+                      <span>{gridSim.currentState.positions.length}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom section: Plotting panel (desktop/tablet, rocket only) */}
+        {simulationType === 'rocket' && (
+          <div className="bottom-section desktop-only" style={styles.bottomSection}>
+            <PlotPanel timeSeries={timeSeries} />
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Panels (slide up from bottom) */}
+      {isMobile && (
+        <>
+          {/* Controls Panel */}
+          <div className={`mobile-panel-wrapper ${mobilePanel === 'controls' ? 'visible' : ''}`}>
+            <div className="mobile-panel-handle" onClick={() => setMobilePanel(null)} />
+            <SimulationSelector
+              currentSimulation={simulationType}
+              onSimulationChange={handleSimulationTypeChange}
+              disabled={activeSim.isRunning}
+            />
             {simulationType === 'rocket' ? (
               <ControlPanel
                 isReady={rocketSim.isReady}
@@ -221,47 +364,26 @@ function App() {
               />
             )}
           </div>
-        </div>
 
-        {/* Center Panel: Visualization */}
-        <div style={styles.centerPanel}>{renderVisualization()}</div>
-
-        {/* Right Panel: Telemetry (rocket only for now) */}
-        <div style={styles.rightPanel}>
-          {simulationType === 'rocket' ? (
-            <TelemetryPanel
-              state={rocketSim.currentState}
-              isRunning={rocketSim.isRunning}
-            />
-          ) : (
-            <div style={styles.telemetryPlaceholder}>
-              <h3 style={styles.telemetryTitle}>Grid Info</h3>
-              {gridSim.currentState && (
-                <div style={styles.gridInfo}>
-                  <div style={styles.infoRow}>
-                    <span>Time:</span>
-                    <span>{gridSim.currentState.time.toFixed(3)}s</span>
-                  </div>
-                  <div style={styles.infoRow}>
-                    <span>Grid Size:</span>
-                    <span>{gridSim.currentState.rows}×{gridSim.currentState.cols}</span>
-                  </div>
-                  <div style={styles.infoRow}>
-                    <span>Masses:</span>
-                    <span>{gridSim.currentState.positions.length}</span>
-                  </div>
-                </div>
-              )}
+          {/* Telemetry Panel */}
+          {simulationType === 'rocket' && (
+            <div className={`mobile-panel-wrapper ${mobilePanel === 'telemetry' ? 'visible' : ''}`}>
+              <div className="mobile-panel-handle" onClick={() => setMobilePanel(null)} />
+              <TelemetryPanel
+                state={rocketSim.currentState}
+                isRunning={rocketSim.isRunning}
+              />
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Bottom section: Plotting panel (rocket only for now) */}
-      {simulationType === 'rocket' && (
-        <div style={styles.bottomSection}>
-          <PlotPanel timeSeries={timeSeries} />
-        </div>
+          {/* Plots Panel */}
+          {simulationType === 'rocket' && (
+            <div className={`mobile-panel-wrapper ${mobilePanel === 'plots' ? 'visible' : ''}`}>
+              <div className="mobile-panel-handle" onClick={() => setMobilePanel(null)} />
+              <PlotPanel timeSeries={timeSeries} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
