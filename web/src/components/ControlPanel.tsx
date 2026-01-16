@@ -7,12 +7,14 @@ interface ControlPanelProps {
   isRunning: boolean;
   error: string | null;
   playbackSpeed: number;
+  cameraTracking?: boolean;
   onInitialize: (config: SimulationConfig) => Promise<void>;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
   onStep: () => void;
   onPlaybackSpeedChange: (speed: number) => void;
+  onCameraTrackingChange?: (enabled: boolean) => void;
 }
 
 export function ControlPanel({
@@ -21,12 +23,14 @@ export function ControlPanel({
   isRunning,
   error,
   playbackSpeed,
+  cameraTracking = false,
   onInitialize,
   onStart,
   onPause,
   onReset,
   onStep,
   onPlaybackSpeedChange,
+  onCameraTrackingChange,
 }: ControlPanelProps) {
   const [config, setConfig] = useState<SimulationConfig>({
     elevation: 85,
@@ -50,7 +54,11 @@ export function ControlPanel({
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>🚀 SOPOT Rocket Simulation</h2>
+      <div style={styles.titleContainer}>
+        <div className="technical-label" style={styles.systemLabel}>SYS-SOPOT</div>
+        <h2 style={styles.title}>MISSION CONTROL</h2>
+        <div style={styles.subtitle}>6-DOF Trajectory Simulation</div>
+      </div>
 
       {/* Error display */}
       {error && (
@@ -76,6 +84,7 @@ export function ControlPanel({
                 min={0}
                 max={90}
                 step={1}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -94,6 +103,7 @@ export function ControlPanel({
                 min={0}
                 max={360}
                 step={1}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -112,6 +122,7 @@ export function ControlPanel({
                 min={0.01}
                 max={1}
                 step={0.01}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -130,6 +141,7 @@ export function ControlPanel({
                 min={0.001}
                 max={0.1}
                 step={0.001}
+                className="touch-input"
                 style={styles.input}
                 disabled={!isReady || isInitializing}
               />
@@ -139,6 +151,7 @@ export function ControlPanel({
           <button
             onClick={handleInitialize}
             disabled={!isReady || isInitializing}
+            className="touch-button"
             style={{
               ...styles.button,
               ...styles.buttonPrimary,
@@ -166,36 +179,39 @@ export function ControlPanel({
               {!isRunning ? (
                 <button
                   onClick={onStart}
-                  style={{ ...styles.button, ...styles.buttonSuccess }}
+                  className="touch-button btn-success"
+                  style={styles.button}
                 >
-                  ▶ Start
+                  START
                 </button>
               ) : (
                 <button
                   onClick={onPause}
-                  style={{ ...styles.button, ...styles.buttonWarning }}
+                  className="touch-button btn-warning"
+                  style={styles.button}
                 >
-                  ⏸ Pause
+                  PAUSE
                 </button>
               )}
 
               <button
                 onClick={onStep}
                 disabled={isRunning}
+                className="touch-button btn-primary"
                 style={{
                   ...styles.button,
-                  ...styles.buttonInfo,
                   ...(isRunning ? styles.buttonDisabled : {}),
                 }}
               >
-                ⏭ Step
+                STEP
               </button>
 
               <button
                 onClick={onReset}
-                style={{ ...styles.button, ...styles.buttonDanger }}
+                className="touch-button btn-danger"
+                style={styles.button}
               >
-                ⟲ Reset
+                RESET
               </button>
             </div>
           </div>
@@ -213,6 +229,7 @@ export function ControlPanel({
                 onChange={(e) =>
                   onPlaybackSpeedChange(parseFloat(e.target.value))
                 }
+                className="touch-slider"
                 style={styles.slider}
                 disabled={!isInitialized}
               />
@@ -222,23 +239,48 @@ export function ControlPanel({
 
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Camera Controls</h3>
+
+            {onCameraTrackingChange && (
+              <div style={styles.inputGroup}>
+                <label style={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={cameraTracking}
+                    onChange={(e) => onCameraTrackingChange(e.target.checked)}
+                    className="touch-checkbox"
+                  />
+                  <span style={styles.checkboxText}>Track Rocket</span>
+                </label>
+                <div style={styles.helpText}>
+                  Camera follows rocket position (keeps rocket in view)
+                </div>
+              </div>
+            )}
+
             <div style={styles.infoBox}>
-              <div>🖱️ Left click + drag: Rotate</div>
-              <div>🖱️ Right click + drag: Pan</div>
-              <div>🖱️ Scroll: Zoom</div>
+              <div style={styles.controlItem}>
+                <span className="technical-label" style={styles.controlLabel}>LMB+DRAG</span>
+                <span>Rotate view</span>
+              </div>
+              <div style={styles.controlItem}>
+                <span className="technical-label" style={styles.controlLabel}>RMB+DRAG</span>
+                <span>Pan view</span>
+              </div>
+              <div style={styles.controlItem}>
+                <span className="technical-label" style={styles.controlLabel}>SCROLL</span>
+                <span>Zoom</span>
+              </div>
             </div>
           </div>
         </>
       )}
 
-      {/* Info Section */}
+      {/* System Info */}
       <div style={styles.footer}>
-        <div style={styles.footerText}>
-          SOPOT WebAssembly Demo v0.1
-        </div>
-        <div style={styles.footerText}>
-          C++20 Physics Simulation in Browser
-        </div>
+        <div className="section-divider"></div>
+        <div className="technical-label" style={styles.footerLabel}>SYSTEM STATUS</div>
+        <div style={styles.footerText}>SOPOT-WASM v0.1.0</div>
+        <div style={styles.footerText}>C++20 Physics Engine</div>
       </div>
     </div>
   );
@@ -247,52 +289,80 @@ export function ControlPanel({
 const styles = {
   container: {
     padding: '20px',
-    backgroundColor: '#2c3e50',
-    color: '#ecf0f1',
+    background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
+    color: 'var(--text-primary)',
     height: '100%',
     overflowY: 'auto' as const,
     display: 'flex',
     flexDirection: 'column' as const,
   },
-  title: {
-    margin: '0 0 20px 0',
-    fontSize: '24px',
-    fontWeight: 'bold' as const,
-    color: '#fff',
+  titleContainer: {
+    marginBottom: '24px',
     textAlign: 'center' as const,
+    borderBottom: '2px solid var(--border-color)',
+    paddingBottom: '16px',
+  },
+  systemLabel: {
+    marginBottom: '8px',
+    color: 'var(--accent-cyan)',
+    background: 'rgba(0, 212, 255, 0.1)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    padding: '4px 12px',
+    borderRadius: '4px',
+    display: 'inline-block',
+  },
+  title: {
+    margin: '8px 0',
+    fontSize: '22px',
+    fontWeight: 700,
+    color: 'var(--text-primary)',
+    letterSpacing: '2px',
+  },
+  subtitle: {
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1.5px',
+    marginTop: '4px',
   },
   section: {
-    marginBottom: '20px',
-    padding: '15px',
-    backgroundColor: '#34495e',
+    marginBottom: '16px',
+    padding: '16px',
+    background: 'var(--bg-tertiary)',
     borderRadius: '8px',
+    border: '1px solid var(--border-color)',
+    boxShadow: 'inset 0 1px 0 rgba(0, 212, 255, 0.05)',
   },
   sectionTitle: {
-    margin: '0 0 15px 0',
-    fontSize: '16px',
-    fontWeight: 'bold' as const,
-    color: '#3498db',
+    margin: '0 0 12px 0',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: 'var(--accent-cyan)',
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    letterSpacing: '1.5px',
   },
   inputGroup: {
-    marginBottom: '15px',
+    marginBottom: '12px',
   },
   label: {
     display: 'block',
-    fontSize: '14px',
-    marginBottom: '5px',
-    color: '#bdc3c7',
+    fontSize: '12px',
+    marginBottom: '6px',
+    color: 'var(--text-secondary)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    fontWeight: 600,
   },
   input: {
     width: '100%',
     padding: '10px',
-    marginTop: '5px',
-    backgroundColor: '#2c3e50',
-    border: '1px solid #7f8c8d',
+    marginTop: '6px',
+    backgroundColor: 'var(--bg-secondary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '4px',
-    color: '#ecf0f1',
+    color: 'var(--text-primary)',
     fontSize: '14px',
+    fontFamily: 'var(--font-mono)',
   },
   buttonGroup: {
     display: 'grid',
@@ -300,83 +370,103 @@ const styles = {
     gap: '10px',
   },
   button: {
-    padding: '12px 20px',
-    border: 'none',
-    borderRadius: '5px',
-    fontSize: '14px',
-    fontWeight: 'bold' as const,
+    padding: '12px 16px',
+    fontSize: '12px',
+    fontWeight: 700,
+    letterSpacing: '1px',
     cursor: 'pointer',
     transition: 'all 0.2s',
   },
-  buttonPrimary: {
-    backgroundColor: '#3498db',
-    color: '#fff',
-  },
-  buttonSuccess: {
-    backgroundColor: '#2ecc71',
-    color: '#fff',
-  },
-  buttonWarning: {
-    backgroundColor: '#f39c12',
-    color: '#fff',
-  },
-  buttonDanger: {
-    backgroundColor: '#e74c3c',
-    color: '#fff',
-  },
-  buttonInfo: {
-    backgroundColor: '#9b59b6',
-    color: '#fff',
-  },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.3,
     cursor: 'not-allowed',
+  },
+  buttonPrimary: {
+    background: 'linear-gradient(135deg, #0066cc 0%, #004499 100%)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    boxShadow: '0 0 12px rgba(0, 102, 204, 0.3)',
   },
   sliderContainer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '15px',
+    gap: '12px',
   },
   slider: {
     flex: 1,
-    height: '8px',
-    borderRadius: '4px',
-    outline: 'none',
-    opacity: 0.8,
-    transition: 'opacity 0.2s',
   },
   sliderValue: {
     minWidth: '50px',
     textAlign: 'center' as const,
-    fontWeight: 'bold' as const,
+    fontWeight: 600,
     fontSize: '16px',
+    fontFamily: 'var(--font-mono)',
+    color: 'var(--accent-cyan)',
   },
   errorBox: {
-    padding: '15px',
-    marginBottom: '20px',
-    backgroundColor: '#c0392b',
-    borderRadius: '5px',
-    border: '1px solid #e74c3c',
-    fontSize: '14px',
+    padding: '12px 16px',
+    marginBottom: '16px',
+    background: 'linear-gradient(135deg, rgba(255, 59, 59, 0.2) 0%, rgba(153, 34, 34, 0.2) 100%)',
+    borderRadius: '6px',
+    border: '1px solid var(--accent-red)',
+    fontSize: '13px',
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-mono)',
   },
   infoBox: {
-    padding: '10px',
-    marginTop: '15px',
-    backgroundColor: '#34495e',
-    borderRadius: '5px',
-    border: '1px solid #7f8c8d',
+    padding: '12px',
+    backgroundColor: 'var(--bg-secondary)',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color)',
+    fontSize: '12px',
+    color: 'var(--text-secondary)',
+  },
+  controlItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '8px',
+  },
+  controlLabel: {
+    fontSize: '9px',
+    padding: '2px 6px',
+    background: 'rgba(0, 212, 255, 0.1)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    borderRadius: '3px',
+    minWidth: '80px',
+    textAlign: 'center' as const,
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+    padding: '8px 0',
+  },
+  checkboxText: {
     fontSize: '13px',
-    color: '#bdc3c7',
+    color: 'var(--text-primary)',
+    fontWeight: 500,
+  },
+  helpText: {
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    marginLeft: '28px',
+    marginTop: '-4px',
   },
   footer: {
     marginTop: 'auto',
-    paddingTop: '20px',
-    borderTop: '1px solid #7f8c8d',
+    paddingTop: '16px',
     textAlign: 'center' as const,
   },
+  footerLabel: {
+    fontSize: '9px',
+    marginBottom: '8px',
+    color: 'var(--text-secondary)',
+  },
   footerText: {
-    fontSize: '12px',
-    color: '#95a5a6',
-    margin: '5px 0',
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    margin: '4px 0',
+    fontFamily: 'var(--font-mono)',
   },
 };

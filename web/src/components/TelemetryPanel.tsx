@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { SimulationState } from '../types/sopot';
+import { ChevronDownIcon, ChevronUpIcon } from './icons/Icons';
 
 interface TelemetryPanelProps {
   state: SimulationState | null;
@@ -6,6 +8,9 @@ interface TelemetryPanelProps {
 }
 
 export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
+  const [isPositionExpanded, setIsPositionExpanded] = useState(false);
+  const [isVelocityExpanded, setIsVelocityExpanded] = useState(false);
+  const [isAttitudeExpanded, setIsAttitudeExpanded] = useState(false);
   if (!state) {
     return (
       <div style={styles.container}>
@@ -16,28 +21,28 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
 
   const telemetryItems = [
     {
-      label: 'Time',
+      label: 'Mission Time',
+      shortLabel: 'MET',
       value: state.time.toFixed(2),
       unit: 's',
-      color: '#3498db',
     },
     {
-      label: 'Altitude',
+      label: 'Altitude ASL',
+      shortLabel: 'ALT',
       value: state.altitude.toFixed(1),
       unit: 'm',
-      color: '#e74c3c',
     },
     {
-      label: 'Speed',
+      label: 'Ground Speed',
+      shortLabel: 'SPD',
       value: state.speed.toFixed(1),
       unit: 'm/s',
-      color: '#2ecc71',
     },
     {
-      label: 'Mass',
+      label: 'Total Mass',
+      shortLabel: 'MASS',
       value: state.mass.toFixed(2),
       unit: 'kg',
-      color: '#f39c12',
     },
   ];
 
@@ -54,92 +59,117 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
   ];
 
   return (
-    <div style={styles.container}>
-      {/* Status indicator */}
-      <div style={styles.statusBar}>
+    <div style={styles.container} className="scrollable">
+      {/* Header */}
+      <div style={styles.header}>
+        <div className="technical-label" style={styles.headerLabel}>TELEMETRY</div>
         <div
-          style={{
-            ...styles.statusIndicator,
-            backgroundColor: isRunning ? '#2ecc71' : '#95a5a6',
-          }}
+          className={`status-indicator ${isRunning ? 'active' : 'inactive'}`}
+          style={styles.statusDot}
         />
         <span style={styles.statusText}>
-          {isRunning ? 'RUNNING' : 'PAUSED'}
+          {isRunning ? 'ACTIVE' : 'STANDBY'}
         </span>
       </div>
 
+      <div className="section-divider" style={{ margin: '16px 0' }}></div>
+
       {/* Main telemetry */}
-      <div style={styles.mainTelemetry}>
+      <div style={styles.mainTelemetry} className="grid-2-col">
         {telemetryItems.map((item) => (
-          <div key={item.label} style={styles.telemetryCard}>
-            <div style={styles.telemetryLabel}>{item.label}</div>
-            <div style={{ ...styles.telemetryValue, color: item.color }}>
+          <div key={item.label} style={styles.telemetryCard} className="mission-panel corner-accent fade-in">
+            <div className="technical-label" style={styles.telemetryLabel}>{item.shortLabel}</div>
+            <div className="telemetry-value" style={styles.telemetryValue}>
               {item.value}
-              <span style={styles.telemetryUnit}>{item.unit}</span>
             </div>
+            <div style={styles.telemetryUnit}>{item.unit}</div>
           </div>
         ))}
       </div>
 
-      {/* Position vector */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Position (ENU)</h3>
-        <div style={styles.vectorGrid}>
-          {positionItems.map((item) => (
-            <div key={item.label} style={styles.vectorItem}>
-              <span style={styles.vectorLabel}>{item.label}:</span>
-              <span style={styles.vectorValue}>
-                {item.value} {item.unit}
-              </span>
-            </div>
-          ))}
-        </div>
+      {/* Position vector - Collapsible */}
+      <div style={styles.section} className="mission-panel">
+        <h3 style={styles.sectionTitleCollapsible} onClick={() => setIsPositionExpanded(!isPositionExpanded)}>
+          <div style={styles.sectionTitleLeft}>
+            <span className="technical-label" style={styles.sectionLabel}>POSITION</span>
+            <span style={styles.frameLabel}>ENU FRAME</span>
+          </div>
+          {isPositionExpanded ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
+        </h3>
+        {isPositionExpanded && (
+          <div style={styles.vectorGrid}>
+            {positionItems.map((item) => (
+              <div key={item.label} style={styles.vectorItem}>
+                <span style={styles.vectorLabel}>{item.label}</span>
+                <span className="data-readout" style={styles.vectorValue}>
+                  {item.value} <span style={styles.unitLabel}>{item.unit}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Velocity vector */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Velocity (ENU)</h3>
-        <div style={styles.vectorGrid}>
-          {velocityItems.map((item) => (
-            <div key={item.label} style={styles.vectorItem}>
-              <span style={styles.vectorLabel}>{item.label}:</span>
-              <span style={styles.vectorValue}>
-                {item.value} {item.unit}
-              </span>
-            </div>
-          ))}
-        </div>
+      {/* Velocity vector - Collapsible */}
+      <div style={styles.section} className="mission-panel">
+        <h3 style={styles.sectionTitleCollapsible} onClick={() => setIsVelocityExpanded(!isVelocityExpanded)}>
+          <div style={styles.sectionTitleLeft}>
+            <span className="technical-label" style={styles.sectionLabel}>VELOCITY</span>
+            <span style={styles.frameLabel}>ENU FRAME</span>
+          </div>
+          {isVelocityExpanded ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
+        </h3>
+        {isVelocityExpanded && (
+          <div style={styles.vectorGrid}>
+            {velocityItems.map((item) => (
+              <div key={item.label} style={styles.vectorItem}>
+                <span style={styles.vectorLabel}>{item.label}</span>
+                <span className="data-readout" style={styles.vectorValue}>
+                  {item.value} <span style={styles.unitLabel}>{item.unit}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Quaternion */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Attitude</h3>
-        <div style={styles.quaternionGrid}>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q1:</span>
-            <span style={styles.quaternionValue}>
-              {state.quaternion.q1.toFixed(3)}
-            </span>
+      {/* Quaternion - Collapsible */}
+      <div style={styles.section} className="mission-panel">
+        <h3 style={styles.sectionTitleCollapsible} onClick={() => setIsAttitudeExpanded(!isAttitudeExpanded)}>
+          <div style={styles.sectionTitleLeft}>
+            <span className="technical-label" style={styles.sectionLabel}>ATTITUDE</span>
+            <span style={styles.frameLabel}>QUATERNION</span>
           </div>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q2:</span>
-            <span style={styles.quaternionValue}>
-              {state.quaternion.q2.toFixed(3)}
-            </span>
+          {isAttitudeExpanded ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
+        </h3>
+        {isAttitudeExpanded && (
+          <div style={styles.quaternionGrid}>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₁</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q1.toFixed(4)}
+              </span>
+            </div>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₂</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q2.toFixed(4)}
+              </span>
+            </div>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₃</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q3.toFixed(4)}
+              </span>
+            </div>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₄</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q4.toFixed(4)}
+              </span>
+            </div>
           </div>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q3:</span>
-            <span style={styles.quaternionValue}>
-              {state.quaternion.q3.toFixed(3)}
-            </span>
-          </div>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q4:</span>
-            <span style={styles.quaternionValue}>
-              {state.quaternion.q4.toFixed(3)}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -148,96 +178,142 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
 const styles = {
   container: {
     padding: '20px',
-    backgroundColor: '#1e1e1e',
-    color: '#fff',
+    background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
+    color: 'var(--text-primary)',
     height: '100%',
     overflowY: 'auto' as const,
-    fontFamily: 'monospace',
+    fontFamily: 'var(--font-mono)',
   },
   noData: {
     textAlign: 'center' as const,
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
     padding: '40px 20px',
+    fontFamily: 'var(--font-mono)',
   },
-  statusBar: {
+  header: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '20px',
-    padding: '10px',
-    backgroundColor: '#2c2c2c',
-    borderRadius: '5px',
+    gap: '12px',
+    marginBottom: '16px',
+    padding: '12px 16px',
+    background: 'var(--bg-tertiary)',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color)',
   },
-  statusIndicator: {
-    width: '12px',
-    height: '12px',
-    borderRadius: '50%',
-    marginRight: '10px',
+  headerLabel: {
+    flex: 1,
+    fontSize: '11px',
+    background: 'rgba(0, 212, 255, 0.1)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    padding: '4px 10px',
+    borderRadius: '4px',
+  },
+  statusDot: {
+    marginRight: '0',
   },
   statusText: {
-    fontSize: '14px',
-    fontWeight: 'bold' as const,
-    letterSpacing: '1px',
+    fontSize: '12px',
+    fontWeight: 700,
+    letterSpacing: '1.5px',
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-mono)',
   },
   mainTelemetry: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '15px',
     marginBottom: '20px',
   },
   telemetryCard: {
-    backgroundColor: '#2c2c2c',
-    padding: '15px',
-    borderRadius: '8px',
-    border: '1px solid #3c3c3c',
+    padding: '16px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
   },
   telemetryLabel: {
-    fontSize: '12px',
-    color: '#95a5a6',
-    marginBottom: '5px',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    fontSize: '10px',
+    background: 'rgba(0, 212, 255, 0.1)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    padding: '3px 8px',
+    borderRadius: '3px',
+    display: 'inline-block',
+    width: 'fit-content',
   },
   telemetryValue: {
-    fontSize: '28px',
-    fontWeight: 'bold' as const,
-    fontFamily: 'monospace',
+    fontSize: '32px',
+    fontWeight: 600,
   },
   telemetryUnit: {
-    fontSize: '14px',
-    color: '#95a5a6',
-    marginLeft: '5px',
-    fontWeight: 'normal' as const,
+    fontSize: '12px',
+    color: 'var(--text-secondary)',
+    marginTop: '4px',
+    fontFamily: 'var(--font-mono)',
   },
   section: {
-    marginBottom: '20px',
-    padding: '15px',
-    backgroundColor: '#2c2c2c',
-    borderRadius: '8px',
-    border: '1px solid #3c3c3c',
+    marginBottom: '16px',
+    padding: '16px',
   },
   sectionTitle: {
-    fontSize: '14px',
-    color: '#95a5a6',
-    marginBottom: '10px',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+  },
+  sectionTitleCollapsible: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'background 0.15s ease',
+  },
+  sectionTitleLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  sectionLabel: {
+    fontSize: '10px',
+    background: 'rgba(0, 212, 255, 0.1)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    padding: '3px 8px',
+    borderRadius: '3px',
+  },
+  frameLabel: {
+    fontSize: '9px',
+    color: 'var(--text-secondary)',
+    letterSpacing: '1px',
+    fontWeight: 600,
   },
   vectorGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr',
-    gap: '8px',
+    gap: '10px',
   },
   vectorItem: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '14px',
+    alignItems: 'center',
+    padding: '8px 12px',
+    background: 'var(--bg-secondary)',
+    borderRadius: '4px',
+    border: '1px solid var(--border-color)',
   },
   vectorLabel: {
-    color: '#95a5a6',
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    fontWeight: 600,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   vectorValue: {
-    color: '#fff',
-    fontWeight: 'bold' as const,
+    fontSize: '15px',
+    fontWeight: 600,
+  },
+  unitLabel: {
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    marginLeft: '6px',
+    opacity: 0.7,
   },
   quaternionGrid: {
     display: 'grid',
@@ -247,13 +323,19 @@ const styles = {
   quaternionItem: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '14px',
+    alignItems: 'center',
+    padding: '8px 12px',
+    background: 'var(--bg-secondary)',
+    borderRadius: '4px',
+    border: '1px solid var(--border-color)',
   },
   quaternionLabel: {
-    color: '#95a5a6',
+    fontSize: '12px',
+    color: 'var(--text-secondary)',
+    fontWeight: 600,
   },
   quaternionValue: {
-    color: '#fff',
-    fontWeight: 'bold' as const,
+    fontSize: '14px',
+    fontWeight: 600,
   },
 };

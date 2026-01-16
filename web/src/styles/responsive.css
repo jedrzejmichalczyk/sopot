@@ -1,0 +1,977 @@
+/**
+ * SOPOT Aerospace Engineering Interface
+ * Mission Control Inspired Design System
+ * Mobile-first responsive styles with touch-optimized controls
+ */
+
+/* ============================================
+   VARIABLES & THEME
+   ============================================ */
+:root {
+  /* Aerospace Color Palette - Mission Control Inspired */
+  --bg-primary: #0a0e14;        /* Space black */
+  --bg-secondary: #141b24;      /* Mission control panel */
+  --bg-tertiary: #1a2332;       /* Card backgrounds */
+  --text-primary: #c5d4e8;      /* Light technical blue-gray */
+  --text-secondary: #7a8a9e;    /* Medium technical gray */
+  --border-color: #2a3f5f;      /* Steel blue borders */
+  --accent-cyan: #00d4ff;       /* Telemetry data (primary accent) */
+  --accent-green: #00ff88;      /* Go/Success status */
+  --accent-amber: #ffaa00;      /* Warning/Caution */
+  --accent-red: #ff3b3b;        /* Critical/Danger */
+
+  /* Technical grid overlay */
+  --grid-color: rgba(42, 63, 95, 0.3);
+  --grid-highlight: rgba(0, 212, 255, 0.1);
+
+  /* Monospace font for technical displays */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Typography */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-xxl: 32px;
+
+  /* Layout */
+  --panel-width-desktop: 320px;
+  --panel-width-tablet: 280px;
+  --header-height-mobile: 60px;
+  --bottom-panel-height: 300px;
+  --bottom-panel-height-mobile: 250px;
+
+  /* Touch targets (min 44px for accessibility) */
+  --touch-target-min: 44px;
+  --button-height: 48px;
+  --input-height: 44px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+}
+
+/* ============================================
+   RESET & BASE STYLES
+   ============================================ */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* ============================================
+   RESPONSIVE BREAKPOINTS
+   ============================================ */
+
+/* Mobile: 0-767px (default/mobile-first) */
+/* Tablet: 768-1023px */
+/* Desktop: 1024px+ */
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-primary);
+  overflow: hidden;
+}
+
+/* ============================================
+   MODERN MOBILE UX (< 768px)
+   ============================================ */
+@media (max-width: 767px) {
+  /* Hide desktop panels on mobile */
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* ===== Floating Action Buttons ===== */
+  .fab-container {
+    position: fixed;
+    bottom: 24px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .fab-button {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 16px rgba(0, 212, 255, 0.3);
+    transition: all var(--transition-fast);
+    position: relative;
+  }
+
+  .fab-button:active {
+    transform: scale(0.92);
+  }
+
+  .fab-button-play {
+    background: linear-gradient(135deg, #00aa66 0%, #007744 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 16px rgba(0, 255, 136, 0.3);
+  }
+
+  .fab-button-pause {
+    background: linear-gradient(135deg, #cc8800 0%, #996600 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 16px rgba(255, 170, 0, 0.3);
+  }
+
+  .fab-button-menu {
+    margin-top: 8px;
+  }
+
+  .fab-button-active {
+    background: linear-gradient(135deg, #cc3333 0%, #992222 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 16px rgba(255, 59, 59, 0.3);
+    transform: rotate(90deg);
+  }
+
+  /* FAB Menu */
+  .fab-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 999;
+    animation: fadeIn var(--transition-fast);
+  }
+
+  .fab-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: slideUpFab 0.2s ease-out;
+  }
+
+  @keyframes slideUpFab {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .fab-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 28px;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    min-width: 140px;
+  }
+
+  .fab-menu-item:active {
+    transform: scale(0.95);
+  }
+
+  .fab-menu-item svg {
+    color: var(--accent-cyan);
+  }
+
+  .fab-menu-item-danger svg {
+    color: var(--accent-red);
+  }
+
+  /* ===== Bottom Sheet ===== */
+  .bottom-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 800;
+    animation: fadeIn var(--transition-normal);
+  }
+
+  .bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+    z-index: 900;
+    transition: height var(--transition-normal), transform var(--transition-fast);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .bottom-sheet.dragging {
+    transition: transform var(--transition-fast);
+  }
+
+  .bottom-sheet-handle-container {
+    padding: 12px 20px 8px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: grab;
+    flex-shrink: 0;
+  }
+
+  .bottom-sheet-handle-container:active {
+    cursor: grabbing;
+  }
+
+  .bottom-sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--text-secondary);
+    border-radius: 2px;
+    margin: 0 auto 8px;
+    opacity: 0.5;
+  }
+
+  .bottom-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .bottom-sheet-title {
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 0;
+  }
+
+  .bottom-sheet-expand-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .bottom-sheet-expand-button:active {
+    transform: scale(0.9);
+    background: var(--bg-primary);
+  }
+
+  .bottom-sheet-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
+  }
+
+  /* Adjust safe area for devices with notches */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .bottom-sheet-content {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .fab-container {
+      bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+  }
+
+  /* Legacy mobile-nav and mobile-panel support (hidden by default) */
+  .mobile-nav {
+    display: none !important;
+  }
+
+  .mobile-panel-wrapper {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   TABLET LAYOUT (768px - 1023px)
+   ============================================ */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .top-section {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .left-panel {
+    width: var(--panel-width-tablet);
+    height: 100%;
+    border-right: 2px solid var(--border-color);
+    overflow-y: auto;
+  }
+
+  .center-panel {
+    flex: 1;
+    height: 100%;
+    position: relative;
+  }
+
+  .right-panel {
+    display: none; /* Hide on tablet to save space */
+  }
+
+  .bottom-section {
+    height: var(--bottom-panel-height-mobile);
+    border-top: 2px solid var(--border-color);
+  }
+
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   DESKTOP LAYOUT (1024px+)
+   ============================================ */
+@media (min-width: 1024px) {
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .top-section {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .left-panel {
+    width: var(--panel-width-desktop);
+    height: 100%;
+    border-right: 2px solid var(--border-color);
+    overflow-y: auto;
+  }
+
+  .center-panel {
+    flex: 1;
+    height: 100%;
+    position: relative;
+  }
+
+  .right-panel {
+    width: var(--panel-width-desktop);
+    height: 100%;
+    border-left: 2px solid var(--border-color);
+    overflow-y: auto;
+  }
+
+  .bottom-section {
+    height: var(--bottom-panel-height);
+    min-height: 200px;
+    max-height: 400px;
+    border-top: 2px solid var(--border-color);
+  }
+
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   MOBILE-FIRST LAYOUT (< 768px)
+   ============================================ */
+@media (max-width: 767px) {
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .top-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .center-panel {
+    flex: 1;
+    position: relative;
+    width: 100%;
+  }
+
+  .left-panel,
+  .right-panel,
+  .bottom-section {
+    display: none; /* Shown in bottom sheets */
+  }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE OPTIMIZATION (< 768px)
+   ============================================ */
+@media (max-width: 767px) and (orientation: landscape) {
+  /* In landscape, use side drawer instead of bottom sheet */
+  .bottom-sheet {
+    left: auto;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 400px;
+    max-width: 80vw;
+    border-radius: 20px 0 0 20px;
+    height: 100vh !important;
+  }
+
+  .bottom-sheet-backdrop {
+    /* Keep backdrop full screen */
+  }
+
+  .fab-container {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  /* Adjust telemetry cards for horizontal space */
+  .grid-2-col {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ============================================
+   TOUCH-OPTIMIZED BUTTONS
+   ============================================ */
+.touch-button {
+  min-height: var(--touch-target-min);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: none;
+  border-radius: 8px;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.touch-button:active {
+  transform: scale(0.97);
+}
+
+.touch-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+@media (max-width: 767px) {
+  .touch-button {
+    min-height: 52px; /* Larger on mobile */
+    font-size: var(--font-size-lg);
+  }
+}
+
+/* ============================================
+   TOUCH-OPTIMIZED INPUTS
+   ============================================ */
+.touch-input {
+  min-height: var(--input-height);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-md);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .touch-input {
+    min-height: 48px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
+
+/* ============================================
+   IMPROVED SLIDER STYLES
+   ============================================ */
+.touch-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  outline: none;
+  opacity: 0.9;
+  transition: opacity var(--transition-fast);
+}
+
+.touch-slider:hover {
+  opacity: 1;
+}
+
+.touch-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+.touch-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  cursor: pointer;
+  border: none;
+  transition: all var(--transition-fast);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+@media (max-width: 767px) {
+  .touch-slider {
+    height: 12px;
+  }
+
+  .touch-slider::-webkit-slider-thumb {
+    width: 32px;
+    height: 32px;
+  }
+
+  .touch-slider::-moz-range-thumb {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* ============================================
+   IMPROVED TYPOGRAPHY & SPACING
+   ============================================ */
+.section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-md);
+}
+
+.page-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-lg);
+}
+
+@media (max-width: 767px) {
+  .page-title {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-md);
+  }
+}
+
+/* ============================================
+   CARDS & CONTAINERS
+   ============================================ */
+.card {
+  background-color: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+@media (max-width: 767px) {
+  .card {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+  }
+
+  /* Mobile-optimized telemetry cards */
+  .mission-panel {
+    padding: 12px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .grid-2-col {
+    gap: 8px !important;
+  }
+
+  /* Compact telemetry values on mobile */
+  .telemetry-value {
+    font-size: 24px !important;
+  }
+
+  /* Reduce section padding in bottom sheets */
+  .bottom-sheet-content .mission-panel {
+    margin-bottom: 8px;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+.scrollable {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-scroll {
+  overflow: hidden;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ============================================
+   LOADING & ANIMATIONS
+   ============================================ */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-normal);
+}
+
+.slide-up {
+  animation: slideUp var(--transition-normal);
+}
+
+/* ============================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Focus indicators */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   CANVAS & 3D VISUALIZATION
+   ============================================ */
+.visualization-canvas {
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* Prevent default touch behavior */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ============================================
+   RESPONSIVE GRID LAYOUTS
+   ============================================ */
+.grid-2-col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+.grid-3-col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 767px) {
+  .grid-3-col {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+
+  .grid-2-col {
+    gap: var(--spacing-sm);
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .mobile-nav,
+  .left-panel,
+  .right-panel {
+    display: none !important;
+  }
+
+  .center-panel {
+    width: 100% !important;
+  }
+}
+
+/* ============================================
+   AEROSPACE ENGINEERING THEME
+   ============================================ */
+
+/* Technical grid background pattern */
+.technical-grid {
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 20px 20px;
+  position: relative;
+}
+
+.technical-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 0%, var(--bg-primary) 100%);
+  pointer-events: none;
+}
+
+/* Mission control panel styling */
+.mission-panel {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border: 1px solid var(--border-color);
+  box-shadow:
+    inset 0 1px 0 rgba(0, 212, 255, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Data readout styling (monospace technical text) */
+.data-readout {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--accent-cyan);
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+/* Status indicator lights */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-indicator.active {
+  background-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.status-indicator.standby {
+  background-color: var(--accent-amber);
+  color: var(--accent-amber);
+}
+
+.status-indicator.inactive {
+  background-color: var(--text-secondary);
+  color: var(--text-secondary);
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Technical label styling */
+.technical-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Mission control button variants */
+.btn-primary {
+  background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 12px rgba(0, 102, 204, 0.3);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #00aa66 0%, #007744 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 12px rgba(0, 170, 102, 0.3);
+}
+
+.btn-success:hover {
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #cc8800 0%, #996600 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  box-shadow: 0 0 12px rgba(204, 136, 0, 0.3);
+}
+
+.btn-warning:hover {
+  box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #cc3333 0%, #992222 100%);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 59, 59, 0.3);
+  box-shadow: 0 0 12px rgba(204, 51, 51, 0.3);
+}
+
+.btn-danger:hover {
+  box-shadow: 0 0 20px rgba(255, 59, 59, 0.5);
+}
+
+/* Telemetry value highlight */
+.telemetry-value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--accent-cyan);
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+/* Section dividers with technical styling */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border-color) 20%,
+    var(--border-color) 80%,
+    transparent 100%
+  );
+  margin: var(--spacing-lg) 0;
+}
+
+/* Corner accent decoration (mission control aesthetic) */
+.corner-accent {
+  position: relative;
+}
+
+.corner-accent::before,
+.corner-accent::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--accent-cyan);
+  opacity: 0.3;
+}
+
+.corner-accent::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.corner-accent::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}

@@ -7,6 +7,7 @@ import type { SimulationState } from '../types/sopot';
 interface RocketVisualization3DProps {
   state: SimulationState | null;
   trajectoryHistory: Array<{ position: THREE.Vector3; time: number }>;
+  cameraTracking?: boolean;
 }
 
 /**
@@ -51,26 +52,34 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
 
     // Update orientation from quaternion
     // SOPOT quaternion convention: (q1, q2, q3, q4) where q4 is scalar, q1-q3 are vector
-    // SOPOT: body X points forward, quaternion transforms body->ENU
-    // Three.js: quaternion (x, y, z, w) where w is scalar
+    // SOPOT: body X points forward (thrust), quaternion transforms body->ENU
+    // Mesh: built to point along +Y (up by default)
     //
     // Coordinate transformation ENU -> Three.js:
     //   Three.js X = ENU X (East)
     //   Three.js Y = ENU Z (Up)
     //   Three.js Z = -ENU Y (South)
     //
-    // The rocket mesh points along +X in local frame
-    // We need to transform the quaternion to account for the coordinate change
+    // Steps:
+    // 1. Transform SOPOT quaternion from ENU to Three.js coords
+    // 2. Compose with rotation that maps mesh +Y to body +X
     const q = state.quaternion;
 
-    // Transform quaternion from ENU to Three.js frame
-    // Swap Y<->Z components and negate the new Z (old Y)
-    groupRef.current.quaternion.set(
+    // Transform quaternion components from ENU to Three.js frame
+    const q_threejs = new THREE.Quaternion(
       q.q1,   // x component stays (East axis)
       q.q3,   // y component = old z (Up axis)
       -q.q2,  // z component = -old y (South axis)
       q.q4    // w (scalar) stays
     );
+
+    // Pre-rotation: mesh +Y to body +X (rotate -90° around Z axis)
+    // This accounts for mesh pointing along +Y while body X is forward
+    const meshToBody = new THREE.Quaternion();
+    meshToBody.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+
+    // Compose: first rotate mesh to align with body, then apply physics orientation
+    groupRef.current.quaternion.copy(q_threejs).multiply(meshToBody);
 
     // Update velocity arrow direction and length
     if (velocityArrowRef.current && state.speed > 0.1) {
@@ -92,42 +101,80 @@ function RocketMesh({ state }: { state: SimulationState | null }) {
 
   return (
     <group ref={groupRef}>
-      {/* Inner group rotated so rocket points up (+Y) by default */}
-      {/* The outer group receives the physics quaternion */}
-      <group rotation={[0, 0, Math.PI / 2]}>
-        {/* Rocket body - metallic red cylinder */}
-        <Cylinder args={[0.08, 0.08, 1.0, 16]} rotation={[Math.PI / 2, 0, 0]}>
-          <meshStandardMaterial color="#cc0000" metalness={0.7} roughness={0.3} />
-        </Cylinder>
+      {/* Rocket mesh built to point along +Y by default (up) */}
+      {/* Body X in SOPOT = forward/thrust direction */}
+      {/* When vertical: body X points ENU up (+Z) which becomes Three.js +Y */}
 
-        {/* Nose cone - white tip */}
-        <Cone
-          args={[0.08, 0.25, 16]}
-          position={[0.625, 0, 0]}
-          rotation={[0, 0, -Math.PI / 2]}
-        >
-          <meshStandardMaterial color="#ffffff" metalness={0.5} roughness={0.5} />
-        </Cone>
+      {/* Rocket body - metallic red cylinder pointing up */}
+      <Cylinder args={[0.08, 0.08, 1.0, 16]}>
+        <meshStandardMaterial color="#cc0000" metalness={0.7} roughness={0.3} />
+      </Cylinder>
 
-        {/* Fins (4 fins at 90° intervals) */}
-        {[0, 90, 180, 270].map((angle, i) => {
-          const rad = (angle * Math.PI) / 180;
-          return (
-            <mesh
-              key={i}
-              position={[-0.4, Math.cos(rad) * 0.12, Math.sin(rad) * 0.12]}
-              rotation={[0, rad, 0]}
-            >
-              <boxGeometry args={[0.15, 0.02, 0.15]} />
-              <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
-            </mesh>
-          );
-        })}
-      </group>
+      {/* Nose cone - white tip at +Y */}
+      <Cone args={[0.08, 0.25, 16]} position={[0, 0.625, 0]}>
+        <meshStandardMaterial color="#ffffff" metalness={0.5} roughness={0.5} />
+      </Cone>
+
+      {/* Fins at -Y (base of rocket), positioned around the body */}
+      {[0, 90, 180, 270].map((angle, i) => {
+        const rad = (angle * Math.PI) / 180;
+        return (
+          <mesh
+            key={i}
+            position={[Math.cos(rad) * 0.12, -0.4, Math.sin(rad) * 0.12]}
+            rotation={[0, 0, rad]}
+          >
+            <boxGeometry args={[0.15, 0.15, 0.02]} />
+            <meshStandardMaterial color="#333333" metalness={0.8} roughness={0.2} />
+          </mesh>
+        );
+      })}
 
       {/* Velocity vector (green arrow) - positioned at rocket center */}
       {velocityArrowRef.current && <primitive object={velocityArrowRef.current} />}
     </group>
+  );
+}
+
+/**
+ * Camera controller for tracking rocket
+ */
+function CameraController({
+  target,
+  enabled,
+}: {
+  target: THREE.Vector3 | null;
+  enabled: boolean;
+}) {
+  const controlsRef = useRef<any>(null);
+
+  useFrame(() => {
+    if (controlsRef.current && enabled && target) {
+      // Smoothly move camera target to rocket position
+      controlsRef.current.target.lerp(target, 0.1);
+      controlsRef.current.update();
+    }
+  });
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      enablePan={true}
+      enableZoom={true}
+      enableRotate={true}
+      minDistance={5}
+      maxDistance={500}
+      maxPolarAngle={Math.PI / 2}
+      enableDamping={true}
+      dampingFactor={0.05}
+      rotateSpeed={0.8}
+      zoomSpeed={1.0}
+      panSpeed={0.8}
+      touches={{
+        ONE: 0, // TOUCH.ROTATE
+        TWO: 2, // TOUCH.DOLLY_PAN
+      }}
+    />
   );
 }
 
@@ -250,13 +297,25 @@ function CoordinateAxes() {
 export function RocketVisualization3D({
   state,
   trajectoryHistory,
+  cameraTracking = false,
 }: RocketVisualization3DProps) {
+  // Compute camera target from rocket position
+  const cameraTarget = useMemo(() => {
+    if (!state) return null;
+    return new THREE.Vector3(
+      state.position.x,
+      state.position.z,
+      -state.position.y
+    );
+  }, [state]);
+
   return (
     <div style={{ width: '100%', height: '100%', background: '#87CEEB' }}>
       <Canvas
         camera={{ position: [20, 15, 20], fov: 50 }}
         shadows
         gl={{ antialias: true }}
+        className="visualization-canvas"
       >
         {/* Lighting */}
         <SceneLighting />
@@ -270,15 +329,8 @@ export function RocketVisualization3D({
         <RocketMesh state={state} />
         <TrajectoryLine trajectoryHistory={trajectoryHistory} />
 
-        {/* Camera controls */}
-        <OrbitControls
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          minDistance={5}
-          maxDistance={500}
-          maxPolarAngle={Math.PI / 2}
-        />
+        {/* Camera controls with optional tracking */}
+        <CameraController target={cameraTarget} enabled={cameraTracking} />
       </Canvas>
     </div>
   );

@@ -46,10 +46,10 @@ export function Grid2DControlPanel({
             style={{
               ...styles.statusDot,
               backgroundColor: isRunning
-                ? '#27ae60'
+                ? 'var(--accent-green)'
                 : isInitialized
-                ? '#f39c12'
-                : '#95a5a6',
+                ? 'var(--accent-amber)'
+                : 'var(--text-secondary)',
             }}
           />
           <span style={styles.statusText}>
@@ -73,6 +73,7 @@ export function Grid2DControlPanel({
           <button
             onClick={onInitialize}
             disabled={!isReady}
+            className="touch-button"
             style={{
               ...styles.button,
               ...styles.buttonPrimary,
@@ -85,32 +86,32 @@ export function Grid2DControlPanel({
           <div style={styles.buttonGroup}>
             <button
               onClick={isRunning ? onPause : onStart}
+              className="touch-button btn-success"
               style={{
                 ...styles.button,
-                ...styles.buttonPrimary,
               }}
             >
-              {isRunning ? '⏸ Pause' : '▶ Start'}
+              {isRunning ? 'PAUSE' : 'START'}
             </button>
             <button
               onClick={onReset}
+              className="touch-button btn-danger"
               style={{
                 ...styles.button,
-                ...styles.buttonSecondary,
               }}
             >
-              🔄 Reset
+              RESET
             </button>
             <button
               onClick={onStep}
               disabled={isRunning}
+              className="touch-button btn-primary"
               style={{
                 ...styles.button,
-                ...styles.buttonSecondary,
                 ...(isRunning ? styles.buttonDisabled : {}),
               }}
             >
-              ⏭ Step
+              STEP
             </button>
           </div>
         )}
@@ -125,6 +126,7 @@ export function Grid2DControlPanel({
               key={speed}
               onClick={() => onPlaybackSpeedChange(speed)}
               disabled={!isInitialized}
+              className="touch-button"
               style={{
                 ...styles.speedButton,
                 ...(playbackSpeed === speed ? styles.speedButtonActive : {}),
@@ -181,15 +183,15 @@ export function Grid2DControlPanel({
 const styles = {
   container: {
     height: '100%',
-    backgroundColor: '#2c3e50',
-    color: '#ecf0f1',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
     overflowY: 'auto' as const,
     display: 'flex',
     flexDirection: 'column' as const,
   },
   header: {
     padding: '20px',
-    borderBottom: '2px solid #34495e',
+    borderBottom: '2px solid var(--bg-tertiary)',
   },
   title: {
     margin: '0 0 10px 0',
@@ -208,25 +210,25 @@ const styles = {
   },
   statusText: {
     fontSize: '14px',
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
   },
   errorBox: {
     margin: '10px 20px',
     padding: '10px',
     backgroundColor: '#c0392b',
-    border: '1px solid #e74c3c',
+    border: '1px solid var(--accent-red)',
     borderRadius: '4px',
     fontSize: '14px',
   },
   section: {
     padding: '20px',
-    borderBottom: '1px solid #34495e',
+    borderBottom: '1px solid var(--bg-tertiary)',
   },
   sectionTitle: {
     margin: '0 0 15px 0',
     fontSize: '14px',
     fontWeight: 600,
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -245,12 +247,12 @@ const styles = {
     transition: 'all 0.2s ease',
   },
   buttonPrimary: {
-    backgroundColor: '#3498db',
+    backgroundColor: 'var(--accent-cyan)',
     color: '#fff',
   },
   buttonSecondary: {
-    backgroundColor: '#34495e',
-    color: '#ecf0f1',
+    backgroundColor: 'var(--bg-tertiary)',
+    color: 'var(--text-primary)',
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -265,16 +267,16 @@ const styles = {
     padding: '8px',
     fontSize: '12px',
     fontWeight: 'bold' as const,
-    border: '2px solid #34495e',
+    border: '2px solid var(--bg-tertiary)',
     borderRadius: '4px',
-    backgroundColor: '#2c3e50',
-    color: '#ecf0f1',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
   speedButtonActive: {
-    borderColor: '#3498db',
-    backgroundColor: '#3498db',
+    borderColor: 'var(--accent-cyan)',
+    backgroundColor: 'var(--accent-cyan)',
     color: '#fff',
   },
   checkboxLabel: {
@@ -291,11 +293,11 @@ const styles = {
   },
   checkboxText: {
     fontSize: '14px',
-    color: '#ecf0f1',
+    color: 'var(--text-primary)',
   },
   infoText: {
     fontSize: '13px',
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
     lineHeight: '1.6',
     marginBottom: '10px',
   },

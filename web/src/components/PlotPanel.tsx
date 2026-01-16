@@ -11,6 +11,14 @@ import {
 } from 'recharts';
 import type { TimeSeriesData } from '../types/sopot';
 
+// Aerospace theme colors (matching CSS variables in responsive.css)
+const THEME_COLORS = {
+  cyan: '#00d4ff',    // --accent-cyan
+  green: '#00ff88',   // --accent-green
+  amber: '#ffaa00',   // --accent-amber
+  red: '#ff3b3b',     // --accent-red
+};
+
 interface PlotPanelProps {
   timeSeries: TimeSeriesData | null;
 }
@@ -49,7 +57,7 @@ const PLOT_CONFIGS: PlotConfig[] = [
       {
         dataKey: 'altitude',
         name: 'Altitude',
-        color: '#3b82f6',
+        color: THEME_COLORS.cyan,
         extractData: (data) => data.kinematics.altitude,
       },
     ],
@@ -62,7 +70,7 @@ const PLOT_CONFIGS: PlotConfig[] = [
       {
         dataKey: 'speed',
         name: 'Speed',
-        color: '#10b981',
+        color: THEME_COLORS.green,
         extractData: (data) => data.kinematics.speed,
       },
     ],
@@ -75,19 +83,19 @@ const PLOT_CONFIGS: PlotConfig[] = [
       {
         dataKey: 'vel_x',
         name: 'East (Vx)',
-        color: '#ef4444',
+        color: THEME_COLORS.red,
         extractData: (data) => data.kinematics.vel_x,
       },
       {
         dataKey: 'vel_y',
         name: 'North (Vy)',
-        color: '#3b82f6',
+        color: THEME_COLORS.cyan,
         extractData: (data) => data.kinematics.vel_y,
       },
       {
         dataKey: 'vel_z',
         name: 'Up (Vz)',
-        color: '#10b981',
+        color: THEME_COLORS.green,
         extractData: (data) => data.kinematics.vel_z,
       },
     ],
@@ -100,19 +108,19 @@ const PLOT_CONFIGS: PlotConfig[] = [
       {
         dataKey: 'accel_x',
         name: 'East (Ax)',
-        color: '#ef4444',
+        color: THEME_COLORS.red,
         extractData: (data) => data.dynamics.accel_x,
       },
       {
         dataKey: 'accel_y',
         name: 'North (Ay)',
-        color: '#3b82f6',
+        color: THEME_COLORS.cyan,
         extractData: (data) => data.dynamics.accel_y,
       },
       {
         dataKey: 'accel_z',
         name: 'Up (Az)',
-        color: '#10b981',
+        color: THEME_COLORS.green,
         extractData: (data) => data.dynamics.accel_z,
       },
     ],
@@ -125,7 +133,7 @@ const PLOT_CONFIGS: PlotConfig[] = [
       {
         dataKey: 'mass',
         name: 'Mass',
-        color: '#f59e0b',
+        color: THEME_COLORS.amber,
         extractData: (data) => data.dynamics.mass,
       },
     ],
@@ -138,13 +146,13 @@ const PLOT_CONFIGS: PlotConfig[] = [
       {
         dataKey: 'thrust',
         name: 'Thrust (N)',
-        color: '#ef4444',
+        color: THEME_COLORS.red,
         extractData: (data) => data.forces.thrust,
       },
       {
         dataKey: 'gravity',
         name: 'Gravity (m/s²)',
-        color: '#8b5cf6',
+        color: THEME_COLORS.cyan,
         extractData: (data) => data.forces.gravity,
       },
     ],
@@ -210,9 +218,10 @@ export function PlotPanel({ timeSeries }: PlotPanelProps) {
     <div style={styles.container}>
       {/* Plot selector */}
       <div style={styles.header}>
-        <h3 style={styles.title}>State Function Time Series</h3>
+        <h3 style={styles.title} className="section-title">State Function Time Series</h3>
         <select
           style={styles.select}
+          className="touch-input"
           value={selectedPlot}
           onChange={(e) => setSelectedPlot(e.target.value as PlotType)}
         >
@@ -231,14 +240,14 @@ export function PlotPanel({ timeSeries }: PlotPanelProps) {
             data={chartData}
             margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#34495e" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-tertiary)" />
             <XAxis
               dataKey="time"
-              stroke="#ecf0f1"
+              stroke="var(--text-primary)"
               label={{ value: 'Time (s)', position: 'insideBottom', offset: -5 }}
             />
             <YAxis
-              stroke="#ecf0f1"
+              stroke="var(--text-primary)"
               label={{
                 value: selectedConfig.yLabel,
                 angle: -90,
@@ -247,11 +256,11 @@ export function PlotPanel({ timeSeries }: PlotPanelProps) {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#2c3e50',
-                border: '1px solid #34495e',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--bg-tertiary)',
                 borderRadius: '4px',
               }}
-              labelStyle={{ color: '#ecf0f1' }}
+              labelStyle={{ color: 'var(--text-primary)' }}
             />
             <Legend />
             {selectedConfig.lines.map((line) => (
@@ -291,29 +300,29 @@ const styles = {
     flexDirection: 'column' as const,
     width: '100%',
     height: '100%',
-    backgroundColor: '#2c3e50',
-    borderTop: '2px solid #34495e',
+    backgroundColor: 'var(--bg-secondary)',
+    borderTop: '2px solid var(--bg-tertiary)',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px 20px',
-    backgroundColor: '#34495e',
-    borderBottom: '1px solid #4a5f7f',
+    backgroundColor: 'var(--bg-tertiary)',
+    borderBottom: '1px solid var(--border-color)',
   },
   title: {
     margin: 0,
     fontSize: '16px',
     fontWeight: 'bold' as const,
-    color: '#ecf0f1',
+    color: 'var(--text-primary)',
   },
   select: {
     padding: '6px 12px',
     fontSize: '14px',
-    backgroundColor: '#2c3e50',
-    color: '#ecf0f1',
-    border: '1px solid #4a5f7f',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '4px',
     cursor: 'pointer',
     outline: 'none',
@@ -327,12 +336,12 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     padding: '8px 20px',
-    backgroundColor: '#34495e',
-    borderTop: '1px solid #4a5f7f',
+    backgroundColor: 'var(--bg-tertiary)',
+    borderTop: '1px solid var(--border-color)',
   },
   infoText: {
     fontSize: '12px',
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
   },
   placeholder: {
     display: 'flex',
@@ -341,7 +350,7 @@ const styles = {
     height: '100%',
   },
   placeholderText: {
-    color: '#95a5a6',
+    color: 'var(--text-secondary)',
     fontSize: '14px',
   },
 };

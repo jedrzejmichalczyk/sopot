@@ -7,14 +7,24 @@ import { TelemetryPanel } from './components/TelemetryPanel';
 import { ControlPanel } from './components/ControlPanel';
 import { Grid2DControlPanel } from './components/Grid2DControlPanel';
 import { PlotPanel } from './components/PlotPanel';
+import { FloatingActionButton } from './components/FloatingActionButton';
+import { BottomSheet } from './components/BottomSheet';
 import { useRocketSimulation } from './hooks/useRocketSimulation';
 import { useGrid2DSimulation } from './hooks/useGrid2DSimulation';
 import type { TimeSeriesData } from './types/sopot';
+import './styles/responsive.css';
+
+type MobilePanel = 'controls' | 'telemetry' | 'plots' | null;
 
 function App() {
   const [simulationType, setSimulationType] = useState<SimulationType>('rocket');
   const [showVelocities, setShowVelocities] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [cameraTracking, setCameraTracking] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(
+    window.innerWidth < 768 ? 'controls' : null
+  );
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Note: Both hooks are instantiated to maintain React hook call order,
   // but inactive simulations are reset when switching types to free resources.
@@ -29,6 +39,21 @@ function App() {
 
   // Get the active simulation based on type
   const activeSim = simulationType === 'rocket' ? rocketSim : gridSim;
+
+  // Handle window resize for responsive layout
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Close mobile panel when switching to desktop
+      if (!mobile) {
+        setMobilePanel(null);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Track trajectory history (rocket only)
   useEffect(() => {
@@ -129,6 +154,7 @@ function App() {
           <RocketVisualization3D
             state={rocketSim.currentState}
             trajectoryHistory={trajectoryHistory}
+            cameraTracking={cameraTracking}
           />
         );
       }
@@ -174,19 +200,138 @@ function App() {
     );
   };
 
-  return (
-    <div style={styles.container}>
-      {/* Top section: 3-column layout */}
-      <div style={styles.topSection}>
-        {/* Left Panel: Controls */}
-        <div style={styles.leftPanel}>
-          <SimulationSelector
-            currentSimulation={simulationType}
-            onSimulationChange={handleSimulationTypeChange}
-            disabled={activeSim.isRunning}
-          />
+  // Handle play/pause for FAB
+  const handlePlayPause = () => {
+    if (activeSim.isRunning) {
+      activeSim.pause();
+    } else {
+      activeSim.start();
+    }
+  };
 
-          <div style={styles.controlPanelWrapper}>
+  return (
+    <div className="app-container">{/* Floating Action Button - Mobile Only */}
+      {isMobile && (
+        <FloatingActionButton
+          isRunning={activeSim.isRunning}
+          isInitialized={activeSim.isInitialized}
+          simulationType={simulationType}
+          onPlayPause={handlePlayPause}
+          onReset={activeSim.reset}
+          onOpenPanel={(panel) => setMobilePanel(panel)}
+        />
+      )}
+
+      {/* Main Layout */}
+      <div className="app-layout">
+        {/* Top section: 3-column layout (desktop/tablet) */}
+        <div className="top-section">
+          {/* Left Panel: Controls (desktop/tablet) */}
+          <div className="left-panel desktop-only">
+            <SimulationSelector
+              currentSimulation={simulationType}
+              onSimulationChange={handleSimulationTypeChange}
+              disabled={activeSim.isRunning}
+            />
+
+            <div style={styles.controlPanelWrapper}>
+              {simulationType === 'rocket' ? (
+                <ControlPanel
+                  isReady={rocketSim.isReady}
+                  isInitialized={rocketSim.isInitialized}
+                  isRunning={rocketSim.isRunning}
+                  error={rocketSim.error}
+                  playbackSpeed={rocketSim.playbackSpeed}
+                  cameraTracking={cameraTracking}
+                  onInitialize={rocketSim.initialize}
+                  onStart={rocketSim.start}
+                  onPause={rocketSim.pause}
+                  onReset={rocketSim.reset}
+                  onStep={rocketSim.step}
+                  onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
+                  onCameraTrackingChange={setCameraTracking}
+                />
+              ) : (
+                <Grid2DControlPanel
+                  isReady={gridSim.isReady}
+                  isInitialized={gridSim.isInitialized}
+                  isRunning={gridSim.isRunning}
+                  error={gridSim.error}
+                  playbackSpeed={gridSim.playbackSpeed}
+                  onInitialize={gridSim.initialize}
+                  onStart={gridSim.start}
+                  onPause={gridSim.pause}
+                  onReset={gridSim.reset}
+                  onStep={gridSim.step}
+                  onPlaybackSpeedChange={gridSim.setPlaybackSpeed}
+                  showVelocities={showVelocities}
+                  showGrid={showGrid}
+                  onShowVelocitiesChange={setShowVelocities}
+                  onShowGridChange={setShowGrid}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Center Panel: Visualization */}
+          <div className="center-panel">
+            {renderVisualization()}
+          </div>
+
+          {/* Right Panel: Telemetry (desktop only) */}
+          <div className="right-panel desktop-only">
+            {simulationType === 'rocket' ? (
+              <TelemetryPanel
+                state={rocketSim.currentState}
+                isRunning={rocketSim.isRunning}
+              />
+            ) : (
+              <div style={styles.telemetryPlaceholder}>
+                <h3 style={styles.telemetryTitle}>Grid Info</h3>
+                {gridSim.currentState && (
+                  <div style={styles.gridInfo}>
+                    <div style={styles.infoRow}>
+                      <span>Time:</span>
+                      <span>{gridSim.currentState.time.toFixed(3)}s</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Grid Size:</span>
+                      <span>{gridSim.currentState.rows}×{gridSim.currentState.cols}</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Masses:</span>
+                      <span>{gridSim.currentState.positions.length}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom section: Plotting panel (desktop/tablet, rocket only) */}
+        {simulationType === 'rocket' && (
+          <div className="bottom-section desktop-only">
+            <PlotPanel timeSeries={timeSeries} />
+          </div>
+        )}
+      </div>
+
+      {/* Modern Bottom Sheets - Mobile Only */}
+      {isMobile && (
+        <>
+          {/* Controls Bottom Sheet */}
+          <BottomSheet
+            isOpen={mobilePanel === 'controls'}
+            onClose={() => setMobilePanel(null)}
+            title="Controls"
+            initialSnapPoint="half"
+          >
+            <SimulationSelector
+              currentSimulation={simulationType}
+              onSimulationChange={handleSimulationTypeChange}
+              disabled={activeSim.isRunning}
+            />
             {simulationType === 'rocket' ? (
               <ControlPanel
                 isReady={rocketSim.isReady}
@@ -194,12 +339,14 @@ function App() {
                 isRunning={rocketSim.isRunning}
                 error={rocketSim.error}
                 playbackSpeed={rocketSim.playbackSpeed}
+                cameraTracking={cameraTracking}
                 onInitialize={rocketSim.initialize}
                 onStart={rocketSim.start}
                 onPause={rocketSim.pause}
                 onReset={rocketSim.reset}
                 onStep={rocketSim.step}
                 onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
+                onCameraTrackingChange={setCameraTracking}
               />
             ) : (
               <Grid2DControlPanel
@@ -220,94 +367,45 @@ function App() {
                 onShowGridChange={setShowGrid}
               />
             )}
-          </div>
-        </div>
+          </BottomSheet>
 
-        {/* Center Panel: Visualization */}
-        <div style={styles.centerPanel}>{renderVisualization()}</div>
-
-        {/* Right Panel: Telemetry (rocket only for now) */}
-        <div style={styles.rightPanel}>
-          {simulationType === 'rocket' ? (
-            <TelemetryPanel
-              state={rocketSim.currentState}
-              isRunning={rocketSim.isRunning}
-            />
-          ) : (
-            <div style={styles.telemetryPlaceholder}>
-              <h3 style={styles.telemetryTitle}>Grid Info</h3>
-              {gridSim.currentState && (
-                <div style={styles.gridInfo}>
-                  <div style={styles.infoRow}>
-                    <span>Time:</span>
-                    <span>{gridSim.currentState.time.toFixed(3)}s</span>
-                  </div>
-                  <div style={styles.infoRow}>
-                    <span>Grid Size:</span>
-                    <span>{gridSim.currentState.rows}×{gridSim.currentState.cols}</span>
-                  </div>
-                  <div style={styles.infoRow}>
-                    <span>Masses:</span>
-                    <span>{gridSim.currentState.positions.length}</span>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Telemetry Bottom Sheet */}
+          {simulationType === 'rocket' && (
+            <BottomSheet
+              isOpen={mobilePanel === 'telemetry'}
+              onClose={() => setMobilePanel(null)}
+              title="Telemetry"
+              initialSnapPoint="half"
+            >
+              <TelemetryPanel
+                state={rocketSim.currentState}
+                isRunning={rocketSim.isRunning}
+              />
+            </BottomSheet>
           )}
-        </div>
-      </div>
 
-      {/* Bottom section: Plotting panel (rocket only for now) */}
-      {simulationType === 'rocket' && (
-        <div style={styles.bottomSection}>
-          <PlotPanel timeSeries={timeSeries} />
-        </div>
+          {/* Plots Bottom Sheet */}
+          {simulationType === 'rocket' && (
+            <BottomSheet
+              isOpen={mobilePanel === 'plots'}
+              onClose={() => setMobilePanel(null)}
+              title="Plots"
+              initialSnapPoint="expanded"
+            >
+              <PlotPanel timeSeries={timeSeries} />
+            </BottomSheet>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    width: '100vw',
-    height: '100vh',
-    backgroundColor: '#1a1a1a',
-  },
-  topSection: {
-    display: 'flex',
-    flex: 1,
-    minHeight: 0,
-  },
-  bottomSection: {
-    height: '300px',
-    minHeight: '200px',
-    maxHeight: '400px',
-  },
-  leftPanel: {
-    width: '320px',
-    height: '100%',
-    borderRight: '2px solid #34495e',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-  },
   controlPanelWrapper: {
     flex: 1,
     minHeight: 0,
     overflow: 'auto',
-  },
-  centerPanel: {
-    flex: 1,
-    height: '100%',
-    position: 'relative' as const,
-  },
-  rightPanel: {
-    width: '320px',
-    height: '100%',
-    borderLeft: '2px solid #34495e',
-    overflow: 'hidden',
   },
   placeholder: {
     width: '100%',
@@ -376,15 +474,5 @@ const styles = {
     borderRadius: '4px',
   },
 };
-
-// Add keyframe animation for spinner
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default App;
