@@ -7,6 +7,53 @@ on:
     branches: [ master, main ]
 
 jobs:
+  wasm-build:
+    name: WebAssembly Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: '3.1.51'  # Match production version
+
+    - name: Verify Emscripten installation
+      run: emcc --version
+
+    - name: Build WebAssembly module
+      run: |
+        cd wasm
+        ./build.sh Release
+
+    - name: Validate WASM output
+      run: |
+        # Check files exist
+        if [ ! -f wasm/sopot.js ]; then
+          echo "ERROR: sopot.js not found"
+          exit 1
+        fi
+
+        if [ ! -f wasm/sopot.wasm ]; then
+          echo "ERROR: sopot.wasm not found"
+          exit 1
+        fi
+
+        # Check files are not empty
+        if [ ! -s wasm/sopot.js ]; then
+          echo "ERROR: sopot.js is empty"
+          exit 1
+        fi
+
+        if [ ! -s wasm/sopot.wasm ]; then
+          echo "ERROR: sopot.wasm is empty"
+          exit 1
+        fi
+
+        echo "✅ WASM build successful"
+        ls -lh wasm/sopot.js wasm/sopot.wasm
+
   build:
     name: ${{ matrix.os }} - ${{ matrix.compiler }}
     runs-on: ${{ matrix.os }}
