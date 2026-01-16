@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type SimulationType = 'rocket' | 'grid2d';
+export type SimulationType = 'rocket' | 'grid2d' | 'pendulum';
 
 interface SimulationSelectorProps {
   currentSimulation: SimulationType;
@@ -29,6 +29,13 @@ export function SimulationSelector({
       title: '2D Mass-Spring Grid',
       description: 'Deformable membrane physics simulation',
       subsystem: 'STRUCTURAL',
+    },
+    {
+      type: 'pendulum' as SimulationType,
+      label: 'INVPND',
+      title: 'Inverted Double Pendulum',
+      description: 'LQR-controlled balancing with real-time stabilization',
+      subsystem: 'CONTROL',
     },
   ];
 

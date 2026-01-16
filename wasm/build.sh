@@ -86,7 +86,7 @@ else
         OPT_FLAGS="-O0 -g -s ASSERTIONS=1 -s SAFE_HEAP=1"
     fi
 
-    # Build command - includes both rocket and grid2d
+    # Build command - includes rocket, grid2d, and inverted pendulum
     emcc -std=c++20 \
         $OPT_FLAGS \
         -lembind \
@@ -103,6 +103,7 @@ else
         -I.. \
         wasm_rocket.cpp \
         wasm_grid2d.cpp \
+        wasm_inverted_pendulum.cpp \
         -o sopot.js
 fi
 
@@ -120,7 +121,14 @@ if [ -f "sopot.js" ] && [ -f "sopot.wasm" ]; then
     echo "Usage in JavaScript/TypeScript:"
     echo "  import createSopotModule from './sopot.js';"
     echo "  const Module = await createSopotModule();"
-    echo "  const sim = new Module.RocketSimulator();"
+    echo ""
+    echo "  // Rocket simulation:"
+    echo "  const rocket = new Module.RocketSimulator();"
+    echo ""
+    echo "  // Inverted double pendulum:"
+    echo "  const pendulum = new Module.InvertedPendulumSimulator();"
+    echo "  pendulum.setupDefault();"
+    echo "  pendulum.step();"
     echo ""
 else
     echo -e "${RED}Build failed!${NC}"

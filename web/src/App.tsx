@@ -3,14 +3,17 @@ import * as THREE from 'three';
 import { SimulationSelector, SimulationType } from './components/SimulationSelector';
 import { RocketVisualization3D } from './components/RocketVisualization3D';
 import { Grid2DVisualization } from './components/Grid2DVisualization';
+import { InvertedPendulumVisualization } from './components/InvertedPendulumVisualization';
 import { TelemetryPanel } from './components/TelemetryPanel';
 import { ControlPanel } from './components/ControlPanel';
 import { Grid2DControlPanel } from './components/Grid2DControlPanel';
+import { InvertedPendulumControlPanel } from './components/InvertedPendulumControlPanel';
 import { PlotPanel } from './components/PlotPanel';
 import { FloatingActionButton } from './components/FloatingActionButton';
 import { BottomSheet } from './components/BottomSheet';
 import { useRocketSimulation } from './hooks/useRocketSimulation';
 import { useGrid2DSimulation } from './hooks/useGrid2DSimulation';
+import { useInvertedPendulumSimulation } from './hooks/useInvertedPendulumSimulation';
 import type { TimeSeriesData } from './types/sopot';
 import './styles/responsive.css';
 
@@ -26,11 +29,12 @@ function App() {
   );
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Note: Both hooks are instantiated to maintain React hook call order,
+  // Note: All hooks are instantiated to maintain React hook call order,
   // but inactive simulations are reset when switching types to free resources.
-  // The rocket WASM module loads on mount for the primary simulation type.
+  // The WASM module loads on mount for the selected simulation type.
   const rocketSim = useRocketSimulation();
   const gridSim = useGrid2DSimulation(5, 5);
+  const pendulumSim = useInvertedPendulumSimulation();
 
   const [trajectoryHistory, setTrajectoryHistory] = useState<
     Array<{ position: THREE.Vector3; time: number }>
@@ -38,7 +42,11 @@ function App() {
   const [timeSeries, setTimeSeries] = useState<TimeSeriesData | null>(null);
 
   // Get the active simulation based on type
-  const activeSim = simulationType === 'rocket' ? rocketSim : gridSim;
+  const activeSim = simulationType === 'rocket'
+    ? rocketSim
+    : simulationType === 'grid2d'
+      ? gridSim
+      : pendulumSim;
 
   // Handle window resize for responsive layout
   useEffect(() => {
@@ -126,19 +134,22 @@ function App() {
     }
   }, [simulationType, rocketSim.isRunning, rocketSim.simulator, rocketSim.isInitialized]);
 
-  // Handle simulation type change - reset both simulations
+  // Handle simulation type change - reset all simulations
   const handleSimulationTypeChange = (type: SimulationType) => {
     console.log(`[App] Switching simulation type to: ${type}`);
 
-    // Pause current simulation
+    // Pause all simulations
     if (rocketSim.isRunning) rocketSim.pause();
     if (gridSim.isRunning) gridSim.pause();
+    if (pendulumSim.isRunning) pendulumSim.pause();
 
     // Reset the simulation we're switching away from to free resources
     if (simulationType === 'rocket' && rocketSim.isInitialized) {
       rocketSim.reset();
     } else if (simulationType === 'grid2d' && gridSim.isInitialized) {
       gridSim.reset();
+    } else if (simulationType === 'pendulum' && pendulumSim.isInitialized) {
+      pendulumSim.reset();
     }
 
     setSimulationType(type);
@@ -159,7 +170,7 @@ function App() {
         );
       }
       return renderPlaceholder('🚀 SOPOT Rocket Simulation', rocketSim.isReady);
-    } else {
+    } else if (simulationType === 'grid2d') {
       if (gridSim.isInitialized) {
         return (
           <Grid2DVisualization
@@ -170,6 +181,19 @@ function App() {
         );
       }
       return renderPlaceholder('🎨 SOPOT 2D Grid Simulation', gridSim.isReady);
+    } else {
+      // Pendulum simulation
+      if (pendulumSim.isInitialized) {
+        return (
+          <InvertedPendulumVisualization
+            state={pendulumSim.currentState}
+            visualizationData={pendulumSim.visualizationData}
+            showTelemetry={true}
+            showForceArrow={true}
+          />
+        );
+      }
+      return renderPlaceholder('⚖️ Inverted Double Pendulum', pendulumSim.isReady);
     }
   };
 
@@ -177,11 +201,11 @@ function App() {
     // Use accurate description based on simulation type
     const description = simulationType === 'rocket'
       ? 'C++20 Physics Simulation compiled to WebAssembly'
-      : 'High-performance physics simulation engine';
+      : simulationType === 'pendulum'
+        ? 'LQR-controlled inverted double pendulum with real-time stabilization'
+        : 'High-performance physics simulation engine';
 
-    const loadingText = simulationType === 'rocket'
-      ? 'Loading WebAssembly module...'
-      : 'Loading simulation engine...';
+    const loadingText = 'Loading WebAssembly module...';
 
     return (
       <div style={styles.placeholder}>
@@ -251,7 +275,7 @@ function App() {
                   onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
                   onCameraTrackingChange={setCameraTracking}
                 />
-              ) : (
+              ) : simulationType === 'grid2d' ? (
                 <Grid2DControlPanel
                   isReady={gridSim.isReady}
                   isInitialized={gridSim.isInitialized}
@@ -269,6 +293,23 @@ function App() {
                   onShowVelocitiesChange={setShowVelocities}
                   onShowGridChange={setShowGrid}
                 />
+              ) : (
+                <InvertedPendulumControlPanel
+                  state={pendulumSim.currentState}
+                  isRunning={pendulumSim.isRunning}
+                  isInitialized={pendulumSim.isInitialized}
+                  simulationFailed={pendulumSim.simulationFailed}
+                  controllerEnabled={pendulumSim.controllerEnabled}
+                  playbackSpeed={pendulumSim.playbackSpeed}
+                  lqrGains={pendulumSim.getLQRGains()}
+                  onInitialize={(t1, t2) => pendulumSim.initialize(undefined, undefined, undefined, undefined, undefined, t1, t2)}
+                  onStart={pendulumSim.start}
+                  onPause={pendulumSim.pause}
+                  onReset={pendulumSim.reset}
+                  onSetPlaybackSpeed={pendulumSim.setPlaybackSpeed}
+                  onSetControllerEnabled={pendulumSim.setControllerEnabled}
+                  onApplyDisturbance={pendulumSim.applyDisturbance}
+                />
               )}
             </div>
           </div>
@@ -285,7 +326,7 @@ function App() {
                 state={rocketSim.currentState}
                 isRunning={rocketSim.isRunning}
               />
-            ) : (
+            ) : simulationType === 'grid2d' ? (
               <div style={styles.telemetryPlaceholder}>
                 <h3 style={styles.telemetryTitle}>Grid Info</h3>
                 {gridSim.currentState && (
@@ -301,6 +342,40 @@ function App() {
                     <div style={styles.infoRow}>
                       <span>Masses:</span>
                       <span>{gridSim.currentState.positions.length}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={styles.telemetryPlaceholder}>
+                <h3 style={styles.telemetryTitle}>Pendulum Info</h3>
+                {pendulumSim.currentState && (
+                  <div style={styles.gridInfo}>
+                    <div style={styles.infoRow}>
+                      <span>Time:</span>
+                      <span>{pendulumSim.currentState.time.toFixed(3)}s</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Cart Position:</span>
+                      <span>{pendulumSim.currentState.x.toFixed(3)}m</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>θ₁:</span>
+                      <span>{(pendulumSim.currentState.theta1 * 180 / Math.PI).toFixed(1)}°</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>θ₂:</span>
+                      <span>{(pendulumSim.currentState.theta2 * 180 / Math.PI).toFixed(1)}°</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Control Force:</span>
+                      <span>{pendulumSim.currentState.controlForce.toFixed(1)}N</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Controller:</span>
+                      <span style={{ color: pendulumSim.controllerEnabled ? '#4ade80' : '#f87171' }}>
+                        {pendulumSim.controllerEnabled ? 'ON' : 'OFF'}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -348,7 +423,7 @@ function App() {
                 onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
                 onCameraTrackingChange={setCameraTracking}
               />
-            ) : (
+            ) : simulationType === 'grid2d' ? (
               <Grid2DControlPanel
                 isReady={gridSim.isReady}
                 isInitialized={gridSim.isInitialized}
@@ -366,6 +441,23 @@ function App() {
                 onShowVelocitiesChange={setShowVelocities}
                 onShowGridChange={setShowGrid}
               />
+            ) : (
+              <InvertedPendulumControlPanel
+                state={pendulumSim.currentState}
+                isRunning={pendulumSim.isRunning}
+                isInitialized={pendulumSim.isInitialized}
+                simulationFailed={pendulumSim.simulationFailed}
+                controllerEnabled={pendulumSim.controllerEnabled}
+                playbackSpeed={pendulumSim.playbackSpeed}
+                lqrGains={pendulumSim.getLQRGains()}
+                onInitialize={(t1, t2) => pendulumSim.initialize(undefined, undefined, undefined, undefined, undefined, t1, t2)}
+                onStart={pendulumSim.start}
+                onPause={pendulumSim.pause}
+                onReset={pendulumSim.reset}
+                onSetPlaybackSpeed={pendulumSim.setPlaybackSpeed}
+                onSetControllerEnabled={pendulumSim.setControllerEnabled}
+                onApplyDisturbance={pendulumSim.applyDisturbance}
+              />
             )}
           </BottomSheet>
 
@@ -381,6 +473,63 @@ function App() {
                 state={rocketSim.currentState}
                 isRunning={rocketSim.isRunning}
               />
+            </BottomSheet>
+          )}
+
+          {simulationType === 'pendulum' && (
+            <BottomSheet
+              isOpen={mobilePanel === 'telemetry'}
+              onClose={() => setMobilePanel(null)}
+              title="Pendulum Telemetry"
+              initialSnapPoint="half"
+            >
+              <div style={styles.telemetryPlaceholder}>
+                <h3 style={styles.telemetryTitle}>Pendulum State</h3>
+                {pendulumSim.currentState && (
+                  <div style={styles.gridInfo}>
+                    <div style={styles.infoRow}>
+                      <span>Time:</span>
+                      <span>{pendulumSim.currentState.time.toFixed(3)}s</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Cart Position:</span>
+                      <span>{pendulumSim.currentState.x.toFixed(3)}m</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Cart Velocity:</span>
+                      <span>{pendulumSim.currentState.xdot.toFixed(3)}m/s</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>θ₁ (Link 1):</span>
+                      <span>{(pendulumSim.currentState.theta1 * 180 / Math.PI).toFixed(2)}°</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>θ₂ (Link 2):</span>
+                      <span>{(pendulumSim.currentState.theta2 * 180 / Math.PI).toFixed(2)}°</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>ω₁:</span>
+                      <span>{pendulumSim.currentState.omega1.toFixed(2)} rad/s</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>ω₂:</span>
+                      <span>{pendulumSim.currentState.omega2.toFixed(2)} rad/s</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Control Force:</span>
+                      <span style={{ color: pendulumSim.currentState.controlForce > 0 ? '#4ade80' : '#f87171' }}>
+                        {pendulumSim.currentState.controlForce.toFixed(1)}N
+                      </span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <span>Controller:</span>
+                      <span style={{ color: pendulumSim.controllerEnabled ? '#4ade80' : '#f87171' }}>
+                        {pendulumSim.controllerEnabled ? 'LQR ACTIVE' : 'DISABLED'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </BottomSheet>
           )}
 

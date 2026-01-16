@@ -147,11 +147,96 @@ export interface Grid2DSimulator {
   getState(): Grid2DWasmState;
   getMassPosition(row: number, col: number): { x: number; y: number };
   getKineticEnergy(): number;
+  getCenterOfMass(): { x: number; y: number };
+  getTotalMomentum(): { px: number; py: number };
+}
+
+/**
+ * Inverted Double Pendulum Simulator
+ */
+export interface InvertedPendulumSimulator {
+  // Configuration
+  setParameters(cartMass: number, m1: number, m2: number, L1: number, L2: number, g: number): void;
+  setInitialState(x: number, theta1: number, theta2: number, xdot: number, omega1: number, omega2: number): void;
+  setTimestep(dt: number): void;
+  setMaxForce(maxForce: number): void;
+  configureLQR(qDiag: number[], r: number): void;
+  setupDefault(): void;
+  reset(): void;
+
+  // Simulation control
+  step(): boolean;
+  stepWithDt(dt: number): boolean;
+  setControllerEnabled(enabled: boolean): void;
+  applyCartImpulse(impulse: number): void;
+  applyLink1Impulse(impulse: number): void;
+  applyLink2Impulse(impulse: number): void;
+
+  // State queries
+  getTime(): number;
+  getCartPosition(): number;
+  getTheta1(): number;
+  getTheta2(): number;
+  getCartVelocity(): number;
+  getOmega1(): number;
+  getOmega2(): number;
+  getControlForce(): number;
+  getFullState(): {
+    time: number;
+    x: number;
+    theta1: number;
+    theta2: number;
+    xdot: number;
+    omega1: number;
+    omega2: number;
+    controlForce: number;
+    link1Tip: { x: number; y: number };
+    link2Tip: { x: number; y: number };
+  };
+  getVisualizationData(): {
+    cart: { x: number; y: number };
+    joint1: { x: number; y: number };
+    joint2: { x: number; y: number };
+    tip: { x: number; y: number };
+    theta1: number;
+    theta2: number;
+    controlForce: number;
+  };
+
+  // History
+  setRecordHistory(record: boolean): void;
+  getHistorySize(): number;
+  clearHistory(): void;
+  getHistory(): {
+    time: number[];
+    x: number[];
+    theta1: number[];
+    theta2: number[];
+    xdot: number[];
+    omega1: number[];
+    omega2: number[];
+    controlForce: number[];
+  };
+
+  // Parameters
+  getCartMass(): number;
+  getMass1(): number;
+  getMass2(): number;
+  getLength1(): number;
+  getLength2(): number;
+  getGravity(): number;
+  getMaxForce(): number;
+  isInitialized(): boolean;
+  isControllerEnabled(): boolean;
+  getLQRGain(): number[];
+
+  delete(): void;
 }
 
 export interface SopotModule {
   RocketSimulator: new () => RocketSimulator;
   Grid2DSimulator: new () => Grid2DSimulator;
+  InvertedPendulumSimulator?: new () => InvertedPendulumSimulator;
 }
 
 export type CreateSopotModule = () => Promise<SopotModule>;

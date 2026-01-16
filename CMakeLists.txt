@@ -188,6 +188,11 @@ target_link_libraries(named_expression_test sopot_core sopot_physics)
 target_compile_features(named_expression_test PRIVATE cxx_std_20)
 add_test(NAME named_expression_test COMMAND named_expression_test)
 
+add_executable(inverted_pendulum_test tests/inverted_pendulum_test.cpp)
+target_link_libraries(inverted_pendulum_test sopot_core sopot_physics)
+target_compile_features(inverted_pendulum_test PRIVATE cxx_std_20)
+add_test(NAME inverted_pendulum_test COMMAND inverted_pendulum_test)
+
 # Experimental: Field-based component architecture
 add_executable(simple_reactor_demo experimental/simple_reactor_demo.cpp)
 target_include_directories(simple_reactor_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
@@ -223,7 +228,8 @@ add_custom_target(run_tests
     COMMAND double_pendulum_test
     COMMAND symbolic_diff_test
     COMMAND named_expression_test
-    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test double_pendulum_test symbolic_diff_test named_expression_test
+    COMMAND inverted_pendulum_test
+    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test double_pendulum_test symbolic_diff_test named_expression_test inverted_pendulum_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running SOPOT tests"
 )
@@ -249,6 +255,7 @@ set(TEST_TARGETS
     double_pendulum_test
     symbolic_diff_test
     named_expression_test
+    inverted_pendulum_test
 )
 
 # First target creates the PCH, others reuse it
