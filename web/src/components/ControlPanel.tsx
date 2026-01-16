@@ -7,12 +7,14 @@ interface ControlPanelProps {
   isRunning: boolean;
   error: string | null;
   playbackSpeed: number;
+  cameraTracking?: boolean;
   onInitialize: (config: SimulationConfig) => Promise<void>;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
   onStep: () => void;
   onPlaybackSpeedChange: (speed: number) => void;
+  onCameraTrackingChange?: (enabled: boolean) => void;
 }
 
 export function ControlPanel({
@@ -21,12 +23,14 @@ export function ControlPanel({
   isRunning,
   error,
   playbackSpeed,
+  cameraTracking = false,
   onInitialize,
   onStart,
   onPause,
   onReset,
   onStep,
   onPlaybackSpeedChange,
+  onCameraTrackingChange,
 }: ControlPanelProps) {
   const [config, setConfig] = useState<SimulationConfig>({
     elevation: 85,
@@ -235,6 +239,24 @@ export function ControlPanel({
 
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Camera Controls</h3>
+
+            {onCameraTrackingChange && (
+              <div style={styles.inputGroup}>
+                <label style={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={cameraTracking}
+                    onChange={(e) => onCameraTrackingChange(e.target.checked)}
+                    className="touch-checkbox"
+                  />
+                  <span style={styles.checkboxText}>Track Rocket</span>
+                </label>
+                <div style={styles.helpText}>
+                  Camera follows rocket position (keeps rocket in view)
+                </div>
+              </div>
+            )}
+
             <div style={styles.infoBox}>
               <div style={styles.controlItem}>
                 <span className="technical-label" style={styles.controlLabel}>LMB+DRAG</span>
@@ -412,6 +434,24 @@ const styles = {
     borderRadius: '3px',
     minWidth: '80px',
     textAlign: 'center' as const,
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+    padding: '8px 0',
+  },
+  checkboxText: {
+    fontSize: '13px',
+    color: 'var(--text-primary)',
+    fontWeight: 500,
+  },
+  helpText: {
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    marginLeft: '28px',
+    marginTop: '-4px',
   },
   footer: {
     marginTop: 'auto',

@@ -20,6 +20,7 @@ function App() {
   const [simulationType, setSimulationType] = useState<SimulationType>('rocket');
   const [showVelocities, setShowVelocities] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [cameraTracking, setCameraTracking] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>(
     window.innerWidth < 768 ? 'controls' : null
   );
@@ -153,6 +154,7 @@ function App() {
           <RocketVisualization3D
             state={rocketSim.currentState}
             trajectoryHistory={trajectoryHistory}
+            cameraTracking={cameraTracking}
           />
         );
       }
@@ -240,12 +242,14 @@ function App() {
                   isRunning={rocketSim.isRunning}
                   error={rocketSim.error}
                   playbackSpeed={rocketSim.playbackSpeed}
+                  cameraTracking={cameraTracking}
                   onInitialize={rocketSim.initialize}
                   onStart={rocketSim.start}
                   onPause={rocketSim.pause}
                   onReset={rocketSim.reset}
                   onStep={rocketSim.step}
                   onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
+                  onCameraTrackingChange={setCameraTracking}
                 />
               ) : (
                 <Grid2DControlPanel
@@ -335,12 +339,14 @@ function App() {
                 isRunning={rocketSim.isRunning}
                 error={rocketSim.error}
                 playbackSpeed={rocketSim.playbackSpeed}
+                cameraTracking={cameraTracking}
                 onInitialize={rocketSim.initialize}
                 onStart={rocketSim.start}
                 onPause={rocketSim.pause}
                 onReset={rocketSim.reset}
                 onStep={rocketSim.step}
                 onPlaybackSpeedChange={rocketSim.setPlaybackSpeed}
+                onCameraTrackingChange={setCameraTracking}
               />
             ) : (
               <Grid2DControlPanel
