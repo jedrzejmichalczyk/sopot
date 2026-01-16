@@ -257,6 +257,7 @@ export function RocketVisualization3D({
         camera={{ position: [20, 15, 20], fov: 50 }}
         shadows
         gl={{ antialias: true }}
+        className="visualization-canvas"
       >
         {/* Lighting */}
         <SceneLighting />
@@ -270,7 +271,7 @@ export function RocketVisualization3D({
         <RocketMesh state={state} />
         <TrajectoryLine trajectoryHistory={trajectoryHistory} />
 
-        {/* Camera controls */}
+        {/* Camera controls - optimized for both desktop and touch */}
         <OrbitControls
           enablePan={true}
           enableZoom={true}
@@ -278,6 +279,19 @@ export function RocketVisualization3D({
           minDistance={5}
           maxDistance={500}
           maxPolarAngle={Math.PI / 2}
+          // Touch controls
+          enableDamping={true}
+          dampingFactor={0.05}
+          rotateSpeed={0.8}
+          zoomSpeed={1.0}
+          panSpeed={0.8}
+          // Touch-specific settings - values from three.js OrbitControls TOUCH enum:
+          // TOUCH.ROTATE = 0, TOUCH.DOLLY_PAN = 2, TOUCH.DOLLY_ROTATE = 3, TOUCH.PAN = 1
+          // See: https://threejs.org/docs/#examples/en/controls/OrbitControls
+          touches={{
+            ONE: 0,    // TOUCH.ROTATE - one finger rotates camera
+            TWO: 2     // TOUCH.DOLLY_PAN - two fingers zoom and pan
+          }}
         />
       </Canvas>
     </div>

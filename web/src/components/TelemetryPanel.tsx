@@ -54,9 +54,9 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
   ];
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="scrollable">
       {/* Status indicator */}
-      <div style={styles.statusBar}>
+      <div style={styles.statusBar} className="card">
         <div
           style={{
             ...styles.statusIndicator,
@@ -69,10 +69,10 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
       </div>
 
       {/* Main telemetry */}
-      <div style={styles.mainTelemetry}>
+      <div style={styles.mainTelemetry} className="grid-2-col">
         {telemetryItems.map((item) => (
-          <div key={item.label} style={styles.telemetryCard}>
-            <div style={styles.telemetryLabel}>{item.label}</div>
+          <div key={item.label} style={styles.telemetryCard} className="card fade-in">
+            <div style={styles.telemetryLabel} className="section-title">{item.label}</div>
             <div style={{ ...styles.telemetryValue, color: item.color }}>
               {item.value}
               <span style={styles.telemetryUnit}>{item.unit}</span>
@@ -82,8 +82,8 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
       </div>
 
       {/* Position vector */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Position (ENU)</h3>
+      <div style={styles.section} className="card">
+        <h3 style={styles.sectionTitle} className="section-title">Position (ENU)</h3>
         <div style={styles.vectorGrid}>
           {positionItems.map((item) => (
             <div key={item.label} style={styles.vectorItem}>
@@ -97,8 +97,8 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
       </div>
 
       {/* Velocity vector */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Velocity (ENU)</h3>
+      <div style={styles.section} className="card">
+        <h3 style={styles.sectionTitle} className="section-title">Velocity (ENU)</h3>
         <div style={styles.vectorGrid}>
           {velocityItems.map((item) => (
             <div key={item.label} style={styles.vectorItem}>
@@ -112,8 +112,8 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
       </div>
 
       {/* Quaternion */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Attitude</h3>
+      <div style={styles.section} className="card">
+        <h3 style={styles.sectionTitle} className="section-title">Attitude</h3>
         <div style={styles.quaternionGrid}>
           <div style={styles.quaternionItem}>
             <span style={styles.quaternionLabel}>q1:</span>

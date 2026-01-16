@@ -32,7 +32,7 @@ export function SimulationSelector({
 
   return (
     <div style={styles.container}>
-      <h3 style={styles.header}>Simulation Type</h3>
+      <h3 style={styles.header} className="section-title">Simulation Type</h3>
       <div style={styles.cardContainer}>
         {simulations.map((sim) => {
           const isSelected = currentSimulation === sim.type;
@@ -45,6 +45,7 @@ export function SimulationSelector({
               onMouseEnter={() => setHoveredType(sim.type)}
               onMouseLeave={() => setHoveredType(null)}
               disabled={disabled}
+              className="touch-button card"
               style={{
                 ...styles.card,
                 ...(isSelected ? styles.cardSelected : {}),
