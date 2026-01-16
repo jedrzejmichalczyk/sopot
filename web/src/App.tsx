@@ -20,7 +20,9 @@ function App() {
   const [simulationType, setSimulationType] = useState<SimulationType>('rocket');
   const [showVelocities, setShowVelocities] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(
+    window.innerWidth < 768 ? 'controls' : null
+  );
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Note: Both hooks are instantiated to maintain React hook call order,
