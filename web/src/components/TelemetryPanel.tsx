@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { SimulationState } from '../types/sopot';
+import { ChevronDownIcon, ChevronUpIcon } from './icons/Icons';
 
 interface TelemetryPanelProps {
   state: SimulationState | null;
@@ -6,6 +8,9 @@ interface TelemetryPanelProps {
 }
 
 export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
+  const [isPositionExpanded, setIsPositionExpanded] = useState(false);
+  const [isVelocityExpanded, setIsVelocityExpanded] = useState(false);
+  const [isAttitudeExpanded, setIsAttitudeExpanded] = useState(false);
   if (!state) {
     return (
       <div style={styles.container}>
@@ -82,74 +87,89 @@ export function TelemetryPanel({ state, isRunning }: TelemetryPanelProps) {
         ))}
       </div>
 
-      {/* Position vector */}
+      {/* Position vector - Collapsible */}
       <div style={styles.section} className="mission-panel">
-        <h3 style={styles.sectionTitle}>
-          <span className="technical-label" style={styles.sectionLabel}>POSITION</span>
-          <span style={styles.frameLabel}>ENU FRAME</span>
+        <h3 style={styles.sectionTitleCollapsible} onClick={() => setIsPositionExpanded(!isPositionExpanded)}>
+          <div style={styles.sectionTitleLeft}>
+            <span className="technical-label" style={styles.sectionLabel}>POSITION</span>
+            <span style={styles.frameLabel}>ENU FRAME</span>
+          </div>
+          {isPositionExpanded ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
         </h3>
-        <div style={styles.vectorGrid}>
-          {positionItems.map((item) => (
-            <div key={item.label} style={styles.vectorItem}>
-              <span style={styles.vectorLabel}>{item.label}</span>
-              <span className="data-readout" style={styles.vectorValue}>
-                {item.value} <span style={styles.unitLabel}>{item.unit}</span>
-              </span>
-            </div>
-          ))}
-        </div>
+        {isPositionExpanded && (
+          <div style={styles.vectorGrid}>
+            {positionItems.map((item) => (
+              <div key={item.label} style={styles.vectorItem}>
+                <span style={styles.vectorLabel}>{item.label}</span>
+                <span className="data-readout" style={styles.vectorValue}>
+                  {item.value} <span style={styles.unitLabel}>{item.unit}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Velocity vector */}
+      {/* Velocity vector - Collapsible */}
       <div style={styles.section} className="mission-panel">
-        <h3 style={styles.sectionTitle}>
-          <span className="technical-label" style={styles.sectionLabel}>VELOCITY</span>
-          <span style={styles.frameLabel}>ENU FRAME</span>
+        <h3 style={styles.sectionTitleCollapsible} onClick={() => setIsVelocityExpanded(!isVelocityExpanded)}>
+          <div style={styles.sectionTitleLeft}>
+            <span className="technical-label" style={styles.sectionLabel}>VELOCITY</span>
+            <span style={styles.frameLabel}>ENU FRAME</span>
+          </div>
+          {isVelocityExpanded ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
         </h3>
-        <div style={styles.vectorGrid}>
-          {velocityItems.map((item) => (
-            <div key={item.label} style={styles.vectorItem}>
-              <span style={styles.vectorLabel}>{item.label}</span>
-              <span className="data-readout" style={styles.vectorValue}>
-                {item.value} <span style={styles.unitLabel}>{item.unit}</span>
-              </span>
-            </div>
-          ))}
-        </div>
+        {isVelocityExpanded && (
+          <div style={styles.vectorGrid}>
+            {velocityItems.map((item) => (
+              <div key={item.label} style={styles.vectorItem}>
+                <span style={styles.vectorLabel}>{item.label}</span>
+                <span className="data-readout" style={styles.vectorValue}>
+                  {item.value} <span style={styles.unitLabel}>{item.unit}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Quaternion */}
+      {/* Quaternion - Collapsible */}
       <div style={styles.section} className="mission-panel">
-        <h3 style={styles.sectionTitle}>
-          <span className="technical-label" style={styles.sectionLabel}>ATTITUDE</span>
-          <span style={styles.frameLabel}>QUATERNION</span>
+        <h3 style={styles.sectionTitleCollapsible} onClick={() => setIsAttitudeExpanded(!isAttitudeExpanded)}>
+          <div style={styles.sectionTitleLeft}>
+            <span className="technical-label" style={styles.sectionLabel}>ATTITUDE</span>
+            <span style={styles.frameLabel}>QUATERNION</span>
+          </div>
+          {isAttitudeExpanded ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
         </h3>
-        <div style={styles.quaternionGrid}>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q₁</span>
-            <span className="data-readout" style={styles.quaternionValue}>
-              {state.quaternion.q1.toFixed(4)}
-            </span>
+        {isAttitudeExpanded && (
+          <div style={styles.quaternionGrid}>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₁</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q1.toFixed(4)}
+              </span>
+            </div>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₂</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q2.toFixed(4)}
+              </span>
+            </div>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₃</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q3.toFixed(4)}
+              </span>
+            </div>
+            <div style={styles.quaternionItem}>
+              <span style={styles.quaternionLabel}>q₄</span>
+              <span className="data-readout" style={styles.quaternionValue}>
+                {state.quaternion.q4.toFixed(4)}
+              </span>
+            </div>
           </div>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q₂</span>
-            <span className="data-readout" style={styles.quaternionValue}>
-              {state.quaternion.q2.toFixed(4)}
-            </span>
-          </div>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q₃</span>
-            <span className="data-readout" style={styles.quaternionValue}>
-              {state.quaternion.q3.toFixed(4)}
-            </span>
-          </div>
-          <div style={styles.quaternionItem}>
-            <span style={styles.quaternionLabel}>q₄</span>
-            <span className="data-readout" style={styles.quaternionValue}>
-              {state.quaternion.q4.toFixed(4)}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -235,6 +255,21 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '12px',
+  },
+  sectionTitleCollapsible: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '8px',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'background 0.15s ease',
+  },
+  sectionTitleLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
   },
   sectionLabel: {
     fontSize: '10px',

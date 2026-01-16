@@ -7,6 +7,8 @@ import { TelemetryPanel } from './components/TelemetryPanel';
 import { ControlPanel } from './components/ControlPanel';
 import { Grid2DControlPanel } from './components/Grid2DControlPanel';
 import { PlotPanel } from './components/PlotPanel';
+import { FloatingActionButton } from './components/FloatingActionButton';
+import { BottomSheet } from './components/BottomSheet';
 import { useRocketSimulation } from './hooks/useRocketSimulation';
 import { useGrid2DSimulation } from './hooks/useGrid2DSimulation';
 import type { TimeSeriesData } from './types/sopot';
@@ -18,9 +20,7 @@ function App() {
   const [simulationType, setSimulationType] = useState<SimulationType>('rocket');
   const [showVelocities, setShowVelocities] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(
-    window.innerWidth < 768 ? 'controls' : null
-  );
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Note: Both hooks are instantiated to maintain React hook call order,
@@ -196,36 +196,26 @@ function App() {
     );
   };
 
+  // Handle play/pause for FAB
+  const handlePlayPause = () => {
+    if (activeSim.isRunning) {
+      activeSim.pause();
+    } else {
+      activeSim.start();
+    }
+  };
+
   return (
-    <div className="app-container">
-      {/* Mobile Navigation */}
+    <div className="app-container">{/* Floating Action Button - Mobile Only */}
       {isMobile && (
-        <div className="mobile-nav mobile-only">
-          <button
-            className={`mobile-nav-button ${mobilePanel === 'controls' ? 'active' : ''}`}
-            onClick={() => setMobilePanel(mobilePanel === 'controls' ? null : 'controls')}
-          >
-            <span className="mobile-nav-icon">⚙️</span>
-            <span>Controls</span>
-          </button>
-          <button
-            className={`mobile-nav-button ${mobilePanel === 'telemetry' ? 'active' : ''}`}
-            onClick={() => setMobilePanel(mobilePanel === 'telemetry' ? null : 'telemetry')}
-            disabled={simulationType !== 'rocket'}
-          >
-            <span className="mobile-nav-icon">📊</span>
-            <span>Data</span>
-          </button>
-          {simulationType === 'rocket' && (
-            <button
-              className={`mobile-nav-button ${mobilePanel === 'plots' ? 'active' : ''}`}
-              onClick={() => setMobilePanel(mobilePanel === 'plots' ? null : 'plots')}
-            >
-              <span className="mobile-nav-icon">📈</span>
-              <span>Plots</span>
-            </button>
-          )}
-        </div>
+        <FloatingActionButton
+          isRunning={activeSim.isRunning}
+          isInitialized={activeSim.isInitialized}
+          simulationType={simulationType}
+          onPlayPause={handlePlayPause}
+          onReset={activeSim.reset}
+          onOpenPanel={(panel) => setMobilePanel(panel)}
+        />
       )}
 
       {/* Main Layout */}
@@ -321,12 +311,16 @@ function App() {
         )}
       </div>
 
-      {/* Mobile Panels (slide up from bottom) */}
+      {/* Modern Bottom Sheets - Mobile Only */}
       {isMobile && (
         <>
-          {/* Controls Panel */}
-          <div className={`mobile-panel-wrapper ${mobilePanel === 'controls' ? 'visible' : ''}`}>
-            <div className="mobile-panel-handle" onClick={() => setMobilePanel(null)} />
+          {/* Controls Bottom Sheet */}
+          <BottomSheet
+            isOpen={mobilePanel === 'controls'}
+            onClose={() => setMobilePanel(null)}
+            title="Controls"
+            initialSnapPoint="half"
+          >
             <SimulationSelector
               currentSimulation={simulationType}
               onSimulationChange={handleSimulationTypeChange}
@@ -365,25 +359,33 @@ function App() {
                 onShowGridChange={setShowGrid}
               />
             )}
-          </div>
+          </BottomSheet>
 
-          {/* Telemetry Panel */}
+          {/* Telemetry Bottom Sheet */}
           {simulationType === 'rocket' && (
-            <div className={`mobile-panel-wrapper ${mobilePanel === 'telemetry' ? 'visible' : ''}`}>
-              <div className="mobile-panel-handle" onClick={() => setMobilePanel(null)} />
+            <BottomSheet
+              isOpen={mobilePanel === 'telemetry'}
+              onClose={() => setMobilePanel(null)}
+              title="Telemetry"
+              initialSnapPoint="half"
+            >
               <TelemetryPanel
                 state={rocketSim.currentState}
                 isRunning={rocketSim.isRunning}
               />
-            </div>
+            </BottomSheet>
           )}
 
-          {/* Plots Panel */}
+          {/* Plots Bottom Sheet */}
           {simulationType === 'rocket' && (
-            <div className={`mobile-panel-wrapper ${mobilePanel === 'plots' ? 'visible' : ''}`}>
-              <div className="mobile-panel-handle" onClick={() => setMobilePanel(null)} />
+            <BottomSheet
+              isOpen={mobilePanel === 'plots'}
+              onClose={() => setMobilePanel(null)}
+              title="Plots"
+              initialSnapPoint="expanded"
+            >
               <PlotPanel timeSeries={timeSeries} />
-            </div>
+            </BottomSheet>
           )}
         </>
       )}
