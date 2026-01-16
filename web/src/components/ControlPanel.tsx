@@ -359,6 +359,11 @@ const styles = {
     opacity: 0.3,
     cursor: 'not-allowed',
   },
+  buttonPrimary: {
+    background: 'linear-gradient(135deg, #0066cc 0%, #004499 100%)',
+    border: '1px solid rgba(0, 212, 255, 0.3)',
+    boxShadow: '0 0 12px rgba(0, 102, 204, 0.3)',
+  },
   sliderContainer: {
     display: 'flex',
     alignItems: 'center',
