@@ -285,10 +285,12 @@ export function RocketVisualization3D({
           rotateSpeed={0.8}
           zoomSpeed={1.0}
           panSpeed={0.8}
-          // Touch-specific settings (0=ROTATE, 2=DOLLY_PAN)
+          // Touch-specific settings - values from three.js OrbitControls TOUCH enum:
+          // TOUCH.ROTATE = 0, TOUCH.DOLLY_PAN = 2, TOUCH.DOLLY_ROTATE = 3, TOUCH.PAN = 1
+          // See: https://threejs.org/docs/#examples/en/controls/OrbitControls
           touches={{
-            ONE: 0,    // One finger: rotate
-            TWO: 2     // Two fingers: zoom and pan
+            ONE: 0,    // TOUCH.ROTATE - one finger rotates camera
+            TWO: 2     // TOUCH.DOLLY_PAN - two fingers zoom and pan
           }}
         />
       </Canvas>

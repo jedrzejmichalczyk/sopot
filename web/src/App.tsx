@@ -390,46 +390,10 @@ function App() {
 }
 
 const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    width: '100vw',
-    height: '100vh',
-    backgroundColor: '#1a1a1a',
-  },
-  topSection: {
-    display: 'flex',
-    flex: 1,
-    minHeight: 0,
-  },
-  bottomSection: {
-    height: '300px',
-    minHeight: '200px',
-    maxHeight: '400px',
-  },
-  leftPanel: {
-    width: '320px',
-    height: '100%',
-    borderRight: '2px solid #34495e',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-  },
   controlPanelWrapper: {
     flex: 1,
     minHeight: 0,
     overflow: 'auto',
-  },
-  centerPanel: {
-    flex: 1,
-    height: '100%',
-    position: 'relative' as const,
-  },
-  rightPanel: {
-    width: '320px',
-    height: '100%',
-    borderLeft: '2px solid #34495e',
-    overflow: 'hidden',
   },
   placeholder: {
     width: '100%',
