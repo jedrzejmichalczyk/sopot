@@ -57,8 +57,18 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
 
         console.log(`[WASM] Loading module from: ${moduleUrl}`);
 
+        // Fetch the module and create a blob URL to bypass Vite's transform
+        const response = await fetch(moduleUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${moduleUrl}: ${response.status}`);
+        }
+        const moduleText = await response.text();
+        const blob = new Blob([moduleText], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+
         // @ts-ignore - Dynamic import of WebAssembly
-        const createSopotModule = await import(/* @vite-ignore */ moduleUrl);
+        const createSopotModule = await import(/* @vite-ignore */ blobUrl);
+        URL.revokeObjectURL(blobUrl);
 
         if (!mounted) return;
 
