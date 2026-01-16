@@ -8,6 +8,10 @@ on:
     paths:
       - 'web/**'
       - 'wasm/**'
+      - 'core/**'
+      - 'physics/**'
+      - 'rocket/**'
+      - 'io/**'
       - '.github/workflows/deploy-github-pages.yml'
   workflow_dispatch:
 
