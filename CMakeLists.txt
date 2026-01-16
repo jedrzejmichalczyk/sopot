@@ -173,6 +173,11 @@ target_link_libraries(grid_2d_test sopot_core sopot_physics)
 target_compile_features(grid_2d_test PRIVATE cxx_std_20)
 add_test(NAME grid_2d_test COMMAND grid_2d_test)
 
+add_executable(kink_chain_test tests/kink_chain_test.cpp)
+target_link_libraries(kink_chain_test sopot_core sopot_physics)
+target_compile_features(kink_chain_test PRIVATE cxx_std_20)
+add_test(NAME kink_chain_test COMMAND kink_chain_test)
+
 # Experimental: Field-based component architecture
 add_executable(simple_reactor_demo experimental/simple_reactor_demo.cpp)
 target_include_directories(simple_reactor_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
@@ -200,7 +205,8 @@ add_custom_target(run_tests
     COMMAND connected_masses_test
     COMMAND connected_masses_validation_test
     COMMAND grid_2d_test
-    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test
+    COMMAND kink_chain_test
+    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test kink_chain_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running SOPOT tests"
 )
@@ -223,6 +229,7 @@ set(TEST_TARGETS
     connected_masses_test
     connected_masses_validation_test
     grid_2d_test
+    kink_chain_test
 )
 
 # First target creates the PCH, others reuse it
