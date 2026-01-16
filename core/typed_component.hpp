@@ -195,7 +195,15 @@ class TypedRegistry {
     // OPTIMIZATION: Compile-time provider index calculation
     // ========================================================================
     // Finds the index of the first component providing Tag at compile time.
-    // This is still O(N) in concept checks but doesn't create recursive templates.
+    //
+    // NOTE: This function still uses O(N) template recursion for index finding.
+    // However, the recursion only happens at compile-time during template
+    // instantiation, not during component access. The optimization benefit
+    // comes from separating index calculation (compile-time) from component
+    // retrieval (runtime), which enables better compiler optimization.
+    //
+    // Future improvement: Use fold expressions or std::index_sequence for
+    // fully non-recursive implementation if needed.
 
     template<StateTagConcept Tag, size_t Index = 0>
     static constexpr size_t findProviderIndex() {

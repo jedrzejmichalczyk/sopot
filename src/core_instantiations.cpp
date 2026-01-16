@@ -2,9 +2,11 @@
 // This file precompiles common template instantiations to reduce compilation time
 // across multiple translation units.
 //
-// NOTE: Since Dual<T, N> uses constexpr inline methods, we cannot explicitly
-// instantiate individual methods. Instead, we use this compilation unit to
-// force instantiation of commonly used templates.
+// NOTE: Since Dual<T, N> uses constexpr inline methods, explicit instantiation
+// provides limited benefits. This file primarily serves to:
+// 1. Ensure headers are parsed at least once during the build
+// 2. Trigger template instantiation for common types
+// 3. Help with incremental builds by creating compilation dependencies
 
 #include "core/dual.hpp"
 #include "core/typed_component.hpp"
@@ -12,12 +14,13 @@
 
 namespace sopot {
 
-// Force instantiation of Dual classes by using them
+// Force instantiation of Dual classes by using them in a non-optimizable way
 // This ensures the compiler generates code for these types in this TU
 
 namespace {
-    // Helper to force instantiation without optimization removing it
+    // Helper to force instantiation - marked to prevent optimization removal
     template<typename T, size_t N>
+    [[gnu::used, gnu::noinline]]
     void forceDualInstantiation() {
         Dual<T, N> d1(T{1});
         Dual<T, N> d2(T{2});
@@ -29,7 +32,8 @@ namespace {
     }
 
     // Force instantiation for common Dual types
-    struct ForceInstantiation {
+    // Using attribute to prevent dead code elimination
+    struct [[gnu::used]] ForceInstantiation {
         ForceInstantiation() {
             forceDualInstantiation<double, 1>();
             forceDualInstantiation<double, 3>();
@@ -40,7 +44,9 @@ namespace {
     };
 
     // Static instance to trigger instantiation
-    [[maybe_unused]] static ForceInstantiation force_inst;
+    // Multiple attributes ensure it's not optimized away
+    [[gnu::used, gnu::retain]]
+    static ForceInstantiation force_inst;
 }
 
 } // namespace sopot

@@ -66,9 +66,9 @@ void collectDerivatives(...) {
 }
 ```
 
-**After**: Fold expression - O(1) depth
+**After**: Fold expression - Constant recursion depth
 ```cpp
-// NEW: Parallel fold expression, no recursion
+// NEW: Fold expression with index_sequence, no recursive calls
 void collectDerivatives(...) {
     [this, ...]<size_t... Is>(std::index_sequence<Is...>) {
         (collectDerivativeForComponent<Is>(...), ...);
@@ -76,7 +76,9 @@ void collectDerivatives(...) {
 }
 ```
 
-**Impact**: Reduces template recursion depth from 460 levels to **<10 levels** for any size system.
+**Impact**: Reduces template **recursion depth** from 460 levels to **<10 levels** for any size system.
+
+**Note**: This eliminates the recursive template pattern. Each component still requires a separate template instantiation of `collectDerivativeForComponent<I>`, but these instantiations occur in parallel (via fold expression) rather than nested recursively. The key benefit is avoiding deep recursion chains that hit compiler limits.
 
 #### 1C. Fold-Based Initialization (lines 293-300 and 348-373)
 
@@ -86,9 +88,14 @@ Uses fold expressions for offset initialization and initial state collection, el
 
 | Operation | Before | After | Improvement |
 |-----------|--------|-------|-------------|
-| Offset calculation | 211,600 instantiations | 1 array | **99.9%** |
-| Template depth | 460 levels | <10 levels | **95%** |
-| Derivative collection | 460 recursions | 1 fold | **Eliminates recursion** |
+| Offset calculation | 211,600 recursive instantiations | 1 array + 460 lookups | **99.5% fewer operations** |
+| Template recursion depth | 460 levels | <10 levels | **95% depth reduction** |
+| Derivative collection pattern | 460 nested recursions | 460 parallel instantiations | **Eliminates recursion chain** |
+
+**Key Clarification**: The total number of template instantiations (N per component) remains necessary, but the **pattern** changes from deeply nested recursion to parallel instantiation, which:
+- Reduces compiler memory usage
+- Avoids hitting template depth limits
+- Improves compilation parallelization opportunities
 
 ### Category 2: Build System Optimizations
 
@@ -173,26 +180,42 @@ make -j4         # Use 4 cores
 
 ## Compilation Time Measurements
 
-### Before Optimizations
+**Note on measurements**: The times below are approximate and vary significantly based on hardware, compiler version, and system load. The percentages represent theoretical improvements based on complexity reduction rather than precise benchmarks.
+
+### Measured Build Times (Current Implementation)
+
+Test environment: GCC 13.3.0, 4 cores, Release build
+
 ```
-Clean build (make -j4): ~60-90 seconds
-Incremental build (1 file): ~8-15 seconds
-Grid 2D test (10×10): ~20-30 seconds
+Clean build (make -j4): ~45 seconds
+Incremental build (1 file): ~3-5 seconds
+Incremental build with ccache: <1 second
+Grid 2D test (3×3): ~2 seconds
+Grid 2D test (10×10): Not tested (theoretical only)
 ```
 
-### After Optimizations (PCH + ccache)
+### Theoretical Improvements from Algorithmic Optimizations
+
+The algorithmic changes provide **qualitative** benefits rather than directly measurable time savings:
+
+1. **Enables larger systems** - Can now compile 10×10+ grids without hitting template depth limits
+2. **Reduces compiler memory** - Flat instantiation patterns use less memory than nested recursion
+3. **Improves scalability** - Compilation time grows more linearly with system size
+
+### Measured Impact of Build System Optimizations
+
 ```
-Clean build (make -j4): ~40-60 seconds (33% faster)
-Incremental build (1 file): <1 second (90%+ faster)
-Grid 2D test (10×10): ~15-20 seconds (25% faster)
-Subsequent builds: <5 seconds (ccache)
+PCH (Precompiled Headers): ~30-50% faster for test files (measured)
+ccache (incremental builds): 90%+ faster when cache hits (measured)
+Parallel compilation (-j4): ~3-4x faster than -j1 (expected from core count)
+Unity builds: Not thoroughly tested, 20-40% is theoretical
 ```
 
-### With Unity Builds
-```
-Clean build (make -j4): ~30-45 seconds (50% faster)
-Incremental build (1 file): ~10-20 seconds (slower)
-```
+### Important Caveats
+
+- Grid tests in the test suite use **3×3 and 4×4 grids**, not 10×10
+- 10×10 grid compilation times are **theoretical projections**, not measurements
+- Actual improvements depend heavily on system configuration and workload
 
 ## Best Practices
 
@@ -321,13 +344,17 @@ The optimizations implemented provide:
 
 ### Algorithmic Optimizations (Fundamental)
 
-| Optimization | Complexity Reduction | Impact |
-|--------------|---------------------|--------|
-| Constexpr offset array | O(N²) → O(1) | 99.9% fewer instantiations |
-| Fold-based derivatives | O(N) depth → O(1) depth | Eliminates recursion |
-| Fold-based initialization | O(N) depth → O(1) depth | **95% depth reduction** |
+| Optimization | Complexity Reduction | Primary Benefit |
+|--------------|---------------------|-----------------|
+| Constexpr offset array | O(N²) recursive → O(N) parallel | 99.5% fewer recursive operations |
+| Fold-based derivatives | O(N) nested → O(1) depth | Eliminates recursion chain |
+| Fold-based initialization | O(N) nested → O(1) depth | 95% depth reduction |
 
-**Key Benefit**: Enables compilation of larger systems (>500 components) without hitting template depth limits.
+**Key Benefits**:
+- Enables compilation of larger systems (>500 components) without hitting template depth limits
+- Reduces compiler memory usage during compilation
+- Changes nested recursion patterns to parallel instantiation
+- Improves compilation scalability
 
 ### Build System Optimizations
 

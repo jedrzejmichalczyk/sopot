@@ -25,6 +25,9 @@ if(MSVC)
     add_compile_options("$<$<CONFIG:Release>:/O2>")
     # MSVC template compilation optimizations
     add_compile_options(/bigobj)  # Increase object file section limit
+    # Note: MSVC uses /constexpr:depth<N> for constexpr recursion depth
+    # and doesn't have a direct equivalent to -ftemplate-depth
+    # Template instantiation depth is generally higher in MSVC (default ~1500)
     add_compile_options(/constexpr:depth2048)  # Increase constexpr evaluation depth
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
@@ -34,6 +37,9 @@ else()
     # GCC/Clang template compilation optimizations
     add_compile_options(-ftemplate-depth=2048)  # Increase template instantiation depth
 
+    # Note: With algorithmic optimizations, template depth rarely exceeds 50 levels,
+    # so this limit is very conservative. Previously needed for O(N) recursive patterns.
+
     # Optional: Enable compilation time tracing (Clang only)
     # Uncomment to generate time-trace JSON files for analysis
     # add_compile_options($<$<CXX_COMPILER_ID:Clang>:-ftime-trace>)
@@ -42,29 +48,42 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # ============================================================================
-# Explicit template instantiation libraries
-# These precompile common template instantiations to speed up builds
+# Explicit template instantiation libraries (optional, for incremental builds)
 # ============================================================================
+# These libraries force compilation of commonly used headers to help with
+# incremental builds. Since most SOPOT components use inline constexpr methods,
+# explicit instantiation provides limited benefits. The main value is creating
+# compilation dependencies for build system tracking.
+#
+# Can be disabled with: cmake -DSOPOT_USE_INSTANTIATION_LIBS=OFF
 
-# Core instantiations (Dual numbers, TypedComponent, etc.)
-add_library(sopot_core_inst STATIC src/core_instantiations.cpp)
-target_include_directories(sopot_core_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_features(sopot_core_inst PRIVATE cxx_std_20)
+option(SOPOT_USE_INSTANTIATION_LIBS "Enable instantiation helper libraries (minimal benefit)" ON)
 
-# Rocket instantiations (Vector3, Quaternion, rocket components)
-add_library(sopot_rocket_inst STATIC src/rocket_instantiations.cpp)
-target_include_directories(sopot_rocket_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(sopot_rocket_inst PUBLIC sopot_core_inst)
-target_compile_features(sopot_rocket_inst PRIVATE cxx_std_20)
+if(SOPOT_USE_INSTANTIATION_LIBS)
+    # Core instantiations (Dual numbers, TypedComponent, etc.)
+    add_library(sopot_core_inst STATIC src/core_instantiations.cpp)
+    target_include_directories(sopot_core_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_features(sopot_core_inst PRIVATE cxx_std_20)
 
-# Physics instantiations (mass-spring systems)
-add_library(sopot_physics_inst STATIC src/physics_instantiations.cpp)
-target_include_directories(sopot_physics_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(sopot_physics_inst PUBLIC sopot_core_inst)
-target_compile_features(sopot_physics_inst PRIVATE cxx_std_20)
+    # Rocket instantiations (Vector3, Quaternion, rocket components)
+    add_library(sopot_rocket_inst STATIC src/rocket_instantiations.cpp)
+    target_include_directories(sopot_rocket_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(sopot_rocket_inst PUBLIC sopot_core_inst)
+    target_compile_features(sopot_rocket_inst PRIVATE cxx_std_20)
+
+    # Physics instantiations (mass-spring systems)
+    add_library(sopot_physics_inst STATIC src/physics_instantiations.cpp)
+    target_include_directories(sopot_physics_inst PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(sopot_physics_inst PUBLIC sopot_core_inst)
+    target_compile_features(sopot_physics_inst PRIVATE cxx_std_20)
+
+    message(STATUS "Instantiation libraries: Enabled (use -DSOPOT_USE_INSTANTIATION_LIBS=OFF to disable)")
+else()
+    message(STATUS "Instantiation libraries: Disabled")
+endif()
 
 # ============================================================================
-# Header-only library interfaces (for compatibility)
+# Header-only library interfaces
 # ============================================================================
 
 # Header-only core library
@@ -72,20 +91,29 @@ add_library(sopot_core INTERFACE)
 target_include_directories(sopot_core INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(sopot_core INTERFACE sopot_core_inst)
+# Link instantiation library if enabled (INTERFACE can link to static libraries)
+if(SOPOT_USE_INSTANTIATION_LIBS)
+    target_link_libraries(sopot_core INTERFACE sopot_core_inst)
+endif()
 
 # Header-only physics library
 add_library(sopot_physics INTERFACE)
 target_include_directories(sopot_physics INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/physics)
-target_link_libraries(sopot_physics INTERFACE sopot_core sopot_physics_inst)
+target_link_libraries(sopot_physics INTERFACE sopot_core)
+if(SOPOT_USE_INSTANTIATION_LIBS)
+    target_link_libraries(sopot_physics INTERFACE sopot_physics_inst)
+endif()
 
 # Header-only rocket library
 add_library(sopot_rocket INTERFACE)
 target_include_directories(sopot_rocket INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/rocket
     ${CMAKE_CURRENT_SOURCE_DIR}/io)
-target_link_libraries(sopot_rocket INTERFACE sopot_core sopot_rocket_inst)
+target_link_libraries(sopot_rocket INTERFACE sopot_core)
+if(SOPOT_USE_INSTANTIATION_LIBS)
+    target_link_libraries(sopot_rocket INTERFACE sopot_rocket_inst)
+endif()
 
 set(ROCKET_HEADERS
     rocket/rocket.hpp
