@@ -285,10 +285,10 @@ export function RocketVisualization3D({
           rotateSpeed={0.8}
           zoomSpeed={1.0}
           panSpeed={0.8}
-          // Touch-specific settings
+          // Touch-specific settings (0=ROTATE, 2=DOLLY_PAN)
           touches={{
-            ONE: THREE.TOUCH.ROTATE,    // One finger: rotate
-            TWO: THREE.TOUCH.DOLLY_PAN  // Two fingers: zoom and pan
+            ONE: 0,    // One finger: rotate
+            TWO: 2     // Two fingers: zoom and pan
           }}
         />
       </Canvas>

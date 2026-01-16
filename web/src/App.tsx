@@ -231,7 +231,7 @@ function App() {
         {/* Top section: 3-column layout (desktop/tablet) */}
         <div className="top-section">
           {/* Left Panel: Controls (desktop/tablet) */}
-          <div className="left-panel desktop-only" style={styles.leftPanel}>
+          <div className="left-panel desktop-only">
             <SimulationSelector
               currentSimulation={simulationType}
               onSimulationChange={handleSimulationTypeChange}
@@ -276,12 +276,12 @@ function App() {
           </div>
 
           {/* Center Panel: Visualization */}
-          <div className="center-panel" style={styles.centerPanel}>
+          <div className="center-panel">
             {renderVisualization()}
           </div>
 
           {/* Right Panel: Telemetry (desktop only) */}
-          <div className="right-panel desktop-only" style={styles.rightPanel}>
+          <div className="right-panel desktop-only">
             {simulationType === 'rocket' ? (
               <TelemetryPanel
                 state={rocketSim.currentState}
@@ -313,7 +313,7 @@ function App() {
 
         {/* Bottom section: Plotting panel (desktop/tablet, rocket only) */}
         {simulationType === 'rocket' && (
-          <div className="bottom-section desktop-only" style={styles.bottomSection}>
+          <div className="bottom-section desktop-only">
             <PlotPanel timeSeries={timeSeries} />
           </div>
         )}
@@ -498,15 +498,5 @@ const styles = {
     borderRadius: '4px',
   },
 };
-
-// Add keyframe animation for spinner
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default App;
