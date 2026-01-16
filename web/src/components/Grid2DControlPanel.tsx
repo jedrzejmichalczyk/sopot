@@ -46,7 +46,7 @@ export function Grid2DControlPanel({
             style={{
               ...styles.statusDot,
               backgroundColor: isRunning
-                ? '#27ae60'
+                ? 'var(--accent-green)'
                 : isInitialized
                 ? 'var(--accent-amber)'
                 : 'var(--text-secondary)',
@@ -86,35 +86,32 @@ export function Grid2DControlPanel({
           <div style={styles.buttonGroup}>
             <button
               onClick={isRunning ? onPause : onStart}
-              className="touch-button"
+              className="touch-button btn-success"
               style={{
                 ...styles.button,
-                ...styles.buttonPrimary,
               }}
             >
-              {isRunning ? '⏸ Pause' : '▶ Start'}
+              {isRunning ? 'PAUSE' : 'START'}
             </button>
             <button
               onClick={onReset}
-              className="touch-button"
+              className="touch-button btn-danger"
               style={{
                 ...styles.button,
-                ...styles.buttonSecondary,
               }}
             >
-              🔄 Reset
+              RESET
             </button>
             <button
               onClick={onStep}
               disabled={isRunning}
-              className="touch-button"
+              className="touch-button btn-primary"
               style={{
                 ...styles.button,
-                ...styles.buttonSecondary,
                 ...(isRunning ? styles.buttonDisabled : {}),
               }}
             >
-              ⏭ Step
+              STEP
             </button>
           </div>
         )}

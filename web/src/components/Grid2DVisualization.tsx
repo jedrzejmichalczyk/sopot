@@ -14,6 +14,16 @@ interface Grid2DVisualizationProps {
   showGrid?: boolean;
 }
 
+/**
+ * Helper function to resolve CSS variables for Canvas 2D API
+ * Canvas context cannot parse var() syntax, so we need to resolve it
+ */
+function getCSSVariable(variableName: string): string {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(variableName)
+    .trim();
+}
+
 export function Grid2DVisualization({
   state,
   showVelocities = false,
@@ -46,7 +56,7 @@ export function Grid2DVisualization({
     if (!ctx) return;
 
     // Clear canvas
-    ctx.fillStyle = 'var(--bg-primary)';
+    ctx.fillStyle = getCSSVariable('--bg-primary');
     ctx.fillRect(0, 0, dimensions.width, dimensions.height);
 
     // Calculate bounds for scaling
@@ -84,7 +94,7 @@ export function Grid2DVisualization({
 
     // Draw grid edges (springs)
     if (showGrid) {
-      ctx.strokeStyle = 'var(--bg-tertiary)';
+      ctx.strokeStyle = getCSSVariable('--bg-tertiary');
       ctx.lineWidth = 1;
 
       const { rows, cols } = state;
@@ -122,7 +132,7 @@ export function Grid2DVisualization({
 
     // Draw velocity vectors
     if (showVelocities && state.velocities) {
-      ctx.strokeStyle = 'var(--accent-cyan)';
+      ctx.strokeStyle = getCSSVariable('--accent-cyan');
       ctx.lineWidth = 2;
 
       const velocityScale = 0.1; // Scale factor for velocity visualization
@@ -165,20 +175,27 @@ export function Grid2DVisualization({
       const y = toCanvasY(pos.y);
 
       // Mass point
-      ctx.fillStyle = 'var(--accent-red)';
+      ctx.fillStyle = getCSSVariable('--accent-red');
       ctx.beginPath();
       ctx.arc(x, y, 4, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Glow effect
-      ctx.fillStyle = 'rgba(231, 76, 60, 0.3)';
+      // Glow effect (derive from red accent with transparency)
+      const redColor = getCSSVariable('--accent-red');
+      // Convert hex to rgba with 0.3 opacity
+      const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+      if (rgb) {
+        ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, 0.3)`;
+      } else {
+        ctx.fillStyle = 'rgba(255, 59, 59, 0.3)'; // Fallback
+      }
       ctx.beginPath();
       ctx.arc(x, y, 8, 0, 2 * Math.PI);
       ctx.fill();
     });
 
     // Draw time display
-    ctx.fillStyle = 'var(--text-primary)';
+    ctx.fillStyle = getCSSVariable('--text-primary');
     ctx.font = '16px monospace';
     ctx.fillText(`t = ${state.time.toFixed(3)}s`, 10, 25);
 
