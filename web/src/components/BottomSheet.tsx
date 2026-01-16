@@ -36,29 +36,36 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
   const handleRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const prevIsOpenRef = useRef(isOpen);
 
-  // Update snap point when isOpen changes
+  // Update snap point when isOpen changes (avoid circular dependency)
   useEffect(() => {
-    if (isOpen && snapPoint === 'hidden') {
-      setSnapPoint(initialSnapPoint);
-    } else if (!isOpen && snapPoint !== 'hidden') {
-      setSnapPoint('hidden');
+    // Only react to isOpen changes, not snapPoint changes
+    if (isOpen !== prevIsOpenRef.current) {
+      prevIsOpenRef.current = isOpen;
+
+      if (isOpen && snapPoint === 'hidden') {
+        setSnapPoint(initialSnapPoint);
+      } else if (!isOpen && snapPoint !== 'hidden') {
+        setSnapPoint('hidden');
+      }
     }
   }, [isOpen, snapPoint, setSnapPoint, initialSnapPoint]);
 
-  // Add touch event listeners
+  // Add touch event listeners with passive: false to allow preventDefault
   useEffect(() => {
     const handle = handleRef.current;
     if (!handle) return;
 
-    handle.addEventListener('touchstart', handleTouchStart);
-    handle.addEventListener('touchmove', handleTouchMove);
-    handle.addEventListener('touchend', handleTouchEnd);
+    const options: AddEventListenerOptions = { passive: false };
+    handle.addEventListener('touchstart', handleTouchStart as EventListener, options);
+    handle.addEventListener('touchmove', handleTouchMove as EventListener, options);
+    handle.addEventListener('touchend', handleTouchEnd as EventListener, options);
 
     return () => {
-      handle.removeEventListener('touchstart', handleTouchStart);
-      handle.removeEventListener('touchmove', handleTouchMove);
-      handle.removeEventListener('touchend', handleTouchEnd);
+      handle.removeEventListener('touchstart', handleTouchStart as EventListener, options);
+      handle.removeEventListener('touchmove', handleTouchMove as EventListener, options);
+      handle.removeEventListener('touchend', handleTouchEnd as EventListener, options);
     };
   }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
 
