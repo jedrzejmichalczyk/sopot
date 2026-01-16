@@ -173,6 +173,16 @@ target_link_libraries(grid_2d_test sopot_core sopot_physics)
 target_compile_features(grid_2d_test PRIVATE cxx_std_20)
 add_test(NAME grid_2d_test COMMAND grid_2d_test)
 
+add_executable(double_pendulum_test tests/double_pendulum_test.cpp)
+target_link_libraries(double_pendulum_test sopot_core sopot_physics)
+target_compile_features(double_pendulum_test PRIVATE cxx_std_20)
+add_test(NAME double_pendulum_test COMMAND double_pendulum_test)
+
+add_executable(symbolic_diff_test tests/symbolic_diff_test.cpp)
+target_link_libraries(symbolic_diff_test sopot_core sopot_physics)
+target_compile_features(symbolic_diff_test PRIVATE cxx_std_20)
+add_test(NAME symbolic_diff_test COMMAND symbolic_diff_test)
+
 # Experimental: Field-based component architecture
 add_executable(simple_reactor_demo experimental/simple_reactor_demo.cpp)
 target_include_directories(simple_reactor_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/experimental)
@@ -191,6 +201,11 @@ add_executable(reflect_two_masses examples/reflect_two_masses.cpp)
 target_include_directories(reflect_two_masses PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(reflect_two_masses PRIVATE cxx_std_20)
 
+# Symbolic CAS demonstration
+add_executable(symbolic_cas_demo examples/symbolic_cas_demo.cpp)
+target_include_directories(symbolic_cas_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(symbolic_cas_demo PRIVATE cxx_std_20)
+
 # Custom target to run all tests
 add_custom_target(run_tests
     COMMAND compile_time_test
@@ -200,7 +215,9 @@ add_custom_target(run_tests
     COMMAND connected_masses_test
     COMMAND connected_masses_validation_test
     COMMAND grid_2d_test
-    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test
+    COMMAND double_pendulum_test
+    COMMAND symbolic_diff_test
+    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test double_pendulum_test symbolic_diff_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running SOPOT tests"
 )
@@ -223,6 +240,8 @@ set(TEST_TARGETS
     connected_masses_test
     connected_masses_validation_test
     grid_2d_test
+    double_pendulum_test
+    symbolic_diff_test
 )
 
 # First target creates the PCH, others reuse it
