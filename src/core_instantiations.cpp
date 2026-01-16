@@ -12,6 +12,23 @@
 #include "core/typed_component.hpp"
 #include <cmath>
 
+// Compiler-specific attributes to prevent dead code elimination
+#if defined(__GNUC__) || defined(__clang__)
+    #define SOPOT_USED [[gnu::used]]
+    #define SOPOT_NOINLINE [[gnu::noinline]]
+    #define SOPOT_RETAIN [[gnu::retain]]
+#elif defined(_MSC_VER)
+    #define SOPOT_USED
+    #define SOPOT_NOINLINE __declspec(noinline)
+    #define SOPOT_RETAIN
+    // MSVC: Use #pragma to prevent inlining and ensure symbols are kept
+    #pragma optimize("", off)
+#else
+    #define SOPOT_USED
+    #define SOPOT_NOINLINE
+    #define SOPOT_RETAIN
+#endif
+
 namespace sopot {
 
 // Force instantiation of Dual classes by using them in a non-optimizable way
@@ -20,7 +37,7 @@ namespace sopot {
 namespace {
     // Helper to force instantiation - marked to prevent optimization removal
     template<typename T, size_t N>
-    [[gnu::used, gnu::noinline]]
+    SOPOT_USED SOPOT_NOINLINE
     void forceDualInstantiation() {
         Dual<T, N> d1(T{1});
         Dual<T, N> d2(T{2});
@@ -32,8 +49,8 @@ namespace {
     }
 
     // Force instantiation for common Dual types
-    // Using attribute to prevent dead code elimination
-    struct [[gnu::used]] ForceInstantiation {
+    // Using attributes to prevent dead code elimination
+    struct SOPOT_USED ForceInstantiation {
         ForceInstantiation() {
             forceDualInstantiation<double, 1>();
             forceDualInstantiation<double, 3>();
@@ -45,8 +62,17 @@ namespace {
 
     // Static instance to trigger instantiation
     // Multiple attributes ensure it's not optimized away
-    [[gnu::used, gnu::retain]]
+    SOPOT_USED SOPOT_RETAIN
     static ForceInstantiation force_inst;
 }
 
 } // namespace sopot
+
+#if defined(_MSC_VER)
+    #pragma optimize("", on)
+#endif
+
+// Undefine macros to avoid polluting global namespace
+#undef SOPOT_USED
+#undef SOPOT_NOINLINE
+#undef SOPOT_RETAIN
