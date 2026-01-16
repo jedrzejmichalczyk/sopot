@@ -191,22 +191,47 @@ class TypedRegistry {
     // Self type for concept checks
     using Self = TypedRegistry<T, Components...>;
 
-    // Find first component that provides a given function type (compile-time)
-    // CRITICAL: Must return by reference (decltype(auto)) to avoid copying components!
-    template<StateTagConcept Tag, size_t I = 0>
-    constexpr decltype(auto) findProvider() const {
-        if constexpr (I < sizeof...(Components)) {
-            using ComponentType = std::tuple_element_t<I, std::tuple<const Components&...>>;
-            using DecayedType = std::decay_t<ComponentType>;
+    // ========================================================================
+    // OPTIMIZATION: Compile-time provider index calculation
+    // ========================================================================
+    // Finds the index of the first component providing Tag at compile time.
+    //
+    // NOTE: This function still uses O(N) template recursion for index finding.
+    // However, the recursion only happens at compile-time during template
+    // instantiation, not during component access. The optimization benefit
+    // comes from separating index calculation (compile-time) from component
+    // retrieval (runtime), which enables better compiler optimization.
+    //
+    // Future improvement: Use fold expressions or std::index_sequence for
+    // fully non-recursive implementation if needed.
 
-            if constexpr (TypedProvidesStateFunction<DecayedType, Tag, T, Self>) {
-                return std::get<I>(m_components);
-            } else {
-                return findProvider<Tag, I + 1>();
-            }
+    template<StateTagConcept Tag, size_t Index = 0>
+    static constexpr size_t findProviderIndex() {
+        if constexpr (Index >= sizeof...(Components)) {
+            // Not found - static_assert will catch this later
+            return 0;
         } else {
-            return std::get<0>(m_components); // Dummy return (static_assert will catch)
+            using ComponentType = std::tuple_element_t<Index, std::tuple<Components...>>;
+
+            if constexpr (TypedProvidesStateFunction<ComponentType, Tag, T, Self>) {
+                return Index;
+            } else {
+                return findProviderIndex<Tag, Index + 1>();
+            }
         }
+    }
+
+    // Get component by index - returns reference
+    template<size_t Index>
+    constexpr decltype(auto) getComponentByIndex() const {
+        return std::get<Index>(m_components);
+    }
+
+    // Find provider using compile-time index (avoids recursive findProvider)
+    template<StateTagConcept Tag>
+    constexpr decltype(auto) findProvider() const {
+        constexpr size_t provider_index = findProviderIndex<Tag>();
+        return getComponentByIndex<provider_index>();
     }
 
 public:
@@ -273,75 +298,103 @@ private:
     static constexpr size_t m_component_count = sizeof...(Components);
     using RegistryType = TypedRegistry<T, Components...>;
 
-    // Initialize component state offsets
-    template<size_t I = 0, size_t Offset = 0>
-    constexpr void initializeOffsets() {
-        if constexpr (I < sizeof...(Components)) {
-            auto& component = std::get<I>(m_components);
-            component.setStateOffset(Offset);
-            component.setOffset(Offset);  // TypedComponent provides this
-            constexpr size_t NextOffset = Offset +
-                std::tuple_element_t<I, std::tuple<Components...>>::state_size;
-            initializeOffsets<I + 1, NextOffset>();
-        }
+    // ========================================================================
+    // OPTIMIZATION: Compile-time offset array (O(1) instead of O(N) recursion)
+    // ========================================================================
+    // Creates an array of state offsets at compile time using fold expressions.
+    // This eliminates recursive template instantiation for offset calculation.
+    static constexpr auto make_offset_array() {
+        std::array<size_t, sizeof...(Components) + 1> offsets{};
+        size_t offset = 0;
+        size_t i = 0;
+        // Fold expression: processes all Components in parallel
+        ((offsets[i++] = offset, offset += Components::state_size), ...);
+        offsets[sizeof...(Components)] = offset;  // Total size at end
+        return offsets;
     }
 
-    // Collect derivatives from all components using compile-time dispatch
-    template<size_t I = 0>
-    void collectDerivatives(std::vector<T>& derivatives, T t, const std::vector<T>& state) const {
-        if constexpr (I < sizeof...(Components)) {
-            using ComponentType = std::tuple_element_t<I, std::tuple<Components...>>;
+    static constexpr auto offset_array = make_offset_array();
+
+    // Initialize component state offsets using fold expression (O(1) depth)
+    constexpr void initializeOffsets() {
+        [this]<size_t... Is>(std::index_sequence<Is...>) {
+            // Fold expression: sets all offsets in parallel
+            (std::get<Is>(m_components).setStateOffset(offset_array[Is]), ...);
+            (std::get<Is>(m_components).setOffset(offset_array[Is]), ...);
+        }(std::make_index_sequence<sizeof...(Components)>{});
+    }
+
+    // ========================================================================
+    // OPTIMIZATION: Fold-based derivative collection (O(1) depth)
+    // ========================================================================
+    // Uses fold expression instead of recursive template instantiation.
+    // This reduces template instantiation depth from O(N) to O(1).
+
+    template<size_t I>
+    void collectDerivativeForComponent(std::vector<T>& derivatives, T t,
+                                       const std::vector<T>& state) const {
+        using ComponentType = std::tuple_element_t<I, std::tuple<Components...>>;
+        constexpr size_t local_size = ComponentType::state_size;
+
+        if constexpr (local_size > 0) {
             const auto& component = std::get<I>(m_components);
-            constexpr size_t local_size = ComponentType::state_size;
             constexpr size_t off = offset<I>();
 
-            if constexpr (local_size > 0) {
-                // Create spans for local and global state
-                std::span<const T> local_span(state.data() + off, local_size);
-                std::span<const T> global_span(state);
+            // Create spans for local and global state
+            std::span<const T> local_span(state.data() + off, local_size);
+            std::span<const T> global_span(state);
 
-                // Compile-time requirement: component must have derivatives method
-                static_assert(
-                    HasDerivativesMethod<ComponentType, T, RegistryType>,
-                    "Component with state_size > 0 must provide derivatives(t, local, global, registry)"
-                );
+            // Compile-time requirement: component must have derivatives method
+            static_assert(
+                HasDerivativesMethod<ComponentType, T, RegistryType>,
+                "Component with state_size > 0 must provide derivatives(t, local, global, registry)"
+            );
 
-                auto local_derivs = component.derivatives(t, local_span, global_span, m_registry);
-                for (size_t j = 0; j < local_size; ++j) {
-                    derivatives[off + j] = local_derivs[j];
-                }
+            auto local_derivs = component.derivatives(t, local_span, global_span, m_registry);
+            for (size_t j = 0; j < local_size; ++j) {
+                derivatives[off + j] = local_derivs[j];
             }
-
-            collectDerivatives<I + 1>(derivatives, t, state);
         }
     }
 
-    // Compile-time offset calculation
+    void collectDerivatives(std::vector<T>& derivatives, T t, const std::vector<T>& state) const {
+        [this, &derivatives, t, &state]<size_t... Is>(std::index_sequence<Is...>) {
+            // Fold expression: processes all components in parallel
+            (collectDerivativeForComponent<Is>(derivatives, t, state), ...);
+        }(std::make_index_sequence<sizeof...(Components)>{});
+    }
+
+    // OPTIMIZATION: O(1) offset lookup instead of O(I) recursive calculation
     template<size_t I>
     static constexpr size_t offset() {
-        if constexpr (I == 0) return 0;
-        else return offset<I-1>() + std::tuple_element_t<I-1, std::tuple<Components...>>::state_size;
+        return offset_array[I];  // Direct array lookup - O(1)!
     }
 
-    // Collect initial states from all components
-    template<size_t I = 0>
-    void collectInitialStates(std::vector<T>& state) const {
-        if constexpr (I < sizeof...(Components)) {
+    // ========================================================================
+    // OPTIMIZATION: Fold-based initial state collection (O(1) depth)
+    // ========================================================================
+
+    template<size_t I>
+    void collectInitialStateForComponent(std::vector<T>& state) const {
+        using ComponentType = std::tuple_element_t<I, std::tuple<Components...>>;
+        constexpr size_t local_size = ComponentType::state_size;
+
+        if constexpr (local_size > 0) {
             const auto& component = std::get<I>(m_components);
-            constexpr size_t local_size =
-                std::tuple_element_t<I, std::tuple<Components...>>::state_size;
+            auto local_state = component.getInitialLocalState();
+            size_t off = component.getStateOffset();
 
-            if constexpr (local_size > 0) {
-                auto local_state = component.getInitialLocalState();
-                size_t off = component.getStateOffset();
-
-                for (size_t j = 0; j < local_state.size; ++j) {
-                    state[off + j] = local_state[j];
-                }
+            for (size_t j = 0; j < local_state.size; ++j) {
+                state[off + j] = local_state[j];
             }
-
-            collectInitialStates<I + 1>(state);
         }
+    }
+
+    void collectInitialStates(std::vector<T>& state) const {
+        [this, &state]<size_t... Is>(std::index_sequence<Is...>) {
+            // Fold expression: processes all components in parallel
+            (collectInitialStateForComponent<Is>(state), ...);
+        }(std::make_index_sequence<sizeof...(Components)>{});
     }
 
 public:
