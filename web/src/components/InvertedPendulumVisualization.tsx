@@ -55,7 +55,6 @@ export function InvertedPendulumVisualization({
   showForceArrow = true,
   trackWidth = 3.0,
 }: InvertedPendulumVisualizationProps) {
-  void _cartMass; // Reserved for future use (cart rendering)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });

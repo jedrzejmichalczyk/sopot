@@ -302,7 +302,15 @@ function App() {
                   controllerEnabled={pendulumSim.controllerEnabled}
                   playbackSpeed={pendulumSim.playbackSpeed}
                   lqrGains={pendulumSim.getLQRGains()}
-                  onInitialize={(t1, t2) => pendulumSim.initialize(undefined, undefined, undefined, undefined, undefined, t1, t2)}
+                  onInitialize={(t1, t2) => pendulumSim.initialize(
+                    /* cartMass */ undefined,
+                    /* m1 */ undefined,
+                    /* m2 */ undefined,
+                    /* L1 */ undefined,
+                    /* L2 */ undefined,
+                    t1,
+                    t2
+                  )}
                   onStart={pendulumSim.start}
                   onPause={pendulumSim.pause}
                   onReset={pendulumSim.reset}
@@ -450,7 +458,15 @@ function App() {
                 controllerEnabled={pendulumSim.controllerEnabled}
                 playbackSpeed={pendulumSim.playbackSpeed}
                 lqrGains={pendulumSim.getLQRGains()}
-                onInitialize={(t1, t2) => pendulumSim.initialize(undefined, undefined, undefined, undefined, undefined, t1, t2)}
+                onInitialize={(t1, t2) => pendulumSim.initialize(
+                  /* cartMass */ undefined,
+                  /* m1 */ undefined,
+                  /* m2 */ undefined,
+                  /* L1 */ undefined,
+                  /* L2 */ undefined,
+                  t1,
+                  t2
+                )}
                 onStart={pendulumSim.start}
                 onPause={pendulumSim.pause}
                 onReset={pendulumSim.reset}
