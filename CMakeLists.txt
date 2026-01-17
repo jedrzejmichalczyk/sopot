@@ -173,6 +173,11 @@ target_link_libraries(grid_2d_test sopot_core sopot_physics)
 target_compile_features(grid_2d_test PRIVATE cxx_std_20)
 add_test(NAME grid_2d_test COMMAND grid_2d_test)
 
+add_executable(triangle_grid_test tests/triangle_grid_test.cpp)
+target_link_libraries(triangle_grid_test sopot_core sopot_physics)
+target_compile_features(triangle_grid_test PRIVATE cxx_std_20)
+add_test(NAME triangle_grid_test COMMAND triangle_grid_test)
+
 add_executable(double_pendulum_test tests/double_pendulum_test.cpp)
 target_link_libraries(double_pendulum_test sopot_core sopot_physics)
 target_compile_features(double_pendulum_test PRIVATE cxx_std_20)
@@ -225,11 +230,12 @@ add_custom_target(run_tests
     COMMAND connected_masses_test
     COMMAND connected_masses_validation_test
     COMMAND grid_2d_test
+    COMMAND triangle_grid_test
     COMMAND double_pendulum_test
     COMMAND symbolic_diff_test
     COMMAND named_expression_test
     COMMAND inverted_pendulum_test
-    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test double_pendulum_test symbolic_diff_test named_expression_test inverted_pendulum_test
+    DEPENDS compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test connected_masses_test connected_masses_validation_test grid_2d_test triangle_grid_test double_pendulum_test symbolic_diff_test named_expression_test inverted_pendulum_test
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Running SOPOT tests"
 )
@@ -252,6 +258,7 @@ set(TEST_TARGETS
     connected_masses_test
     connected_masses_validation_test
     grid_2d_test
+    triangle_grid_test
     double_pendulum_test
     symbolic_diff_test
     named_expression_test
