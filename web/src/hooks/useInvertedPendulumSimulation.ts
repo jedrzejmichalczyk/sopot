@@ -198,8 +198,8 @@ export function useInvertedPendulumSimulation() {
           cartMass ?? 1.0,
           m1 ?? 0.5,
           m2 ?? 0.5,
-          L1 ?? 0.5,
-          L2 ?? 0.5,
+          L1 ?? 0.7,
+          L2 ?? 0.7,
           9.81
         );
       }

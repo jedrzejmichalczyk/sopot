@@ -108,7 +108,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       simulator.setMass(1.0);
       simulator.setSpacing(0.5);
       simulator.setStiffness(50.0);
-      simulator.setDamping(0.5);
+      simulator.setDamping(0.15);
       simulator.setTimestep(0.005);
 
       // Initialize
@@ -162,6 +162,14 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     setCurrentState(wasmToVizState(simulatorRef.current));
   }, [isRunning, wasmToVizState]);
 
+  // Perturb a specific mass
+  const perturbMass = useCallback((row: number, col: number, dx: number, dy: number) => {
+    if (!simulatorRef.current) return;
+
+    simulatorRef.current.perturbMass(row, col, dx, dy);
+    setCurrentState(wasmToVizState(simulatorRef.current));
+  }, [wasmToVizState]);
+
   // Animation loop
   useEffect(() => {
     if (!isRunning || !simulatorRef.current) return;
@@ -211,5 +219,6 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     reset,
     step,
     setPlaybackSpeed,
+    perturbMass,
   };
 }

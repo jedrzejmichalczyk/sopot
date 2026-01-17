@@ -1,4 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+
+// Constants for touch interaction and visualization
+const TOUCH_RADIUS_PX = 30; // pixels - hit detection radius for touch targets
+const TOUCH_FEEDBACK_DURATION_MS = 200; // milliseconds - visual feedback duration
+const PERTURB_STRENGTH_M = 0.2; // meters - vertical perturbation strength
+const CANVAS_PADDING_PX = 50; // pixels - padding around visualization area
+const MASS_RADIUS_NORMAL_PX = 4; // pixels - normal mass render radius
+const MASS_RADIUS_TOUCHED_PX = 6; // pixels - touched mass render radius
+const MASS_GLOW_RADIUS_NORMAL_PX = 8; // pixels - normal mass glow radius
+const MASS_GLOW_RADIUS_TOUCHED_PX = 12; // pixels - touched mass glow radius
+const MASS_GLOW_OPACITY_NORMAL = 0.3; // opacity for normal glow
+const MASS_GLOW_OPACITY_TOUCHED = 0.6; // opacity for touched glow
 
 export interface Grid2DState {
   time: number;
@@ -12,6 +24,7 @@ interface Grid2DVisualizationProps {
   state: Grid2DState | null;
   showVelocities?: boolean;
   showGrid?: boolean;
+  onMassPerturb?: (row: number, col: number, dx: number, dy: number) => void;
 }
 
 /**
@@ -28,10 +41,12 @@ export function Grid2DVisualization({
   state,
   showVelocities = false,
   showGrid = true,
+  onMassPerturb,
 }: Grid2DVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [touchedMass, setTouchedMass] = useState<number | null>(null);
 
   // Handle canvas resizing
   useEffect(() => {
@@ -46,6 +61,99 @@ export function Grid2DVisualization({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Handle touch/click interaction with masses
+  const handleMassInteraction = useCallback((clientX: number, clientY: number) => {
+    if (!canvasRef.current || !state || !onMassPerturb) return;
+
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = clientX - rect.left;
+    const canvasY = clientY - rect.top;
+
+    // Calculate scaling parameters (same as in rendering)
+    const positions = state.positions;
+    if (positions.length === 0) return;
+
+    const xs = positions.map((p) => p.x);
+    const ys = positions.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const padding = CANVAS_PADDING_PX;
+    const estimatedSpacing = Math.max(
+      (maxX - minX) / (state.cols - 1 || 1),
+      (maxY - minY) / (state.rows - 1 || 1)
+    ) || 0.5;
+
+    const rangeX = Math.max(maxX - minX, estimatedSpacing);
+    const rangeY = Math.max(maxY - minY, estimatedSpacing);
+    const scaleX = (dimensions.width - 2 * padding) / rangeX;
+    const scaleY = (dimensions.height - 2 * padding) / rangeY;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Transform functions
+    const toCanvasX = (x: number) => padding + (x - minX) * scale;
+    const toCanvasY = (y: number) => dimensions.height - (padding + (y - minY) * scale);
+
+    // Find closest mass
+    let closestIdx = -1;
+    let closestDist = Infinity;
+    const touchRadius = TOUCH_RADIUS_PX;
+
+    positions.forEach((pos, idx) => {
+      const massCanvasX = toCanvasX(pos.x);
+      const massCanvasY = toCanvasY(pos.y);
+      const dist = Math.sqrt(
+        Math.pow(canvasX - massCanvasX, 2) + Math.pow(canvasY - massCanvasY, 2)
+      );
+      if (dist < closestDist && dist < touchRadius) {
+        closestDist = dist;
+        closestIdx = idx;
+      }
+    });
+
+    if (closestIdx !== -1) {
+      // Convert index to row/col
+      const row = Math.floor(closestIdx / state.cols);
+      const col = closestIdx % state.cols;
+
+      // Apply upward perturbation
+      onMassPerturb(row, col, 0, PERTURB_STRENGTH_M);
+
+      // Visual feedback
+      setTouchedMass(closestIdx);
+      setTimeout(() => setTouchedMass(null), TOUCH_FEEDBACK_DURATION_MS);
+    }
+  }, [state, dimensions, onMassPerturb]);
+
+  // Touch event handlers
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !state) return;
+
+    const handleTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0] || e.changedTouches[0];
+      if (touch) {
+        handleMassInteraction(touch.clientX, touch.clientY);
+      }
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      handleMassInteraction(e.clientX, e.clientY);
+    };
+
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('click', handleClick);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouch);
+      canvas.removeEventListener('click', handleClick);
+    };
+  }, [handleMassInteraction, state]);
 
   // Render the grid
   useEffect(() => {
@@ -71,7 +179,7 @@ export function Grid2DVisualization({
     const maxY = Math.max(...ys);
 
     // Add padding
-    const padding = 50;
+    const padding = CANVAS_PADDING_PX;
 
     // Use grid-based fallback for better scaling when points are collinear
     // Estimate grid spacing from number of rows/cols
@@ -170,27 +278,30 @@ export function Grid2DVisualization({
     }
 
     // Draw masses as circles
-    positions.forEach((pos) => {
+    positions.forEach((pos, idx) => {
       const x = toCanvasX(pos.x);
       const y = toCanvasY(pos.y);
+      const isTouched = idx === touchedMass;
+
+      // Glow effect (larger if touched)
+      const redColor = getCSSVariable('--accent-red');
+      const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+      const opacity = isTouched ? MASS_GLOW_OPACITY_TOUCHED : MASS_GLOW_OPACITY_NORMAL;
+      if (rgb) {
+        ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, ${opacity})`;
+      } else {
+        ctx.fillStyle = `rgba(255, 59, 59, ${opacity})`;
+      }
+      ctx.beginPath();
+      const glowRadius = isTouched ? MASS_GLOW_RADIUS_TOUCHED_PX : MASS_GLOW_RADIUS_NORMAL_PX;
+      ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
+      ctx.fill();
 
       // Mass point
       ctx.fillStyle = getCSSVariable('--accent-red');
       ctx.beginPath();
-      ctx.arc(x, y, 4, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Glow effect (derive from red accent with transparency)
-      const redColor = getCSSVariable('--accent-red');
-      // Convert hex to rgba with 0.3 opacity
-      const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-      if (rgb) {
-        ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, 0.3)`;
-      } else {
-        ctx.fillStyle = 'rgba(255, 59, 59, 0.3)'; // Fallback
-      }
-      ctx.beginPath();
-      ctx.arc(x, y, 8, 0, 2 * Math.PI);
+      const massRadius = isTouched ? MASS_RADIUS_TOUCHED_PX : MASS_RADIUS_NORMAL_PX;
+      ctx.arc(x, y, massRadius, 0, 2 * Math.PI);
       ctx.fill();
     });
 
@@ -201,7 +312,7 @@ export function Grid2DVisualization({
 
     // Draw grid info
     ctx.fillText(`Grid: ${state.rows}×${state.cols}`, 10, 45);
-  }, [state, dimensions, showVelocities, showGrid]);
+  }, [state, dimensions, showVelocities, showGrid, touchedMass]);
 
   return (
     <div ref={containerRef} style={styles.container}>
