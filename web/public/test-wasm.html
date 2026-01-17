@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM Loading Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        h1 {
+            color: #4fc3f7;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #2d4a2d;
+            color: #a5d6a7;
+        }
+        .error {
+            background: #4a2d2d;
+            color: #ef9a9a;
+        }
+        .info {
+            background: #2d3a4a;
+            color: #90caf9;
+        }
+        pre {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #4fc3f7;
+            color: #1e1e1e;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover {
+            background: #29b6f6;
+        }
+        #status {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>SOPOT WASM Module Loading Test</h1>
+    <p>Testing WebAssembly module with Inverted Double Pendulum simulator</p>
+
+    <button onclick="runTest()">Run Test</button>
+    <button onclick="clearResults()">Clear Results</button>
+
+    <div id="status"></div>
+
+    <script type="module">
+        let Module = null;
+        let simulator = null;
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            document.getElementById('status').appendChild(div);
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+
+        function logObject(obj) {
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(obj, null, 2);
+            document.getElementById('status').appendChild(pre);
+        }
+
+        async function runTest() {
+            document.getElementById('status').innerHTML = '';
+            log('Starting WASM loading test...', 'info');
+
+            try {
+                // Step 1: Load the module
+                log('Step 1: Importing WASM module...', 'info');
+                const createSopotModule = (await import('./sopot.js')).default;
+                log('✓ Module JavaScript loaded', 'success');
+
+                // Step 2: Initialize WASM
+                log('Step 2: Initializing WebAssembly...', 'info');
+                Module = await createSopotModule();
+                log('✓ WASM initialized', 'success');
+
+                // Step 3: Check available simulators
+                log('Step 3: Checking available simulators...', 'info');
+                const simulators = {
+                    RocketSimulator: typeof Module.RocketSimulator === 'function',
+                    Grid2DSimulator: typeof Module.Grid2DSimulator === 'function',
+                    InvertedPendulumSimulator: typeof Module.InvertedPendulumSimulator === 'function'
+                };
+
+                for (const [name, available] of Object.entries(simulators)) {
+                    log(`  ${name}: ${available ? '✓ Available' : '✗ Missing'}`,
+                        available ? 'success' : 'error');
+                }
+
+                if (!simulators.InvertedPendulumSimulator) {
+                    throw new Error('InvertedPendulumSimulator not found!');
+                }
+
+                // Step 4: Create simulator instance
+                log('Step 4: Creating InvertedPendulumSimulator instance...', 'info');
+                simulator = new Module.InvertedPendulumSimulator();
+                log('✓ Simulator instance created', 'success');
+
+                // Step 5: Initialize with default parameters
+                log('Step 5: Calling setupDefault()...', 'info');
+                simulator.setupDefault();
+                log('✓ Default setup complete', 'success');
+
+                // Step 6: Get initial state
+                log('Step 6: Reading initial state...', 'info');
+                const state = simulator.getFullState();
+                log('✓ State retrieved', 'success');
+                log('Initial state:', 'info');
+                logObject({
+                    time: state.time.toFixed(4),
+                    cartPosition: state.x.toFixed(4),
+                    theta1: state.theta1.toFixed(4),
+                    theta2: state.theta2.toFixed(4),
+                    cartVelocity: state.xdot.toFixed(4),
+                    omega1: state.omega1.toFixed(4),
+                    omega2: state.omega2.toFixed(4),
+                    controlForce: state.controlForce.toFixed(4)
+                });
+
+                // Step 7: Run simulation step
+                log('Step 7: Running simulation step...', 'info');
+                const success = simulator.step();
+                log(`✓ Simulation step ${success ? 'succeeded' : 'failed'}`,
+                    success ? 'success' : 'error');
+
+                const newState = simulator.getFullState();
+                log('State after step:', 'info');
+                logObject({
+                    time: newState.time.toFixed(4),
+                    cartPosition: newState.x.toFixed(4),
+                    theta1: newState.theta1.toFixed(4),
+                    theta2: newState.theta2.toFixed(4)
+                });
+
+                // Step 8: Test visualization data
+                log('Step 8: Getting visualization data...', 'info');
+                const vizData = simulator.getVisualizationData();
+                log('✓ Visualization data retrieved', 'success');
+                logObject({
+                    cart: vizData.cart,
+                    joint1: vizData.joint1,
+                    joint2: vizData.joint2,
+                    tip: vizData.tip
+                });
+
+                // Success!
+                log('========================================', 'success');
+                log('ALL TESTS PASSED! ✓', 'success');
+                log('The WASM module is working correctly!', 'success');
+                log('========================================', 'success');
+
+            } catch (error) {
+                log('========================================', 'error');
+                log('TEST FAILED! ✗', 'error');
+                log(`Error: ${error.message}`, 'error');
+                log('========================================', 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('status').innerHTML = '';
+        }
+
+        // Make functions global
+        window.runTest = runTest;
+        window.clearResults = clearResults;
+
+        // Auto-run on load
+        log('Page loaded. Click "Run Test" to verify WASM loading.', 'info');
+    </script>
+</body>
+</html>
