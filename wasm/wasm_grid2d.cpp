@@ -47,6 +47,10 @@ private:
     enum class GridSize { G3x3, G4x4, G5x5, G6x6 };
     GridSize m_grid_size{GridSize::G5x5};
 
+    // Grid type selection
+    enum class GridType { Quad, Triangle };
+    GridType m_grid_type{GridType::Quad};
+
     // Template-based systems for different grid sizes
     // Each is created on-demand when initialize() is called
 
@@ -75,42 +79,81 @@ private:
     }
 
     // Physics systems for each grid size (non-static to avoid cross-instance contamination)
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))> system_3x3;
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))> system_4x4;
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))> system_5x5;
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))> system_6x6;
+    // Quad grid systems
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))> system_quad_3x3;
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))> system_quad_4x4;
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))> system_quad_5x5;
+    std::unique_ptr<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))> system_quad_6x6;
+
+    // Triangular grid systems
+    std::unique_ptr<decltype(makeTriangularGridSystem<double, 3, 3>(1.0, 0.5, 50.0, 0.5))> system_tri_3x3;
+    std::unique_ptr<decltype(makeTriangularGridSystem<double, 4, 4>(1.0, 0.5, 50.0, 0.5))> system_tri_4x4;
+    std::unique_ptr<decltype(makeTriangularGridSystem<double, 5, 5>(1.0, 0.5, 50.0, 0.5))> system_tri_5x5;
+    std::unique_ptr<decltype(makeTriangularGridSystem<double, 6, 6>(1.0, 0.5, 50.0, 0.5))> system_tri_6x6;
 
     // Step functions for each grid size
     void step3x3() {
-        if (!system_3x3) {
-            system_3x3 = std::make_unique<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 3, 3, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        if (m_grid_type == GridType::Quad) {
+            if (!system_quad_3x3) {
+                system_quad_3x3 = std::make_unique<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))>(
+                    makeGrid2DSystem<double, 3, 3, false>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_quad_3x3, m_dt);
+        } else {
+            if (!system_tri_3x3) {
+                system_tri_3x3 = std::make_unique<decltype(makeTriangularGridSystem<double, 3, 3>(1.0, 0.5, 50.0, 0.5))>(
+                    makeTriangularGridSystem<double, 3, 3>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_tri_3x3, m_dt);
         }
-        rk4Step(*system_3x3, m_dt);
     }
 
     void step4x4() {
-        if (!system_4x4) {
-            system_4x4 = std::make_unique<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 4, 4, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        if (m_grid_type == GridType::Quad) {
+            if (!system_quad_4x4) {
+                system_quad_4x4 = std::make_unique<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))>(
+                    makeGrid2DSystem<double, 4, 4, false>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_quad_4x4, m_dt);
+        } else {
+            if (!system_tri_4x4) {
+                system_tri_4x4 = std::make_unique<decltype(makeTriangularGridSystem<double, 4, 4>(1.0, 0.5, 50.0, 0.5))>(
+                    makeTriangularGridSystem<double, 4, 4>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_tri_4x4, m_dt);
         }
-        rk4Step(*system_4x4, m_dt);
     }
 
     void step5x5() {
-        if (!system_5x5) {
-            system_5x5 = std::make_unique<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 5, 5, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        if (m_grid_type == GridType::Quad) {
+            if (!system_quad_5x5) {
+                system_quad_5x5 = std::make_unique<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))>(
+                    makeGrid2DSystem<double, 5, 5, false>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_quad_5x5, m_dt);
+        } else {
+            if (!system_tri_5x5) {
+                system_tri_5x5 = std::make_unique<decltype(makeTriangularGridSystem<double, 5, 5>(1.0, 0.5, 50.0, 0.5))>(
+                    makeTriangularGridSystem<double, 5, 5>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_tri_5x5, m_dt);
         }
-        rk4Step(*system_5x5, m_dt);
     }
 
     void step6x6() {
-        if (!system_6x6) {
-            system_6x6 = std::make_unique<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 6, 6, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        if (m_grid_type == GridType::Quad) {
+            if (!system_quad_6x6) {
+                system_quad_6x6 = std::make_unique<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))>(
+                    makeGrid2DSystem<double, 6, 6, false>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_quad_6x6, m_dt);
+        } else {
+            if (!system_tri_6x6) {
+                system_tri_6x6 = std::make_unique<decltype(makeTriangularGridSystem<double, 6, 6>(1.0, 0.5, 50.0, 0.5))>(
+                    makeTriangularGridSystem<double, 6, 6>(m_mass, m_spacing, m_stiffness, m_damping));
+            }
+            rk4Step(*system_tri_6x6, m_dt);
         }
-        rk4Step(*system_6x6, m_dt);
     }
 
 public:
@@ -139,6 +182,26 @@ public:
             default:
                 throw std::runtime_error("Grid size must be 3, 4, 5, or 6");
         }
+    }
+
+    /**
+     * Set grid type: "quad" for rectangular grid, "triangle" for triangular mesh
+     */
+    void setGridType(const std::string& type) {
+        if (type == "quad") {
+            m_grid_type = GridType::Quad;
+        } else if (type == "triangle") {
+            m_grid_type = GridType::Triangle;
+        } else {
+            throw std::runtime_error("Grid type must be 'quad' or 'triangle'");
+        }
+    }
+
+    /**
+     * Get current grid type
+     */
+    std::string getGridType() const {
+        return m_grid_type == GridType::Quad ? "quad" : "triangle";
     }
 
     void setMass(double mass) { m_mass = mass; }
@@ -416,6 +479,8 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
 
         // Configuration
         .function("setGridSize", &Grid2DSimulator::setGridSize)
+        .function("setGridType", &Grid2DSimulator::setGridType)
+        .function("getGridType", &Grid2DSimulator::getGridType)
         .function("setMass", &Grid2DSimulator::setMass)
         .function("setSpacing", &Grid2DSimulator::setSpacing)
         .function("setStiffness", &Grid2DSimulator::setStiffness)
