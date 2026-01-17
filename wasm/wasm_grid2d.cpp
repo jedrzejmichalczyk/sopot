@@ -385,6 +385,8 @@ public:
     /**
      * Compute total potential energy (sum over all springs)
      * PE = 0.5 * k * (length - rest_length)^2
+     *
+     * For triangular grids, includes diagonal springs with rest_length = spacing * sqrt(2)
      */
     double getPotentialEnergy() const {
         if (!m_initialized) return 0.0;
@@ -429,6 +431,51 @@ public:
                 double extension = length - m_spacing;
 
                 pe += 0.5 * m_stiffness * extension * extension;
+            }
+        }
+
+        // Diagonal springs (only for triangular grids)
+        if (m_grid_type == GridType::Triangle) {
+            double diagonal_rest_length = m_spacing * std::sqrt(2.0);
+
+            for (size_t r = 0; r < m_rows - 1; r++) {
+                for (size_t c = 0; c < m_cols - 1; c++) {
+                    // Main diagonal (top-left to bottom-right)
+                    {
+                        size_t idx1 = r * m_cols + c;
+                        size_t idx2 = (r + 1) * m_cols + c + 1;
+
+                        double x1 = m_state[idx1 * 4 + 0];
+                        double y1 = m_state[idx1 * 4 + 1];
+                        double x2 = m_state[idx2 * 4 + 0];
+                        double y2 = m_state[idx2 * 4 + 1];
+
+                        double dx = x2 - x1;
+                        double dy = y2 - y1;
+                        double length = std::sqrt(dx * dx + dy * dy);
+                        double extension = length - diagonal_rest_length;
+
+                        pe += 0.5 * m_stiffness * extension * extension;
+                    }
+
+                    // Anti-diagonal (top-right to bottom-left)
+                    {
+                        size_t idx1 = r * m_cols + c + 1;
+                        size_t idx2 = (r + 1) * m_cols + c;
+
+                        double x1 = m_state[idx1 * 4 + 0];
+                        double y1 = m_state[idx1 * 4 + 1];
+                        double x2 = m_state[idx2 * 4 + 0];
+                        double y2 = m_state[idx2 * 4 + 1];
+
+                        double dx = x2 - x1;
+                        double dy = y2 - y1;
+                        double length = std::sqrt(dx * dx + dy * dy);
+                        double extension = length - diagonal_rest_length;
+
+                        pe += 0.5 * m_stiffness * extension * extension;
+                    }
+                }
             }
         }
 

@@ -109,7 +109,7 @@ void test_triangle_vs_quad_stability() {
 }
 
 /**
- * @brief Test triangular grid edge count
+ * @brief Test triangular grid edge count and verify diagonal edges
  */
 void test_triangle_edge_count() {
     std::cout << "\n=== Triangular Grid Edge Count Test ===\n";
@@ -132,14 +132,45 @@ void test_triangle_edge_count() {
     std::cout << "  Quad: " << expected_quad << " (horizontal + vertical)\n";
     std::cout << "  Triangle: " << expected_triangle << " (quad + diagonals)\n";
 
-    if (quad_edges.size() == expected_quad && triangle_edges.size() == expected_triangle) {
-        std::cout << "\n✓ Edge counts are correct!\n";
-    } else {
-        std::cout << "\n✗ Edge count mismatch!\n";
+    if (quad_edges.size() != expected_quad || triangle_edges.size() != expected_triangle) {
+        throw std::runtime_error("Edge count mismatch!");
+    }
+    std::cout << "✓ Edge counts are correct!\n";
+
+    // Verify diagonal edges are actually present
+    std::cout << "\nVerifying diagonal edges are present:\n";
+
+    // For a 3x3 grid, check for specific diagonal edges
+    // Main diagonals: (0,4), (1,5), (3,7), (4,8)
+    // Anti-diagonals: (1,3), (2,4), (4,6), (5,7)
+    std::vector<std::pair<size_t, size_t>> expected_diagonals = {
+        {0, 4}, {1, 5}, {3, 7}, {4, 8},  // Main diagonals
+        {1, 3}, {2, 4}, {4, 6}, {5, 7}   // Anti-diagonals
+    };
+
+    size_t found_diagonals = 0;
+    for (const auto& expected_edge : expected_diagonals) {
+        for (const auto& edge : triangle_edges) {
+            if (edge == expected_edge ||
+                (edge.first == expected_edge.second && edge.second == expected_edge.first)) {
+                found_diagonals++;
+                std::cout << "  ✓ Found diagonal edge (" << expected_edge.first << ", "
+                          << expected_edge.second << ")\n";
+                break;
+            }
+        }
     }
 
-    // Print some triangle edges to verify structure
-    std::cout << "\nSample triangular grid edges:\n";
+    if (found_diagonals != expected_diagonals.size()) {
+        throw std::runtime_error("Missing diagonal edges! Found " +
+                                 std::to_string(found_diagonals) + " of " +
+                                 std::to_string(expected_diagonals.size()));
+    }
+
+    std::cout << "✓ All " << expected_diagonals.size() << " diagonal edges verified!\n";
+
+    // Print first few edges for reference
+    std::cout << "\nFirst 10 triangular grid edges:\n";
     for (size_t i = 0; i < std::min(size_t(10), triangle_edges.size()); ++i) {
         auto [a, b] = triangle_edges[i];
         std::cout << "  Edge " << i << ": (" << a << ", " << b << ")\n";
