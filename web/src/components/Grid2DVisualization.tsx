@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 export interface Grid2DState {
   time: number;
@@ -12,6 +12,7 @@ interface Grid2DVisualizationProps {
   state: Grid2DState | null;
   showVelocities?: boolean;
   showGrid?: boolean;
+  onMassPerturb?: (row: number, col: number, dx: number, dy: number) => void;
 }
 
 /**
@@ -28,10 +29,12 @@ export function Grid2DVisualization({
   state,
   showVelocities = false,
   showGrid = true,
+  onMassPerturb,
 }: Grid2DVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [touchedMass, setTouchedMass] = useState<number | null>(null);
 
   // Handle canvas resizing
   useEffect(() => {
@@ -46,6 +49,100 @@ export function Grid2DVisualization({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Handle touch/click interaction with masses
+  const handleMassInteraction = useCallback((clientX: number, clientY: number) => {
+    if (!canvasRef.current || !state || !onMassPerturb) return;
+
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = clientX - rect.left;
+    const canvasY = clientY - rect.top;
+
+    // Calculate scaling parameters (same as in rendering)
+    const positions = state.positions;
+    if (positions.length === 0) return;
+
+    const xs = positions.map((p) => p.x);
+    const ys = positions.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const padding = 50;
+    const estimatedSpacing = Math.max(
+      (maxX - minX) / (state.cols - 1 || 1),
+      (maxY - minY) / (state.rows - 1 || 1)
+    ) || 0.5;
+
+    const rangeX = Math.max(maxX - minX, estimatedSpacing);
+    const rangeY = Math.max(maxY - minY, estimatedSpacing);
+    const scaleX = (dimensions.width - 2 * padding) / rangeX;
+    const scaleY = (dimensions.height - 2 * padding) / rangeY;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Transform functions
+    const toCanvasX = (x: number) => padding + (x - minX) * scale;
+    const toCanvasY = (y: number) => dimensions.height - (padding + (y - minY) * scale);
+
+    // Find closest mass
+    let closestIdx = -1;
+    let closestDist = Infinity;
+    const touchRadius = 30; // pixels
+
+    positions.forEach((pos, idx) => {
+      const massCanvasX = toCanvasX(pos.x);
+      const massCanvasY = toCanvasY(pos.y);
+      const dist = Math.sqrt(
+        Math.pow(canvasX - massCanvasX, 2) + Math.pow(canvasY - massCanvasY, 2)
+      );
+      if (dist < closestDist && dist < touchRadius) {
+        closestDist = dist;
+        closestIdx = idx;
+      }
+    });
+
+    if (closestIdx !== -1) {
+      // Convert index to row/col
+      const row = Math.floor(closestIdx / state.cols);
+      const col = closestIdx % state.cols;
+
+      // Apply upward perturbation
+      const perturbStrength = 0.2;
+      onMassPerturb(row, col, 0, perturbStrength);
+
+      // Visual feedback
+      setTouchedMass(closestIdx);
+      setTimeout(() => setTouchedMass(null), 200);
+    }
+  }, [state, dimensions, onMassPerturb]);
+
+  // Touch event handlers
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0] || e.changedTouches[0];
+      if (touch) {
+        handleMassInteraction(touch.clientX, touch.clientY);
+      }
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      handleMassInteraction(e.clientX, e.clientY);
+    };
+
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('click', handleClick);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouch);
+      canvas.removeEventListener('click', handleClick);
+    };
+  }, [handleMassInteraction]);
 
   // Render the grid
   useEffect(() => {
@@ -170,27 +267,27 @@ export function Grid2DVisualization({
     }
 
     // Draw masses as circles
-    positions.forEach((pos) => {
+    positions.forEach((pos, idx) => {
       const x = toCanvasX(pos.x);
       const y = toCanvasY(pos.y);
+      const isTouched = idx === touchedMass;
+
+      // Glow effect (larger if touched)
+      const redColor = getCSSVariable('--accent-red');
+      const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+      if (rgb) {
+        ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, ${isTouched ? 0.6 : 0.3})`;
+      } else {
+        ctx.fillStyle = isTouched ? 'rgba(255, 59, 59, 0.6)' : 'rgba(255, 59, 59, 0.3)';
+      }
+      ctx.beginPath();
+      ctx.arc(x, y, isTouched ? 12 : 8, 0, 2 * Math.PI);
+      ctx.fill();
 
       // Mass point
       ctx.fillStyle = getCSSVariable('--accent-red');
       ctx.beginPath();
-      ctx.arc(x, y, 4, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Glow effect (derive from red accent with transparency)
-      const redColor = getCSSVariable('--accent-red');
-      // Convert hex to rgba with 0.3 opacity
-      const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-      if (rgb) {
-        ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, 0.3)`;
-      } else {
-        ctx.fillStyle = 'rgba(255, 59, 59, 0.3)'; // Fallback
-      }
-      ctx.beginPath();
-      ctx.arc(x, y, 8, 0, 2 * Math.PI);
+      ctx.arc(x, y, isTouched ? 6 : 4, 0, 2 * Math.PI);
       ctx.fill();
     });
 
@@ -201,7 +298,7 @@ export function Grid2DVisualization({
 
     // Draw grid info
     ctx.fillText(`Grid: ${state.rows}×${state.cols}`, 10, 45);
-  }, [state, dimensions, showVelocities, showGrid]);
+  }, [state, dimensions, showVelocities, showGrid, touchedMass]);
 
   return (
     <div ref={containerRef} style={styles.container}>

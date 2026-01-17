@@ -177,6 +177,7 @@ function App() {
             state={gridSim.currentState}
             showVelocities={showVelocities}
             showGrid={showGrid}
+            onMassPerturb={gridSim.perturbMass}
           />
         );
       }
@@ -190,6 +191,7 @@ function App() {
             visualizationData={pendulumSim.visualizationData}
             showTelemetry={true}
             showForceArrow={true}
+            onApplyImpulse={pendulumSim.applyDisturbance}
           />
         );
       }

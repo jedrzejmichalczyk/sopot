@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 export interface PendulumState {
   time: number;
@@ -32,6 +32,7 @@ interface InvertedPendulumVisualizationProps {
   showTelemetry?: boolean;
   showForceArrow?: boolean;
   trackWidth?: number;  // Total track width for cart travel
+  onApplyImpulse?: (type: 'cart' | 'link1' | 'link2', impulse: number) => void;
 }
 
 /**
@@ -49,15 +50,17 @@ export function InvertedPendulumVisualization({
   cartMass: _cartMass = 1.0,
   mass1 = 0.5,
   mass2 = 0.5,
-  length1 = 0.5,
-  length2 = 0.5,
+  length1 = 0.7,
+  length2 = 0.7,
   showTelemetry = true,
   showForceArrow = true,
   trackWidth = 3.0,
+  onApplyImpulse,
 }: InvertedPendulumVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [highlightedElement, setHighlightedElement] = useState<'cart' | 'link1' | 'link2' | null>(null);
 
   // Handle canvas resizing
   useEffect(() => {
@@ -72,6 +75,129 @@ export function InvertedPendulumVisualization({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Handle touch/click interaction
+  const handleInteraction = useCallback((clientX: number, clientY: number) => {
+    if (!canvasRef.current || !state || !onApplyImpulse) return;
+
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = clientX - rect.left;
+    const canvasY = clientY - rect.top;
+
+    // Get current visualization positions
+    let cart: { x: number; y: number };
+    let joint2: { x: number; y: number };
+    let tip: { x: number; y: number };
+
+    if (visualizationData) {
+      cart = visualizationData.cart;
+      joint2 = visualizationData.joint2;
+      tip = visualizationData.tip;
+    } else {
+      const x = state.x;
+      const theta1 = state.theta1;
+      const theta2 = state.theta2;
+      cart = { x, y: 0 };
+      joint2 = {
+        x: x + length1 * Math.sin(theta1),
+        y: length1 * Math.cos(theta1)
+      };
+      tip = {
+        x: joint2.x + length2 * Math.sin(theta2),
+        y: joint2.y + length2 * Math.cos(theta2)
+      };
+    }
+
+    // Transform to canvas coordinates (same as rendering)
+    const totalHeight = length1 + length2;
+    const padding = 60;
+    const viewWidth = Math.max(trackWidth, 2 * totalHeight);
+    const viewHeight = totalHeight * 1.5;
+
+    const scaleX = (dimensions.width - 2 * padding) / viewWidth;
+    const scaleY = (dimensions.height - 2 * padding) / viewHeight;
+    const scale = Math.min(scaleX, scaleY) * 0.8;
+
+    const centerX = dimensions.width / 2;
+    const groundY = dimensions.height * 0.7;
+
+    const toCanvasX = (x: number) => centerX + x * scale;
+    const toCanvasY = (y: number) => groundY - y * scale;
+
+    const cartWidth = 0.3 * scale;
+    const cartHeight = 0.15 * scale;
+    const cartX = toCanvasX(cart.x);
+    const cartY = groundY;
+    const j2x = toCanvasX(joint2.x);
+    const j2y = toCanvasY(joint2.y);
+    const tipX = toCanvasX(tip.x);
+    const tipY = toCanvasY(tip.y);
+
+    const mass1Radius = 8 + mass1 * 10;
+    const mass2Radius = 8 + mass2 * 10;
+
+    // Check what was clicked
+    let clickedElement: 'cart' | 'link1' | 'link2' | null = null;
+
+    // Check mass 2 (tip)
+    const distTip = Math.sqrt(Math.pow(canvasX - tipX, 2) + Math.pow(canvasY - tipY, 2));
+    if (distTip < mass2Radius + 10) {
+      clickedElement = 'link2';
+    }
+
+    // Check mass 1 (joint2)
+    if (!clickedElement) {
+      const distJoint2 = Math.sqrt(Math.pow(canvasX - j2x, 2) + Math.pow(canvasY - j2y, 2));
+      if (distJoint2 < mass1Radius + 10) {
+        clickedElement = 'link1';
+      }
+    }
+
+    // Check cart
+    if (!clickedElement) {
+      if (canvasX >= cartX - cartWidth / 2 - 10 && canvasX <= cartX + cartWidth / 2 + 10 &&
+          canvasY >= cartY - cartHeight - 10 && canvasY <= cartY + 10) {
+        clickedElement = 'cart';
+      }
+    }
+
+    if (clickedElement) {
+      // Apply impulse based on clicked element
+      const impulseStrength = clickedElement === 'cart' ? 5 : 0.5;
+      onApplyImpulse(clickedElement, impulseStrength);
+
+      // Visual feedback
+      setHighlightedElement(clickedElement);
+      setTimeout(() => setHighlightedElement(null), 200);
+    }
+  }, [state, visualizationData, dimensions, length1, length2, mass1, mass2, trackWidth, onApplyImpulse]);
+
+  // Touch event handlers
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0] || e.changedTouches[0];
+      if (touch) {
+        handleInteraction(touch.clientX, touch.clientY);
+      }
+    };
+
+    const handleClick = (e: MouseEvent) => {
+      handleInteraction(e.clientX, e.clientY);
+    };
+
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('click', handleClick);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouch);
+      canvas.removeEventListener('click', handleClick);
+    };
+  }, [handleInteraction]);
 
   // Render the pendulum
   useEffect(() => {
@@ -171,9 +297,16 @@ export function InvertedPendulumVisualization({
     const cartX = toCanvasX(cart.x);
     const cartY = groundY;
 
-    // Cart body
-    ctx.fillStyle = getCSSVariable('--accent-secondary') || '#4a9eff';
+    // Cart body (highlight if touched)
+    if (highlightedElement === 'cart') {
+      ctx.fillStyle = '#6dd5ff';
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#6dd5ff';
+    } else {
+      ctx.fillStyle = getCSSVariable('--accent-secondary') || '#4a9eff';
+    }
     ctx.fillRect(cartX - cartWidth / 2, cartY - cartHeight, cartWidth, cartHeight);
+    ctx.shadowBlur = 0;
 
     // Cart wheels
     const wheelRadius = cartHeight * 0.3;
@@ -247,25 +380,39 @@ export function InvertedPendulumVisualization({
     ctx.arc(j1x, j1y - cartHeight, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // Mass 1 (joint 2)
+    // Mass 1 (joint 2) - highlight if touched
     const mass1Radius = 8 + mass1 * 10;
-    ctx.fillStyle = getCSSVariable('--accent-primary') || '#6366f1';
+    if (highlightedElement === 'link1') {
+      ctx.fillStyle = '#8b87ff';
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#8b87ff';
+    } else {
+      ctx.fillStyle = getCSSVariable('--accent-primary') || '#6366f1';
+    }
     ctx.beginPath();
     ctx.arc(j2x, j2y, mass1Radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // Mass 2 (tip)
+    // Mass 2 (tip) - highlight if touched
     const mass2Radius = 8 + mass2 * 10;
-    ctx.fillStyle = getCSSVariable('--accent-tertiary') || '#8b5cf6';
+    if (highlightedElement === 'link2') {
+      ctx.fillStyle = '#b490ff';
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#b490ff';
+    } else {
+      ctx.fillStyle = getCSSVariable('--accent-tertiary') || '#8b5cf6';
+    }
     ctx.beginPath();
     ctx.arc(tipX, tipY, mass2Radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Draw telemetry overlay
     if (showTelemetry && state) {
@@ -290,7 +437,7 @@ export function InvertedPendulumVisualization({
     ctx.fillText('Inverted Double Pendulum with LQR Control', dimensions.width / 2, 25);
     ctx.textAlign = 'left';
 
-  }, [state, visualizationData, dimensions, length1, length2, mass1, mass2, showTelemetry, showForceArrow, trackWidth]);
+  }, [state, visualizationData, dimensions, length1, length2, mass1, mass2, showTelemetry, showForceArrow, trackWidth, highlightedElement]);
 
   return (
     <div
