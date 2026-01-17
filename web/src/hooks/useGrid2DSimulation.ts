@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { SopotModule, Grid2DSimulator } from '../types/sopot';
 import type { Grid2DState } from '../components/Grid2DVisualization';
+import { loadSopotWasmModule } from '../utils/wasmLoader';
 
 /**
  * Hook for 2D Grid simulation using WASM
@@ -33,28 +34,8 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       try {
         console.log('[Grid2D] Loading WASM module...');
 
-        // Use base URL to handle GitHub Pages deployment path
-        const basePath = import.meta.env.BASE_URL || '/';
-        const moduleUrl = `${basePath}sopot.js`;
-
-        console.log(`[Grid2D] Loading from: ${moduleUrl}`);
-
-        // Fetch the module and create a blob URL to bypass Vite's transform
-        const response = await fetch(moduleUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${moduleUrl}: ${response.status}`);
-        }
-        const moduleText = await response.text();
-        const blob = new Blob([moduleText], { type: 'application/javascript' });
-        const blobUrl = URL.createObjectURL(blob);
-
-        // @ts-ignore - Dynamic import of WebAssembly
-        const createSopotModule = await import(/* @vite-ignore */ blobUrl);
-        URL.revokeObjectURL(blobUrl);
-
-        if (!mounted) return;
-
-        const module = await createSopotModule.default();
+        // Load the SOPOT WebAssembly module
+        const module = await loadSopotWasmModule();
 
         if (!mounted) return;
 
