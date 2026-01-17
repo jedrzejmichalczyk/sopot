@@ -132,7 +132,15 @@ export function useInvertedPendulumSimulation() {
 
         if (!mounted) return;
 
-        const module = await createSopotModule.default();
+        const module = await createSopotModule.default({
+          locateFile: (path: string) => {
+            // WASM file should be loaded from the public directory
+            if (path.endsWith('.wasm')) {
+              return `${basePath}${path}`;
+            }
+            return path;
+          }
+        });
 
         if (!mounted) return;
 

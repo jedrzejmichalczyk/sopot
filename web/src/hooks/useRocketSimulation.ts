@@ -76,7 +76,15 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
         console.log(`[WASM] Loader script loaded in ${loaderLoadTime.toFixed(2)}ms`);
 
         const instantiateStartTime = performance.now();
-        const moduleInstance = await createSopotModule.default();
+        const moduleInstance = await createSopotModule.default({
+          locateFile: (path: string) => {
+            // WASM file should be loaded from the public directory
+            if (path.endsWith('.wasm')) {
+              return `${basePath}${path}`;
+            }
+            return path;
+          }
+        });
         const instantiateTime = performance.now() - instantiateStartTime;
 
         const totalLoadTime = performance.now() - startTime;
