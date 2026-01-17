@@ -92,26 +92,26 @@ public:
     //=========================================================================
 
     T compute(kinematics::Position, std::span<const T> state) const {
-        return state[m_offset];
+        return this->getGlobalState(state, 0);
     }
 
     T compute(kinematics::Velocity, std::span<const T> state) const {
-        return state[m_offset + 1];
+        return this->getGlobalState(state, 1);
     }
 
     T compute(kinematics::Acceleration, std::span<const T> state) const {
-        T x = state[m_offset];
-        T v = state[m_offset + 1];
+        T x = this->getGlobalState(state, 0);
+        T v = this->getGlobalState(state, 1);
         return T(-m_spring_constant / m_mass) * x - T(m_damping / m_mass) * v;
     }
 
     T compute(energy::Kinetic, std::span<const T> state) const {
-        T v = state[m_offset + 1];
+        T v = this->getGlobalState(state, 1);
         return T(0.5 * m_mass) * v * v;
     }
 
     T compute(energy::Potential, std::span<const T> state) const {
-        T x = state[m_offset];
+        T x = this->getGlobalState(state, 0);
         return T(0.5 * m_spring_constant) * x * x;
     }
 

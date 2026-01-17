@@ -44,7 +44,11 @@ public:
     }
 
     Vector3<T> compute(kinematics::VelocityENU, std::span<const T> state) const {
-        return {state[m_offset], state[m_offset + 1], state[m_offset + 2]};
+        return {
+            this->getGlobalState(state, 0),
+            this->getGlobalState(state, 1),
+            this->getGlobalState(state, 2)
+        };
     }
 };
 

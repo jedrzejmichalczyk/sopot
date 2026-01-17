@@ -91,11 +91,11 @@ public:
     //=========================================================================
 
     T compute(typename TagSet::Position, std::span<const T> state) const {
-        return state[m_offset];
+        return this->getGlobalState(state, 0);
     }
 
     T compute(typename TagSet::Velocity, std::span<const T> state) const {
-        return state[m_offset + 1];
+        return this->getGlobalState(state, 1);
     }
 
     T compute(typename TagSet::Mass, [[maybe_unused]] std::span<const T> state) const {
