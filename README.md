@@ -101,6 +101,14 @@ npm run dev  # Opens at http://localhost:3000
 
 See [`web/README.md`](web/README.md) for detailed instructions.
 
+**Troubleshooting WASM Build:**
+
+If you encounter errors like `$.getCenterOfMass is not a function` or other missing function errors in the web interface, you need to build the WASM module. See [`WASM_BUILD_GUIDE.md`](WASM_BUILD_GUIDE.md) for comprehensive troubleshooting, or use the quick helper script:
+
+```bash
+./build-wasm.sh  # Auto-detects Emscripten or Docker
+```
+
 ### Minimal C++ Example
 
 ```cpp
