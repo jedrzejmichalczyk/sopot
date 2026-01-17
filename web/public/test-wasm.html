@@ -96,7 +96,15 @@
 
                 // Step 2: Initialize WASM
                 log('Step 2: Initializing WebAssembly...', 'info');
-                Module = await createSopotModule();
+                Module = await createSopotModule({
+                    locateFile: (path) => {
+                        // WASM file is in the same directory as this HTML file
+                        if (path.endsWith('.wasm')) {
+                            return './sopot.wasm';
+                        }
+                        return path;
+                    }
+                });
                 log('✓ WASM initialized', 'success');
 
                 // Step 3: Check available simulators
