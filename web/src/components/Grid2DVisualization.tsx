@@ -18,6 +18,10 @@ export interface Grid2DState {
   cols: number;
   positions: Array<{ x: number; y: number }>; // Position of each mass
   velocities: Array<{ vx: number; vy: number }>; // Velocity of each mass
+  centerOfMass?: { x: number; y: number }; // Center of mass
+  kineticEnergy?: number; // Kinetic energy
+  potentialEnergy?: number; // Potential energy
+  totalEnergy?: number; // Total energy
 }
 
 interface Grid2DVisualizationProps {
@@ -82,6 +86,10 @@ export function Grid2DVisualization({
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
+    // Center of bounding box (for transformation)
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
     const padding = CANVAS_PADDING_PX;
     const estimatedSpacing = Math.max(
       (maxX - minX) / (state.cols - 1 || 1),
@@ -94,9 +102,11 @@ export function Grid2DVisualization({
     const scaleY = (dimensions.height - 2 * padding) / rangeY;
     const scale = Math.min(scaleX, scaleY);
 
-    // Transform functions
-    const toCanvasX = (x: number) => padding + (x - minX) * scale;
-    const toCanvasY = (y: number) => dimensions.height - (padding + (y - minY) * scale);
+    // Transform functions - center the view on the bounding box center
+    const canvasCenterX = dimensions.width / 2;
+    const canvasCenterY = dimensions.height / 2;
+    const toCanvasX = (x: number) => canvasCenterX + (x - centerX) * scale;
+    const toCanvasY = (y: number) => canvasCenterY - (y - centerY) * scale; // Flip Y axis
 
     // Find closest mass
     let closestIdx = -1;
@@ -178,6 +188,10 @@ export function Grid2DVisualization({
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
+    // Center of bounding box (for transformation)
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
     // Add padding
     const padding = CANVAS_PADDING_PX;
 
@@ -195,10 +209,11 @@ export function Grid2DVisualization({
     const scale = Math.min(scaleX, scaleY);
 
     // Transform from simulation coordinates to canvas coordinates
-    const toCanvasX = (x: number) =>
-      padding + (x - minX) * scale;
-    const toCanvasY = (y: number) =>
-      dimensions.height - (padding + (y - minY) * scale); // Flip Y axis
+    // Center the view on the bounding box center to preserve center of mass
+    const canvasCenterX = dimensions.width / 2;
+    const canvasCenterY = dimensions.height / 2;
+    const toCanvasX = (x: number) => canvasCenterX + (x - centerX) * scale;
+    const toCanvasY = (y: number) => canvasCenterY - (y - centerY) * scale; // Flip Y axis
 
     // Draw grid edges (springs)
     if (showGrid) {
@@ -305,13 +320,58 @@ export function Grid2DVisualization({
       ctx.fill();
     });
 
+    // Draw center of mass with different color
+    if (state.centerOfMass) {
+      const comX = toCanvasX(state.centerOfMass.x);
+      const comY = toCanvasY(state.centerOfMass.y);
+
+      // Glow effect for center of mass (cyan color)
+      const cyanColor = getCSSVariable('--accent-cyan');
+      const cyanRgb = cyanColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+      if (cyanRgb) {
+        ctx.fillStyle = `rgba(${parseInt(cyanRgb[1], 16)}, ${parseInt(cyanRgb[2], 16)}, ${parseInt(cyanRgb[3], 16)}, 0.4)`;
+      } else {
+        ctx.fillStyle = 'rgba(59, 174, 218, 0.4)';
+      }
+      ctx.beginPath();
+      ctx.arc(comX, comY, 12, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Center of mass point
+      ctx.fillStyle = getCSSVariable('--accent-cyan');
+      ctx.beginPath();
+      ctx.arc(comX, comY, 6, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Add label
+      ctx.fillStyle = getCSSVariable('--text-primary');
+      ctx.font = '12px monospace';
+      ctx.fillText('CoM', comX + 10, comY - 10);
+    }
+
     // Draw time display
     ctx.fillStyle = getCSSVariable('--text-primary');
-    ctx.font = '16px monospace';
-    ctx.fillText(`t = ${state.time.toFixed(3)}s`, 10, 25);
+    ctx.font = '14px monospace';
+    ctx.fillText(`t = ${state.time.toFixed(3)}s`, 10, 20);
 
     // Draw grid info
-    ctx.fillText(`Grid: ${state.rows}×${state.cols}`, 10, 45);
+    ctx.fillText(`Grid: ${state.rows}×${state.cols}`, 10, 38);
+
+    // Draw energy info
+    if (state.totalEnergy !== undefined) {
+      const ke = state.kineticEnergy ?? 0;
+      const pe = state.potentialEnergy ?? 0;
+      const total = state.totalEnergy;
+
+      ctx.fillStyle = getCSSVariable('--accent-cyan');
+      ctx.fillText(`KE: ${ke.toFixed(3)} J`, 10, 56);
+
+      ctx.fillStyle = getCSSVariable('--accent-amber');
+      ctx.fillText(`PE: ${pe.toFixed(3)} J`, 10, 74);
+
+      ctx.fillStyle = getCSSVariable('--accent-green');
+      ctx.fillText(`E:  ${total.toFixed(3)} J`, 10, 92);
+    }
   }, [state, dimensions, showVelocities, showGrid, touchedMass]);
 
   return (

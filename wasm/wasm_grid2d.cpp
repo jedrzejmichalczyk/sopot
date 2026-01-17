@@ -318,6 +318,92 @@ public:
         }
         return ke;
     }
+
+    /**
+     * Compute total potential energy (sum over all springs)
+     * PE = 0.5 * k * (length - rest_length)^2
+     */
+    double getPotentialEnergy() const {
+        if (!m_initialized) return 0.0;
+
+        double pe = 0.0;
+        size_t num_masses = m_rows * m_cols;
+
+        // Horizontal springs
+        for (size_t r = 0; r < m_rows; r++) {
+            for (size_t c = 0; c < m_cols - 1; c++) {
+                size_t idx1 = r * m_cols + c;
+                size_t idx2 = r * m_cols + c + 1;
+
+                double x1 = m_state[idx1 * 4 + 0];
+                double y1 = m_state[idx1 * 4 + 1];
+                double x2 = m_state[idx2 * 4 + 0];
+                double y2 = m_state[idx2 * 4 + 1];
+
+                double dx = x2 - x1;
+                double dy = y2 - y1;
+                double length = std::sqrt(dx * dx + dy * dy);
+                double extension = length - m_spacing;
+
+                pe += 0.5 * m_stiffness * extension * extension;
+            }
+        }
+
+        // Vertical springs
+        for (size_t r = 0; r < m_rows - 1; r++) {
+            for (size_t c = 0; c < m_cols; c++) {
+                size_t idx1 = r * m_cols + c;
+                size_t idx2 = (r + 1) * m_cols + c;
+
+                double x1 = m_state[idx1 * 4 + 0];
+                double y1 = m_state[idx1 * 4 + 1];
+                double x2 = m_state[idx2 * 4 + 0];
+                double y2 = m_state[idx2 * 4 + 1];
+
+                double dx = x2 - x1;
+                double dy = y2 - y1;
+                double length = std::sqrt(dx * dx + dy * dy);
+                double extension = length - m_spacing;
+
+                pe += 0.5 * m_stiffness * extension * extension;
+            }
+        }
+
+        return pe;
+    }
+
+    /**
+     * Compute total energy (kinetic + potential)
+     */
+    double getTotalEnergy() const {
+        return getKineticEnergy() + getPotentialEnergy();
+    }
+
+    /**
+     * Compute center of mass position
+     */
+    val getCenterOfMass() const {
+        val result = val::object();
+        if (!m_initialized) {
+            result.set("x", 0.0);
+            result.set("y", 0.0);
+            return result;
+        }
+
+        double cx = 0.0;
+        double cy = 0.0;
+        size_t num_masses = m_rows * m_cols;
+        double total_mass = m_mass * num_masses;
+
+        for (size_t i = 0; i < num_masses; ++i) {
+            cx += m_mass * m_state[i * 4 + 0];
+            cy += m_mass * m_state[i * 4 + 1];
+        }
+
+        result.set("x", cx / total_mass);
+        result.set("y", cy / total_mass);
+        return result;
+    }
 };
 
 //=============================================================================
@@ -355,5 +441,8 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
         .function("getVelocities", &Grid2DSimulator::getVelocities)
         .function("getState", &Grid2DSimulator::getState)
         .function("getMassPosition", &Grid2DSimulator::getMassPosition)
-        .function("getKineticEnergy", &Grid2DSimulator::getKineticEnergy);
+        .function("getKineticEnergy", &Grid2DSimulator::getKineticEnergy)
+        .function("getPotentialEnergy", &Grid2DSimulator::getPotentialEnergy)
+        .function("getTotalEnergy", &Grid2DSimulator::getTotalEnergy)
+        .function("getCenterOfMass", &Grid2DSimulator::getCenterOfMass);
 }

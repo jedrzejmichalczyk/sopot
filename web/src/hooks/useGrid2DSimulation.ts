@@ -26,6 +26,11 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   const [rows] = useState(defaultRows);
   const [cols] = useState(defaultCols);
 
+  // Physics parameters
+  const [mass, setMass] = useState(1.0);
+  const [stiffness, setStiffness] = useState(50.0);
+  const [damping, setDamping] = useState(0.15);
+
   // Load WASM module (same approach as useRocketSimulation)
   useEffect(() => {
     let mounted = true;
@@ -81,12 +86,22 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       });
     }
 
+    // Get center of mass and energy values
+    const centerOfMass = simulator.getCenterOfMass();
+    const kineticEnergy = simulator.getKineticEnergy();
+    const potentialEnergy = simulator.getPotentialEnergy();
+    const totalEnergy = simulator.getTotalEnergy();
+
     return {
       time: wasmState.time,
       rows: wasmState.rows,
       cols: wasmState.cols,
       positions,
       velocities,
+      centerOfMass,
+      kineticEnergy,
+      potentialEnergy,
+      totalEnergy,
     };
   }, []);
 
@@ -105,10 +120,10 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
 
       // Configure grid
       simulator.setGridSize(rows, cols);
-      simulator.setMass(1.0);
+      simulator.setMass(mass);
       simulator.setSpacing(0.5);
-      simulator.setStiffness(50.0);
-      simulator.setDamping(0.15);
+      simulator.setStiffness(stiffness);
+      simulator.setDamping(damping);
       simulator.setTimestep(0.005);
 
       // Initialize
@@ -128,7 +143,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [rows, cols, wasmToVizState]);
+  }, [rows, cols, mass, stiffness, damping, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -213,12 +228,18 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     error,
     currentState,
     playbackSpeed,
+    mass,
+    stiffness,
+    damping,
     initialize,
     start,
     pause,
     reset,
     step,
     setPlaybackSpeed,
+    setMass,
+    setStiffness,
+    setDamping,
     perturbMass,
   };
 }
