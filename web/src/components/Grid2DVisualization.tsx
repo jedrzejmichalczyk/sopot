@@ -188,9 +188,10 @@ export function Grid2DVisualization({
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
-    // Center of bounding box (for transformation)
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
+    // Use center of mass as the view center (NOT bounding box center)
+    // This keeps the CoM visually stationary on screen, as it should be in physics
+    const centerX = state.centerOfMass?.x ?? (minX + maxX) / 2;
+    const centerY = state.centerOfMass?.y ?? (minY + maxY) / 2;
 
     // Add padding
     const padding = CANVAS_PADDING_PX;
@@ -209,7 +210,7 @@ export function Grid2DVisualization({
     const scale = Math.min(scaleX, scaleY);
 
     // Transform from simulation coordinates to canvas coordinates
-    // Center the view on the bounding box center to preserve center of mass
+    // Center the view on the CENTER OF MASS to keep it visually stationary
     const canvasCenterX = dimensions.width / 2;
     const canvasCenterY = dimensions.height / 2;
     const toCanvasX = (x: number) => canvasCenterX + (x - centerX) * scale;
@@ -371,6 +372,12 @@ export function Grid2DVisualization({
 
       ctx.fillStyle = getCSSVariable('--accent-green');
       ctx.fillText(`E:  ${total.toFixed(3)} J`, 10, 92);
+    }
+
+    // Draw center of mass coordinates (should be constant with no external forces)
+    if (state.centerOfMass) {
+      ctx.fillStyle = getCSSVariable('--accent-cyan');
+      ctx.fillText(`CoM: (${state.centerOfMass.x.toFixed(3)}, ${state.centerOfMass.y.toFixed(3)})`, 10, 110);
     }
   }, [state, dimensions, showVelocities, showGrid, touchedMass]);
 
