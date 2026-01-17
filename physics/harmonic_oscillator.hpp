@@ -40,7 +40,6 @@ private:
     double m_initial_velocity;
     double m_natural_frequency;
     std::string m_name;
-    mutable size_t m_offset{0};
 
 public:
     HarmonicOscillator(
@@ -61,8 +60,6 @@ public:
         if (spring_constant <= 0.0) throw std::invalid_argument("Spring constant must be positive");
         if (damping < 0.0) throw std::invalid_argument("Damping must be non-negative");
     }
-
-    void setOffset(size_t off) const { m_offset = off; }
 
     //=========================================================================
     // Required Component Interface

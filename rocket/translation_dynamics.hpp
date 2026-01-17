@@ -17,7 +17,6 @@ public:
 private:
     Vector3<T> m_initial_velocity{T(0), T(0), T(0)};
     std::string m_name{"translation_dynamics"};
-    mutable size_t m_offset{0};
 
 public:
     TranslationDynamics(Vector3<T> initial_velocity = Vector3<T>::zero(),
@@ -25,7 +24,6 @@ public:
         : m_initial_velocity(initial_velocity), m_name(name) {}
 
     void setInitialVelocity(const Vector3<T>& vel) { m_initial_velocity = vel; }
-    void setOffset(size_t off) const { m_offset = off; }
 
     LocalState getInitialLocalState() const {
         return {m_initial_velocity.x, m_initial_velocity.y, m_initial_velocity.z};

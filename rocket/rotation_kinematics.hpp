@@ -17,7 +17,6 @@ public:
 private:
     Quaternion<T> m_initial_quaternion{T(0), T(0), T(0), T(1)};
     std::string m_name{"rotation_kinematics"};
-    mutable size_t m_offset{0};
 
 public:
     RotationKinematics(Quaternion<T> initial_quaternion = Quaternion<T>::identity(),
@@ -28,7 +27,6 @@ public:
     void setInitialFromLauncherAngles(T elevation_deg, T azimuth_deg) {
         m_initial_quaternion = Quaternion<T>::from_launcher_angles(elevation_deg, azimuth_deg);
     }
-    void setOffset(size_t off) const { m_offset = off; }
 
     LocalState getInitialLocalState() const {
         return {m_initial_quaternion.q1, m_initial_quaternion.q2,

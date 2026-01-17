@@ -35,7 +35,6 @@ private:
     double m_initial_position;
     double m_initial_velocity;
     std::string m_name;
-    mutable size_t m_offset{0};
 
 public:
     PointMass(
@@ -51,8 +50,6 @@ public:
             throw std::invalid_argument("Mass must be positive");
         }
     }
-
-    void setOffset(size_t off) const { m_offset = off; }
 
     //=========================================================================
     // Required Component Interface

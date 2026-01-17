@@ -17,7 +17,6 @@ public:
 private:
     Vector3<T> m_initial_omega{T(0), T(0), T(0)};
     std::string m_name{"rotation_dynamics"};
-    mutable size_t m_offset{0};
 
 public:
     RotationDynamics(Vector3<T> initial_omega = Vector3<T>::zero(),
@@ -25,7 +24,6 @@ public:
         : m_initial_omega(initial_omega), m_name(name) {}
 
     void setInitialAngularVelocity(const Vector3<T>& omega) { m_initial_omega = omega; }
-    void setOffset(size_t off) const { m_offset = off; }
 
     LocalState getInitialLocalState() const {
         return {m_initial_omega.x, m_initial_omega.y, m_initial_omega.z};
