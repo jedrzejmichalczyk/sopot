@@ -19,9 +19,11 @@ interface Grid2DControlPanelProps {
   mass?: number;
   stiffness?: number;
   damping?: number;
+  gridType?: 'quad' | 'triangle';
   onMassChange?: (mass: number) => void;
   onStiffnessChange?: (stiffness: number) => void;
   onDampingChange?: (damping: number) => void;
+  onGridTypeChange?: (gridType: 'quad' | 'triangle') => void;
 }
 
 export function Grid2DControlPanel({
@@ -43,9 +45,11 @@ export function Grid2DControlPanel({
   mass = 1.0,
   stiffness = 50.0,
   damping = 0.15,
+  gridType = 'quad',
   onMassChange,
   onStiffnessChange,
   onDampingChange,
+  onGridTypeChange,
 }: Grid2DControlPanelProps) {
   const playbackSpeeds = [0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
 
@@ -158,6 +162,41 @@ export function Grid2DControlPanel({
         <p style={styles.warningText}>
           Change these before initialization
         </p>
+
+        <div style={styles.parameterControl}>
+          <label style={styles.parameterLabel}>
+            <span style={styles.parameterName}>Grid Type</span>
+            <span style={styles.parameterValue}>
+              {gridType === 'quad' ? 'Quadrilateral' : 'Triangular'}
+            </span>
+          </label>
+          <div style={styles.buttonGroup}>
+            <button
+              onClick={() => onGridTypeChange?.('quad')}
+              disabled={isInitialized}
+              className="touch-button"
+              style={{
+                ...styles.gridTypeButton,
+                ...(gridType === 'quad' ? styles.gridTypeButtonActive : {}),
+                ...(isInitialized ? styles.buttonDisabled : {}),
+              }}
+            >
+              Quadrilateral (Standard)
+            </button>
+            <button
+              onClick={() => onGridTypeChange?.('triangle')}
+              disabled={isInitialized}
+              className="touch-button"
+              style={{
+                ...styles.gridTypeButton,
+                ...(gridType === 'triangle' ? styles.gridTypeButtonActive : {}),
+                ...(isInitialized ? styles.buttonDisabled : {}),
+              }}
+            >
+              Triangular (More Stable)
+            </button>
+          </div>
+        </div>
 
         <div style={styles.parameterControl}>
           <label style={styles.parameterLabel}>
@@ -399,5 +438,21 @@ const styles = {
   slider: {
     width: '100%',
     cursor: 'pointer',
+  },
+  gridTypeButton: {
+    padding: '10px 16px',
+    fontSize: '13px',
+    fontWeight: 'bold' as const,
+    border: '2px solid var(--bg-tertiary)',
+    borderRadius: '4px',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  gridTypeButtonActive: {
+    borderColor: 'var(--accent-cyan)',
+    backgroundColor: 'var(--accent-cyan)',
+    color: '#fff',
   },
 };

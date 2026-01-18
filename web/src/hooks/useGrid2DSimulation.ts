@@ -30,6 +30,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   const [mass, setMass] = useState(1.0);
   const [stiffness, setStiffness] = useState(50.0);
   const [damping, setDamping] = useState(0.15);
+  const [gridType, setGridType] = useState<'quad' | 'triangle'>('quad');
 
   // Load WASM module (same approach as useRocketSimulation)
   useEffect(() => {
@@ -120,6 +121,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
 
       // Configure grid
       simulator.setGridSize(rows, cols);
+      simulator.setGridType(gridType); // Set grid topology (quad or triangle)
       simulator.setMass(mass);
       simulator.setSpacing(0.5);
       simulator.setStiffness(stiffness);
@@ -143,7 +145,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [rows, cols, mass, stiffness, damping, wasmToVizState]);
+  }, [rows, cols, mass, stiffness, damping, gridType, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -231,6 +233,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     mass,
     stiffness,
     damping,
+    gridType,
     initialize,
     start,
     pause,
@@ -240,6 +243,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     setMass,
     setStiffness,
     setDamping,
+    setGridType,
     perturbMass,
   };
 }

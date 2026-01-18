@@ -177,6 +177,7 @@ function App() {
             state={gridSim.currentState}
             showVelocities={showVelocities}
             showGrid={showGrid}
+            gridType={gridSim.gridType}
             onMassPerturb={gridSim.perturbMass}
           />
         );
@@ -297,9 +298,11 @@ function App() {
                   mass={gridSim.mass}
                   stiffness={gridSim.stiffness}
                   damping={gridSim.damping}
+                  gridType={gridSim.gridType}
                   onMassChange={gridSim.setMass}
                   onStiffnessChange={gridSim.setStiffness}
                   onDampingChange={gridSim.setDamping}
+                  onGridTypeChange={gridSim.setGridType}
                 />
               ) : (
                 <InvertedPendulumControlPanel
@@ -459,9 +462,11 @@ function App() {
                 mass={gridSim.mass}
                 stiffness={gridSim.stiffness}
                 damping={gridSim.damping}
+                gridType={gridSim.gridType}
                 onMassChange={gridSim.setMass}
                 onStiffnessChange={gridSim.setStiffness}
                 onDampingChange={gridSim.setDamping}
+                onGridTypeChange={gridSim.setGridType}
               />
             ) : (
               <InvertedPendulumControlPanel

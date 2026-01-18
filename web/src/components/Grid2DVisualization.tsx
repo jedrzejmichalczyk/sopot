@@ -28,6 +28,7 @@ interface Grid2DVisualizationProps {
   state: Grid2DState | null;
   showVelocities?: boolean;
   showGrid?: boolean;
+  gridType?: 'quad' | 'triangle';
   onMassPerturb?: (row: number, col: number, dx: number, dy: number) => void;
 }
 
@@ -45,6 +46,7 @@ export function Grid2DVisualization({
   state,
   showVelocities = false,
   showGrid = true,
+  gridType = 'quad',
   onMassPerturb,
 }: Grid2DVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -251,6 +253,40 @@ export function Grid2DVisualization({
           ctx.lineTo(toCanvasX(p2.x), toCanvasY(p2.y));
           ctx.stroke();
         }
+      }
+
+      // Diagonal edges (only for triangular grid)
+      if (gridType === 'triangle') {
+        ctx.strokeStyle = getCSSVariable('--bg-tertiary');
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.6; // Make diagonals slightly transparent
+
+        for (let r = 0; r < rows - 1; r++) {
+          for (let c = 0; c < cols - 1; c++) {
+            const idx_tl = r * cols + c;           // Top-left
+            const idx_tr = r * cols + c + 1;       // Top-right
+            const idx_bl = (r + 1) * cols + c;     // Bottom-left
+            const idx_br = (r + 1) * cols + c + 1; // Bottom-right
+
+            // Main diagonal (top-left to bottom-right)
+            const p_tl = positions[idx_tl];
+            const p_br = positions[idx_br];
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(p_tl.x), toCanvasY(p_tl.y));
+            ctx.lineTo(toCanvasX(p_br.x), toCanvasY(p_br.y));
+            ctx.stroke();
+
+            // Anti-diagonal (top-right to bottom-left)
+            const p_tr = positions[idx_tr];
+            const p_bl = positions[idx_bl];
+            ctx.beginPath();
+            ctx.moveTo(toCanvasX(p_tr.x), toCanvasY(p_tr.y));
+            ctx.lineTo(toCanvasX(p_bl.x), toCanvasY(p_bl.y));
+            ctx.stroke();
+          }
+        }
+
+        ctx.globalAlpha = 1.0; // Reset alpha
       }
     }
 

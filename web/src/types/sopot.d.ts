@@ -121,6 +121,8 @@ export interface Grid2DWasmState {
 export interface Grid2DSimulator {
   // Configuration
   setGridSize(rows: number, cols: number): void;
+  setGridType(gridType: string): void;
+  getGridType(): string;
   setMass(mass: number): void;
   setSpacing(spacing: number): void;
   setStiffness(stiffness: number): void;
