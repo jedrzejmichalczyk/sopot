@@ -178,6 +178,15 @@ target_link_libraries(triangle_grid_test sopot_core sopot_physics)
 target_compile_features(triangle_grid_test PRIVATE cxx_std_20)
 add_test(NAME triangle_grid_test COMMAND triangle_grid_test)
 
+# Grid size compilation benchmark (optional, not built by default)
+# See GRID_SIZE_LIMITS.md for compilation time analysis
+# Build with: cmake --build . --target triangle_grid_benchmark_5x5
+# Note: Grids larger than 6x6 may take >5 minutes to compile
+add_executable(triangle_grid_benchmark_5x5 EXCLUDE_FROM_ALL tests/triangle_grid_compilation_benchmark.cpp)
+target_compile_definitions(triangle_grid_benchmark_5x5 PRIVATE GRID_ROWS=5 GRID_COLS=5)
+target_link_libraries(triangle_grid_benchmark_5x5 sopot_core sopot_physics)
+target_compile_features(triangle_grid_benchmark_5x5 PRIVATE cxx_std_20)
+
 add_executable(double_pendulum_test tests/double_pendulum_test.cpp)
 target_link_libraries(double_pendulum_test sopot_core sopot_physics)
 target_compile_features(double_pendulum_test PRIVATE cxx_std_20)
