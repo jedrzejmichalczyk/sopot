@@ -118,9 +118,18 @@ export interface Grid2DWasmState {
 /**
  * 2D Grid Simulator - WASM wrapper for C++ physics
  */
+/**
+ * Grid topology type - determines the spring connectivity pattern
+ * - 'quad': Horizontal and vertical springs only (standard grid)
+ * - 'triangle': Adds diagonal springs in X pattern (more stable)
+ */
+export type GridTopology = 'quad' | 'triangle';
+
 export interface Grid2DSimulator {
   // Configuration
   setGridSize(rows: number, cols: number): void;
+  setGridType(gridType: GridTopology): void;
+  getGridType(): GridTopology;
   setMass(mass: number): void;
   setSpacing(spacing: number): void;
   setStiffness(stiffness: number): void;

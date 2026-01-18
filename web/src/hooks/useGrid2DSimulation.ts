@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { SopotModule, Grid2DSimulator } from '../types/sopot';
+import type { SopotModule, Grid2DSimulator, GridTopology } from '../types/sopot';
 import type { Grid2DState } from '../components/Grid2DVisualization';
 import { loadSopotWasmModule } from '../utils/wasmLoader';
 
@@ -30,6 +30,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   const [mass, setMass] = useState(1.0);
   const [stiffness, setStiffness] = useState(50.0);
   const [damping, setDamping] = useState(0.15);
+  const [gridType, setGridType] = useState<GridTopology>('quad');
 
   // Load WASM module (same approach as useRocketSimulation)
   useEffect(() => {
@@ -120,6 +121,9 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
 
       // Configure grid
       simulator.setGridSize(rows, cols);
+      // IMPORTANT: setGridType must be called BEFORE initialize()
+      // The grid topology determines the spring connectivity pattern
+      simulator.setGridType(gridType);
       simulator.setMass(mass);
       simulator.setSpacing(0.5);
       simulator.setStiffness(stiffness);
@@ -143,7 +147,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [rows, cols, mass, stiffness, damping, wasmToVizState]);
+  }, [rows, cols, mass, stiffness, damping, gridType, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -231,6 +235,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     mass,
     stiffness,
     damping,
+    gridType,
     initialize,
     start,
     pause,
@@ -240,6 +245,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     setMass,
     setStiffness,
     setDamping,
+    setGridType,
     perturbMass,
   };
 }
