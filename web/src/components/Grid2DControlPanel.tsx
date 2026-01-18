@@ -1,3 +1,5 @@
+import type { GridTopology } from '../types/sopot';
+
 interface Grid2DControlPanelProps {
   isReady: boolean;
   isInitialized: boolean;
@@ -19,11 +21,11 @@ interface Grid2DControlPanelProps {
   mass?: number;
   stiffness?: number;
   damping?: number;
-  gridType?: 'quad' | 'triangle';
+  gridType?: GridTopology;
   onMassChange?: (mass: number) => void;
   onStiffnessChange?: (stiffness: number) => void;
   onDampingChange?: (damping: number) => void;
-  onGridTypeChange?: (gridType: 'quad' | 'triangle') => void;
+  onGridTypeChange?: (gridType: GridTopology) => void;
 }
 
 export function Grid2DControlPanel({
