@@ -18,6 +18,150 @@
 #include <vector>
 #include <cmath>
 
+// WebAssembly SIMD intrinsics for hardware-accelerated vector math
+// Processes 2 doubles (128-bit) or 4 floats at once
+#ifdef __wasm_simd128__
+#include <wasm_simd128.h>
+#define SOPOT_USE_SIMD 1
+
+// =============================================================================
+// SIMD HELPER FUNCTIONS
+// =============================================================================
+// State layout per mass: [x, y, vx, vy] (4 doubles = 32 bytes)
+// SIMD register: 128 bits = 2 doubles at a time
+// We process (x,y) and (vx,vy) as separate vector pairs
+
+namespace simd {
+
+// Update positions: pos += dt * vel (for all masses)
+// Processes 2 components at a time using SIMD
+inline void updatePositions(double* state, size_t num_masses, double dt) {
+    const v128_t dt_vec = wasm_f64x2_splat(dt);
+
+    for (size_t i = 0; i < num_masses; ++i) {
+        double* base = state + i * 4;
+
+        // Load position (x, y) and velocity (vx, vy)
+        v128_t pos = wasm_v128_load(base);      // [x, y]
+        v128_t vel = wasm_v128_load(base + 2);  // [vx, vy]
+
+        // pos += dt * vel
+        v128_t delta = wasm_f64x2_mul(dt_vec, vel);
+        pos = wasm_f64x2_add(pos, delta);
+
+        // Store updated position
+        wasm_v128_store(base, pos);
+    }
+}
+
+// Update velocities: vel += dt * accel (for all masses)
+// derivs layout matches state: [dx, dy, dvx, dvy] per mass
+inline void updateVelocities(double* state, const double* derivs, size_t num_masses, double dt) {
+    const v128_t dt_vec = wasm_f64x2_splat(dt);
+
+    for (size_t i = 0; i < num_masses; ++i) {
+        double* vel_ptr = state + i * 4 + 2;
+        const double* accel_ptr = derivs + i * 4 + 2;
+
+        // Load velocity and acceleration
+        v128_t vel = wasm_v128_load(vel_ptr);     // [vx, vy]
+        v128_t accel = wasm_v128_load(accel_ptr); // [ax, ay]
+
+        // vel += dt * accel
+        v128_t delta = wasm_f64x2_mul(dt_vec, accel);
+        vel = wasm_f64x2_add(vel, delta);
+
+        // Store updated velocity
+        wasm_v128_store(vel_ptr, vel);
+    }
+}
+
+// Velocity Verlet position update: pos += dt * vel + 0.5 * dt^2 * accel
+inline void updatePositionsVerlet(double* state, const double* derivs, size_t num_masses, double dt) {
+    const v128_t dt_vec = wasm_f64x2_splat(dt);
+    const v128_t half_dt_sq_vec = wasm_f64x2_splat(0.5 * dt * dt);
+
+    for (size_t i = 0; i < num_masses; ++i) {
+        double* base = state + i * 4;
+        const double* deriv_base = derivs + i * 4;
+
+        // Load position, velocity, and acceleration
+        v128_t pos = wasm_v128_load(base);          // [x, y]
+        v128_t vel = wasm_v128_load(base + 2);      // [vx, vy]
+        v128_t accel = wasm_v128_load(deriv_base + 2); // [ax, ay]
+
+        // pos += dt * vel + 0.5 * dt^2 * accel
+        v128_t vel_term = wasm_f64x2_mul(dt_vec, vel);
+        v128_t accel_term = wasm_f64x2_mul(half_dt_sq_vec, accel);
+        pos = wasm_f64x2_add(pos, vel_term);
+        pos = wasm_f64x2_add(pos, accel_term);
+
+        // Store updated position
+        wasm_v128_store(base, pos);
+    }
+}
+
+// Velocity Verlet velocity update: vel += 0.5 * dt * (accel_old + accel_new)
+inline void updateVelocitiesVerlet(double* state, const double* derivs_old,
+                                    const double* derivs_new, size_t num_masses, double dt) {
+    const v128_t half_dt_vec = wasm_f64x2_splat(0.5 * dt);
+
+    for (size_t i = 0; i < num_masses; ++i) {
+        double* vel_ptr = state + i * 4 + 2;
+        const double* accel_old_ptr = derivs_old + i * 4 + 2;
+        const double* accel_new_ptr = derivs_new + i * 4 + 2;
+
+        // Load velocity and accelerations
+        v128_t vel = wasm_v128_load(vel_ptr);
+        v128_t accel_old = wasm_v128_load(accel_old_ptr);
+        v128_t accel_new = wasm_v128_load(accel_new_ptr);
+
+        // vel += 0.5 * dt * (accel_old + accel_new)
+        v128_t accel_sum = wasm_f64x2_add(accel_old, accel_new);
+        v128_t delta = wasm_f64x2_mul(half_dt_vec, accel_sum);
+        vel = wasm_f64x2_add(vel, delta);
+
+        // Store updated velocity
+        wasm_v128_store(vel_ptr, vel);
+    }
+}
+
+// RK4 state combination: state += (dt/6) * (k1 + 2*k2 + 2*k3 + k4)
+inline void rk4Combine(double* state, const double* k1, const double* k2,
+                       const double* k3, const double* k4, size_t state_size, double dt) {
+    const v128_t dt_over_6 = wasm_f64x2_splat(dt / 6.0);
+    const v128_t two = wasm_f64x2_splat(2.0);
+
+    // Process 2 doubles at a time
+    size_t i = 0;
+    for (; i + 1 < state_size; i += 2) {
+        v128_t s = wasm_v128_load(state + i);
+        v128_t v1 = wasm_v128_load(k1 + i);
+        v128_t v2 = wasm_v128_load(k2 + i);
+        v128_t v3 = wasm_v128_load(k3 + i);
+        v128_t v4 = wasm_v128_load(k4 + i);
+
+        // k1 + 2*k2 + 2*k3 + k4
+        v128_t sum = v1;
+        sum = wasm_f64x2_add(sum, wasm_f64x2_mul(two, v2));
+        sum = wasm_f64x2_add(sum, wasm_f64x2_mul(two, v3));
+        sum = wasm_f64x2_add(sum, v4);
+
+        // state += (dt/6) * sum
+        s = wasm_f64x2_add(s, wasm_f64x2_mul(dt_over_6, sum));
+        wasm_v128_store(state + i, s);
+    }
+
+    // Handle remaining element if state_size is odd
+    if (i < state_size) {
+        state[i] += (dt / 6.0) * (k1[i] + 2.0*k2[i] + 2.0*k3[i] + k4[i]);
+    }
+}
+
+} // namespace simd
+
+#endif // __wasm_simd128__
+
 using namespace emscripten;
 using namespace sopot;
 using namespace sopot::unified;
@@ -108,7 +252,7 @@ private:
     std::unique_ptr<GridSystem<triangle_50x50>> m_triangle_50;
     std::unique_ptr<GridSystem<triangle_100x100>> m_triangle_100;
 
-    // RK4 integrator
+    // RK4 integrator (with optional SIMD optimization)
     template<typename System>
     void rk4Step(System& system, double dt) {
         const size_t n = m_state.size();
@@ -125,9 +269,14 @@ private:
         for (size_t i = 0; i < n; ++i) temp[i] = m_state[i] + dt * k3[i];
         auto k4 = system.computeDerivatives(m_time + dt, temp);
 
+        // Final combination: state += (dt/6) * (k1 + 2*k2 + 2*k3 + k4)
+#ifdef SOPOT_USE_SIMD
+        simd::rk4Combine(m_state.data(), k1.data(), k2.data(), k3.data(), k4.data(), n, dt);
+#else
         for (size_t i = 0; i < n; ++i) {
             m_state[i] += (dt / 6.0) * (k1[i] + 2.0*k2[i] + 2.0*k3[i] + k4[i]);
         }
+#endif
 
         m_time += dt;
     }
@@ -154,6 +303,11 @@ private:
         // Get accelerations at current state
         auto derivs = system.computeDerivatives(m_time, m_state);
 
+#ifdef SOPOT_USE_SIMD
+        // SIMD-optimized velocity and position updates
+        simd::updateVelocities(m_state.data(), derivs.data(), num_masses, dt);
+        simd::updatePositions(m_state.data(), num_masses, dt);
+#else
         // Update velocities first: v_{n+1} = v_n + dt * a(x_n, v_n)
         for (size_t i = 0; i < num_masses; ++i) {
             m_state[i * 4 + 2] += dt * derivs[i * 4 + 2];  // vx += dt * ax
@@ -165,6 +319,7 @@ private:
             m_state[i * 4 + 0] += dt * m_state[i * 4 + 2];  // x += dt * vx_new
             m_state[i * 4 + 1] += dt * m_state[i * 4 + 3];  // y += dt * vy_new
         }
+#endif
 
         m_time += dt;
     }
@@ -192,6 +347,16 @@ private:
         // Get accelerations at current state: a_n
         auto derivs = system.computeDerivatives(m_time, m_state);
 
+#ifdef SOPOT_USE_SIMD
+        // SIMD-optimized Verlet position update
+        simd::updatePositionsVerlet(m_state.data(), derivs.data(), num_masses, dt);
+
+        // Get accelerations at new positions: a_{n+1}
+        auto derivs_new = system.computeDerivatives(m_time + dt, m_state);
+
+        // SIMD-optimized Verlet velocity update
+        simd::updateVelocitiesVerlet(m_state.data(), derivs.data(), derivs_new.data(), num_masses, dt);
+#else
         // Update positions: x_{n+1} = x_n + dt * v_n + 0.5 * dt^2 * a_n
         const double half_dt_sq = 0.5 * dt * dt;
         for (size_t i = 0; i < num_masses; ++i) {
@@ -208,6 +373,7 @@ private:
             m_state[i * 4 + 2] += half_dt * (derivs[i * 4 + 2] + derivs_new[i * 4 + 2]);
             m_state[i * 4 + 3] += half_dt * (derivs[i * 4 + 3] + derivs_new[i * 4 + 3]);
         }
+#endif
 
         m_time += dt;
     }

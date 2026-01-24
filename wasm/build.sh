@@ -80,10 +80,12 @@ else
     echo -e "${YELLOW}Building with direct emcc...${NC}"
 
     # Optimization flags based on build mode
+    # -msimd128: Enable WebAssembly SIMD for vectorized math (2-4x speedup)
+    # -mrelaxed-simd: Enable relaxed SIMD operations (faster, widely supported since 2023)
     if [ "$BUILD_MODE" = "Release" ]; then
-        OPT_FLAGS="-O3 -s ASSERTIONS=0"
+        OPT_FLAGS="-O3 -s ASSERTIONS=0 -msimd128 -mrelaxed-simd"
     else
-        OPT_FLAGS="-O0 -g -s ASSERTIONS=1 -s SAFE_HEAP=1"
+        OPT_FLAGS="-O0 -g -s ASSERTIONS=1 -s SAFE_HEAP=1 -msimd128"
     fi
 
     # Build command - includes rocket, grid2d, and inverted pendulum
