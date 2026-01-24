@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { SopotModule, Grid2DSimulator } from '../types/sopot';
+import type { SopotModule, Grid2DSimulator, GridTopology } from '../types/sopot';
 import type { Grid2DState } from '../components/Grid2DVisualization';
+import { loadSopotWasmModule } from '../utils/wasmLoader';
 
 /**
  * Hook for 2D Grid simulation using WASM
@@ -25,6 +26,12 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   const [rows] = useState(defaultRows);
   const [cols] = useState(defaultCols);
 
+  // Physics parameters
+  const [mass, setMass] = useState(1.0);
+  const [stiffness, setStiffness] = useState(50.0);
+  const [damping, setDamping] = useState(0.15);
+  const [gridType, setGridType] = useState<GridTopology>('quad');
+
   // Load WASM module (same approach as useRocketSimulation)
   useEffect(() => {
     let mounted = true;
@@ -33,28 +40,8 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       try {
         console.log('[Grid2D] Loading WASM module...');
 
-        // Use base URL to handle GitHub Pages deployment path
-        const basePath = import.meta.env.BASE_URL || '/';
-        const moduleUrl = `${basePath}sopot.js`;
-
-        console.log(`[Grid2D] Loading from: ${moduleUrl}`);
-
-        // Fetch the module and create a blob URL to bypass Vite's transform
-        const response = await fetch(moduleUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${moduleUrl}: ${response.status}`);
-        }
-        const moduleText = await response.text();
-        const blob = new Blob([moduleText], { type: 'application/javascript' });
-        const blobUrl = URL.createObjectURL(blob);
-
-        // @ts-ignore - Dynamic import of WebAssembly
-        const createSopotModule = await import(/* @vite-ignore */ blobUrl);
-        URL.revokeObjectURL(blobUrl);
-
-        if (!mounted) return;
-
-        const module = await createSopotModule.default();
+        // Load the SOPOT WebAssembly module
+        const module = await loadSopotWasmModule();
 
         if (!mounted) return;
 
@@ -100,12 +87,22 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       });
     }
 
+    // Get center of mass and energy values
+    const centerOfMass = simulator.getCenterOfMass();
+    const kineticEnergy = simulator.getKineticEnergy();
+    const potentialEnergy = simulator.getPotentialEnergy();
+    const totalEnergy = simulator.getTotalEnergy();
+
     return {
       time: wasmState.time,
       rows: wasmState.rows,
       cols: wasmState.cols,
       positions,
       velocities,
+      centerOfMass,
+      kineticEnergy,
+      potentialEnergy,
+      totalEnergy,
     };
   }, []);
 
@@ -124,10 +121,13 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
 
       // Configure grid
       simulator.setGridSize(rows, cols);
-      simulator.setMass(1.0);
+      // IMPORTANT: setGridType must be called BEFORE initialize()
+      // The grid topology determines the spring connectivity pattern
+      simulator.setGridType(gridType);
+      simulator.setMass(mass);
       simulator.setSpacing(0.5);
-      simulator.setStiffness(50.0);
-      simulator.setDamping(0.5);
+      simulator.setStiffness(stiffness);
+      simulator.setDamping(damping);
       simulator.setTimestep(0.005);
 
       // Initialize
@@ -147,7 +147,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [rows, cols, wasmToVizState]);
+  }, [rows, cols, mass, stiffness, damping, gridType, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -180,6 +180,14 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     simulatorRef.current.step();
     setCurrentState(wasmToVizState(simulatorRef.current));
   }, [isRunning, wasmToVizState]);
+
+  // Perturb a specific mass
+  const perturbMass = useCallback((row: number, col: number, dx: number, dy: number) => {
+    if (!simulatorRef.current) return;
+
+    simulatorRef.current.perturbMass(row, col, dx, dy);
+    setCurrentState(wasmToVizState(simulatorRef.current));
+  }, [wasmToVizState]);
 
   // Animation loop
   useEffect(() => {
@@ -224,11 +232,20 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     error,
     currentState,
     playbackSpeed,
+    mass,
+    stiffness,
+    damping,
+    gridType,
     initialize,
     start,
     pause,
     reset,
     step,
     setPlaybackSpeed,
+    setMass,
+    setStiffness,
+    setDamping,
+    setGridType,
+    perturbMass,
   };
 }

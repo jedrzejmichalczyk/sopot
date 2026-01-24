@@ -220,6 +220,9 @@ public:
         T C33 = M11 * M22 - M12 * M12;
 
         // Solve using inverse matrix
+        if (det == T(0)) {
+            throw std::runtime_error("CartDoublePendulum: mass matrix is singular; cannot compute accelerations.");
+        }
         T inv_det = T(1.0) / det;
 
         T xddot = inv_det * (C11 * rhs1 + C12 * rhs2 + C13 * rhs3);

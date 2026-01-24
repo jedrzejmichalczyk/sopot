@@ -247,10 +247,11 @@ void test_make_symbols() {
     constexpr const char* names[] = {"mass", "pos", "vel", "acc"};
     auto [mass, pos, vel, acc] = make_symbols<4>(names);
 
-    static_assert(mass.index == 0);
-    static_assert(pos.index == 1);
-    static_assert(vel.index == 2);
-    static_assert(acc.index == 3);
+    // Verify indices at runtime (structured bindings aren't constexpr in all compilers)
+    assert(mass.index == 0);
+    assert(pos.index == 1);
+    assert(vel.index == 2);
+    assert(acc.index == 3);
 
     // Test expression building
     auto kinetic = sq(vel) * mass;  // 0.5 * m * v^2 (without the 0.5)

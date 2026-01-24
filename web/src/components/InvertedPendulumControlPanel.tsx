@@ -101,16 +101,8 @@ export function InvertedPendulumControlPanel({
           </div>
           <button
             onClick={handleInitialize}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: 'var(--accent-primary)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-            }}
+            className="touch-button btn-primary"
+            style={{ width: '100%' }}
           >
             Initialize Simulation
           </button>
@@ -126,49 +118,26 @@ export function InvertedPendulumControlPanel({
                 <button
                   onClick={onStart}
                   disabled={simulationFailed}
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    backgroundColor: simulationFailed ? 'var(--bg-tertiary)' : 'var(--accent-primary)',
-                    color: simulationFailed ? 'var(--text-tertiary)' : 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: simulationFailed ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold',
-                  }}
+                  className="touch-button btn-success"
+                  style={{ flex: 1 }}
                 >
-                  ▶ Start
+                  START
                 </button>
               ) : (
                 <button
                   onClick={onPause}
-                  style={{
-                    flex: 1,
-                    padding: '10px',
-                    backgroundColor: 'var(--accent-secondary)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                  }}
+                  className="touch-button btn-warning"
+                  style={{ flex: 1 }}
                 >
-                  ⏸ Pause
+                  PAUSE
                 </button>
               )}
               <button
                 onClick={onReset}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                }}
+                className="touch-button btn-danger"
+                style={{ flex: 1 }}
               >
-                ↺ Reset
+                RESET
               </button>
             </div>
 

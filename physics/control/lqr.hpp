@@ -167,6 +167,10 @@ private:
         if constexpr (M == 1) {
             // Scalar case: K = BtP / R
             double r = RplusBtPB[0][0];
+            // Guard against division by zero or nearly zero scalar
+            if (std::abs(r) < 1e-12) {
+                throw std::runtime_error("LQR solveForGain: (R + B'PB) is singular or ill-conditioned in scalar case");
+            }
             for (size_t j = 0; j < N; ++j) {
                 K[0][j] = BtP[0][j] / r;
             }
@@ -196,6 +200,11 @@ private:
                 }
                 std::swap(aug[col], aug[max_row]);
 
+                // Check pivot is not zero
+                if (std::abs(aug[col][col]) < 1e-12) {
+                    throw std::runtime_error("LQR solveForGain: matrix is singular during Gaussian elimination");
+                }
+
                 // Eliminate
                 for (size_t row = col + 1; row < M; ++row) {
                     double factor = aug[row][col] / aug[col][col];
@@ -211,6 +220,10 @@ private:
                     double sum = aug[i][M + j];
                     for (size_t k = i + 1; k < M; ++k) {
                         sum -= aug[i][k] * K[k][j];
+                    }
+                    // Check diagonal element is not zero
+                    if (std::abs(aug[i][i]) < 1e-12) {
+                        throw std::runtime_error("LQR solveForGain: matrix is singular during back substitution");
                     }
                     K[i][j] = sum / aug[i][i];
                 }
@@ -476,6 +489,9 @@ inline std::pair<
     double C23 = -(M11 * M23 - M12 * M13);
     double C33 = M11 * M22 - M12 * M12;
 
+    if (std::abs(det) < 1e-12) {
+        throw std::runtime_error("linearizeCartDoublePendulum: mass matrix is singular");
+    }
     double inv_det = 1.0 / det;
 
     double Minv11 = C11 * inv_det;

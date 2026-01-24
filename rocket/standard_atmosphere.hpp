@@ -31,12 +31,10 @@ private:
         {100000.0, 3.96, 214.65, -0.002, 71000.0}
     }};
     std::string m_name{"atmosphere"};
-    mutable size_t m_altitude_offset{3}; // Position Z is at offset 3 (after time + pos_xy)
 
 public:
     StandardAtmosphere(std::string_view name = "atmosphere") : m_name(name) {}
     void setOffset(size_t) const {} // No state
-    void setAltitudeOffset(size_t off) const { m_altitude_offset = off; }
 
     LocalState getInitialLocalState() const { return {}; }
     std::string_view getComponentType() const { return "StandardAtmosphere"; }
@@ -73,17 +71,25 @@ public:
     T computeSpeedOfSound(T alt) const { return std::sqrt(T(gamma * Rs) * computeTemperature(alt)); }
 
     // State functions query altitude from registry
-    T compute(environment::AtmosphericPressure, std::span<const T> state) const {
-        return computePressure(state[m_altitude_offset]);
+    template<typename Registry>
+    T compute(environment::AtmosphericPressure, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+        return computePressure(altitude);
     }
-    T compute(environment::AtmosphericTemperature, std::span<const T> state) const {
-        return computeTemperature(state[m_altitude_offset]);
+    template<typename Registry>
+    T compute(environment::AtmosphericTemperature, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+        return computeTemperature(altitude);
     }
-    T compute(environment::AtmosphericDensity, std::span<const T> state) const {
-        return computeDensity(state[m_altitude_offset]);
+    template<typename Registry>
+    T compute(environment::AtmosphericDensity, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+        return computeDensity(altitude);
     }
-    T compute(environment::SpeedOfSound, std::span<const T> state) const {
-        return computeSpeedOfSound(state[m_altitude_offset]);
+    template<typename Registry>
+    T compute(environment::SpeedOfSound, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+        return computeSpeedOfSound(altitude);
     }
 };
 

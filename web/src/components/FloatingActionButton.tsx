@@ -40,31 +40,31 @@ export const FloatingActionButton: React.FC<FABProps> = ({
               <SettingsIcon size={20} />
               <span>Controls</span>
             </button>
+            {(simulationType === 'rocket' || simulationType === 'pendulum') && (
+              <button
+                className="fab-menu-item"
+                onClick={() => {
+                  onOpenPanel('telemetry');
+                  setIsMenuOpen(false);
+                }}
+                title="Telemetry"
+              >
+                <DataIcon size={20} />
+                <span>Data</span>
+              </button>
+            )}
             {simulationType === 'rocket' && (
-              <>
-                <button
-                  className="fab-menu-item"
-                  onClick={() => {
-                    onOpenPanel('telemetry');
-                    setIsMenuOpen(false);
-                  }}
-                  title="Telemetry"
-                >
-                  <DataIcon size={20} />
-                  <span>Data</span>
-                </button>
-                <button
-                  className="fab-menu-item"
-                  onClick={() => {
-                    onOpenPanel('plots');
-                    setIsMenuOpen(false);
-                  }}
-                  title="Plots"
-                >
-                  <ChartIcon size={20} />
-                  <span>Plots</span>
-                </button>
-              </>
+              <button
+                className="fab-menu-item"
+                onClick={() => {
+                  onOpenPanel('plots');
+                  setIsMenuOpen(false);
+                }}
+                title="Plots"
+              >
+                <ChartIcon size={20} />
+                <span>Plots</span>
+              </button>
             )}
             {isInitialized && (
               <button

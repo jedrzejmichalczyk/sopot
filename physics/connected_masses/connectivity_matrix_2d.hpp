@@ -197,4 +197,71 @@ auto makeGrid2DSystem(
     return makeConnectedMassSystem2D<T, NumMasses, edges>(mass_params, spring_params);
 }
 
+/**
+ * @brief Create a 2D triangular mesh of masses and springs
+ *
+ * Convenience function to create a triangular mesh with uniform properties.
+ * Each rectangular cell is split into triangles using diagonal connections,
+ * creating a very stable structure suitable for cloth-like simulations.
+ *
+ * The triangular mesh includes:
+ * - Horizontal springs connecting adjacent columns
+ * - Vertical springs connecting adjacent rows
+ * - Diagonal springs forming an 'X' pattern in each cell
+ *
+ * This provides superior stability compared to quad grids, especially for
+ * simulations with large deformations or shearing forces.
+ *
+ * @tparam T Scalar type
+ * @tparam Rows Number of rows in grid
+ * @tparam Cols Number of columns in grid
+ * @param mass Mass value for all masses (kg)
+ * @param spacing Grid spacing (m) - used for both rest length and initial positions
+ * @param stiffness Spring constant (N/m)
+ * @param damping Damping coefficient (N·s/m)
+ */
+template<typename T, size_t Rows, size_t Cols>
+auto makeTriangularGridSystem(
+    double mass,
+    double spacing,
+    double stiffness,
+    double damping = 0.0
+) {
+    static_assert(Rows >= 2, "Grid must have at least 2 rows");
+    static_assert(Cols >= 2, "Grid must have at least 2 columns");
+
+    constexpr size_t NumMasses = Rows * Cols;
+    constexpr auto edges = makeTriangularGridEdgesArray<Rows, Cols>();
+
+    // Create mass parameters with grid positions
+    std::array<MassParams2D, NumMasses> mass_params;
+    for (size_t i = 0; i < NumMasses; ++i) {
+        auto [row, col] = gridCoords(i, Cols);
+        mass_params[i] = {
+            mass,
+            static_cast<double>(col) * spacing,  // x position
+            static_cast<double>(row) * spacing,  // y position
+            0.0,  // vx
+            0.0   // vy
+        };
+    }
+
+    // Create spring parameters
+    std::array<SpringParams2D, edges.size()> spring_params;
+    for (size_t k = 0; k < edges.size(); ++k) {
+        auto [i, j] = edges[k];
+        auto [row_i, col_i] = gridCoords(i, Cols);
+        auto [row_j, col_j] = gridCoords(j, Cols);
+
+        // Calculate rest length based on connection type
+        double dx = static_cast<double>(col_j) - static_cast<double>(col_i);
+        double dy = static_cast<double>(row_j) - static_cast<double>(row_i);
+        double rest_length = spacing * std::sqrt(dx * dx + dy * dy);
+
+        spring_params[k] = {stiffness, rest_length, damping};
+    }
+
+    return makeConnectedMassSystem2D<T, NumMasses, edges>(mass_params, spring_params);
+}
+
 } // namespace sopot::connected_masses

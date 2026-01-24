@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SopotModule, RocketSimulator, SimulationState } from '../types/sopot';
+import { loadSopotWasmModule } from '../utils/wasmLoader';
 
 export interface SimulationConfig {
   elevation: number;
@@ -50,48 +51,21 @@ export function useRocketSimulation(): UseRocketSimulationReturn {
       try {
         const startTime = performance.now();
 
-        // Import the SOPOT WebAssembly module
-        // Use base URL to handle GitHub Pages deployment path
-        const basePath = import.meta.env.BASE_URL || '/';
-        const moduleUrl = `${basePath}sopot.js`;
-
-        console.log(`[WASM] Loading module from: ${moduleUrl}`);
-
-        // Fetch the module and create a blob URL to bypass Vite's transform
-        const response = await fetch(moduleUrl);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${moduleUrl}: ${response.status}`);
-        }
-        const moduleText = await response.text();
-        const blob = new Blob([moduleText], { type: 'application/javascript' });
-        const blobUrl = URL.createObjectURL(blob);
-
-        // @ts-ignore - Dynamic import of WebAssembly
-        const createSopotModule = await import(/* @vite-ignore */ blobUrl);
-        URL.revokeObjectURL(blobUrl);
+        // Load the SOPOT WebAssembly module
+        const moduleInstance = await loadSopotWasmModule();
 
         if (!mounted) return;
-
-        const loaderLoadTime = performance.now() - startTime;
-        console.log(`[WASM] Loader script loaded in ${loaderLoadTime.toFixed(2)}ms`);
-
-        const instantiateStartTime = performance.now();
-        const moduleInstance = await createSopotModule.default();
-        const instantiateTime = performance.now() - instantiateStartTime;
 
         const totalLoadTime = performance.now() - startTime;
 
         if (mounted) {
           setModule(moduleInstance);
-          console.log(`[WASM] Module instantiated in ${instantiateTime.toFixed(2)}ms`);
-          console.log(`[WASM] Total load time: ${totalLoadTime.toFixed(2)}ms`);
+          console.log(`[WASM] Module loaded in ${totalLoadTime.toFixed(2)}ms`);
 
           // Log metrics for monitoring
           if (typeof window !== 'undefined' && (window as any).gtag) {
             (window as any).gtag('event', 'wasm_load_complete', {
               load_time_ms: Math.round(totalLoadTime),
-              loader_time_ms: Math.round(loaderLoadTime),
-              instantiate_time_ms: Math.round(instantiateTime),
             });
           }
         }

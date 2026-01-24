@@ -128,6 +128,9 @@ private:
             double C32 = -(M11 * M23 - M12 * M13);
             double C33 = M11 * M22 - M12 * M12;
 
+            if (std::abs(det) < 1e-12) {
+                throw std::runtime_error("InvertedPendulumSimulator: mass matrix is singular");
+            }
             double inv_det = 1.0 / det;
             double xddot = inv_det * (C11 * rhs1 + C12 * rhs2 + C13 * rhs3);
             double alpha1 = inv_det * (C21 * rhs1 + C22 * rhs2 + C23 * rhs3);

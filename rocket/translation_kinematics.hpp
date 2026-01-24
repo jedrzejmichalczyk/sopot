@@ -26,7 +26,6 @@ public:
 private:
     Vector3<T> m_initial_position{T(0), T(0), T(0)};
     std::string m_name{"translation_kinematics"};
-    mutable size_t m_offset{0};  // Set by system, used for state function access
 
 public:
     TranslationKinematics(
@@ -35,7 +34,6 @@ public:
     ) : m_initial_position(initial_position), m_name(name) {}
 
     void setInitialPosition(const Vector3<T>& pos) { m_initial_position = pos; }
-    void setOffset(size_t off) const { m_offset = off; }
 
     LocalState getInitialLocalState() const {
         return {m_initial_position.x, m_initial_position.y, m_initial_position.z};
@@ -58,12 +56,16 @@ public:
 
     // State function: Position ENU
     Vector3<T> compute(kinematics::PositionENU, std::span<const T> state) const {
-        return {state[m_offset], state[m_offset + 1], state[m_offset + 2]};
+        return {
+            this->getGlobalState(state, 0),
+            this->getGlobalState(state, 1),
+            this->getGlobalState(state, 2)
+        };
     }
 
     // State function: Altitude (Up component)
     T compute(kinematics::Altitude, std::span<const T> state) const {
-        return state[m_offset + 2];
+        return this->getGlobalState(state, 2);
     }
 };
 
