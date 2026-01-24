@@ -34,24 +34,32 @@ function getSpringLineWidth(gridSize: number): number {
  * - Zero ω (stationary): white
  * - Negative ω (clockwise): blue
  *
+ * Uses asinh scaling for smooth transitions across wide range of velocities.
+ * asinh(x) ≈ x for small x, ≈ ln(2x) for large x - provides natural compression.
+ *
  * @param omega Angular velocity in rad/s
- * @param maxOmega Maximum expected angular velocity for normalization (default 10 rad/s)
+ * @param scale Scale factor for asinh normalization (default 2.0)
  * @returns CSS color string
  */
-function angularVelocityToColor(omega: number, maxOmega: number = 10): string {
-  // Normalize to [-1, 1] range
-  const normalized = Math.max(-1, Math.min(1, omega / maxOmega));
+function angularVelocityToColor(omega: number, scale: number = 2.0): string {
+  // Use asinh for smooth scaling: maps (-∞, +∞) to (-∞, +∞) but compresses large values
+  // Normalize by dividing by asinh(scale) so that ω = ±scale maps to ±1
+  const asinhScale = Math.asinh(scale);
+  const normalized = Math.asinh(omega) / asinhScale;
 
-  if (normalized < 0) {
+  // Clamp to [-1, 1] for color interpolation
+  const clamped = Math.max(-1, Math.min(1, normalized));
+
+  if (clamped < 0) {
     // Clockwise (negative ω): interpolate from white to blue
-    const t = Math.abs(normalized);
+    const t = Math.abs(clamped);
     const r = Math.round(255 * (1 - t));
     const g = Math.round(255 * (1 - t));
     const b = 255;
     return `rgb(${r}, ${g}, ${b})`;
-  } else if (normalized > 0) {
+  } else if (clamped > 0) {
     // Counterclockwise (positive ω): interpolate from white to red
-    const t = normalized;
+    const t = clamped;
     const r = 255;
     const g = Math.round(255 * (1 - t));
     const b = Math.round(255 * (1 - t));
@@ -400,6 +408,16 @@ export function Grid2DVisualization({
     const gridSize = state.rows;
     const hasAngularVelocities = state.angularVelocities && state.angularVelocities.length > 0;
 
+    // Compute adaptive scale based on current max angular velocity
+    // Use at least 1.0 to avoid division issues, and cap at reasonable value
+    let omegaScale = 2.0; // Default scale
+    if (hasAngularVelocities && state.angularVelocities) {
+      const maxAbsOmega = Math.max(...state.angularVelocities.map(Math.abs));
+      // Scale so that max velocity maps to ~80% color intensity
+      // Using 1.5x the max gives good visual range
+      omegaScale = Math.max(1.0, maxAbsOmega * 1.5);
+    }
+
     positions.forEach((pos, idx) => {
       const x = toCanvasX(pos.x);
       const y = toCanvasY(pos.y);
@@ -409,7 +427,7 @@ export function Grid2DVisualization({
       let massColor: string;
       if (hasAngularVelocities && state.angularVelocities) {
         const omega = state.angularVelocities[idx] || 0;
-        massColor = angularVelocityToColor(omega, 10); // maxOmega = 10 rad/s
+        massColor = angularVelocityToColor(omega, omegaScale);
       } else {
         // Fallback to red if no angular velocities
         massColor = getCSSVariable('--accent-red');
