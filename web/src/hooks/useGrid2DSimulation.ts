@@ -70,6 +70,10 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
   const [gridType, setGridType] = useState<GridTopology>('quad');
   const [integrator, setIntegrator] = useState<IntegratorType>('rk4');
 
+  // Repulsion parameters (collision avoidance)
+  const [repulsionEnabled, setRepulsionEnabled] = useState(false);
+  const [minDistance, setMinDistance] = useState(0.05);  // Default: 5cm collision radius
+
   // Load WASM module (same approach as useRocketSimulation)
   useEffect(() => {
     let mounted = true;
@@ -170,6 +174,13 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       simulator.setDamping(damping);
       simulator.setTimestep(getTimestepForGridSize(gridSize));
 
+      // Configure repulsion (collision avoidance)
+      if (repulsionEnabled) {
+        simulator.setRepulsion(minDistance);
+      } else {
+        simulator.setRepulsion(0);  // Disabled
+      }
+
       // Initialize
       simulator.initialize();
 
@@ -193,7 +204,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [gridSize, gridType, integrator, mass, stiffness, damping, wasmToVizState]);
+  }, [gridSize, gridType, integrator, mass, stiffness, damping, repulsionEnabled, minDistance, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -321,6 +332,8 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
     damping,
     gridType,
     integrator,
+    repulsionEnabled,
+    minDistance,
     initialize,
     start,
     pause,
@@ -333,6 +346,8 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
     setDamping,
     setGridType,
     setIntegrator,
+    setRepulsionEnabled,
+    setMinDistance,
     perturbMass,
   };
 }

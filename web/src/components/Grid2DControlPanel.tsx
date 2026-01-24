@@ -28,11 +28,15 @@ interface Grid2DControlPanelProps {
   damping?: number;
   gridType?: GridTopology;
   integrator?: IntegratorType;
+  repulsionEnabled?: boolean;
+  minDistance?: number;
   onMassChange?: (mass: number) => void;
   onStiffnessChange?: (stiffness: number) => void;
   onDampingChange?: (damping: number) => void;
   onGridTypeChange?: (gridType: GridTopology) => void;
   onIntegratorChange?: (integrator: IntegratorType) => void;
+  onRepulsionEnabledChange?: (enabled: boolean) => void;
+  onMinDistanceChange?: (distance: number) => void;
 }
 
 export function Grid2DControlPanel({
@@ -58,11 +62,15 @@ export function Grid2DControlPanel({
   damping = 1.0,
   gridType = 'quad',
   integrator = 'rk4',
+  repulsionEnabled = false,
+  minDistance = 0.05,
   onMassChange,
   onStiffnessChange,
   onDampingChange,
   onGridTypeChange,
   onIntegratorChange,
+  onRepulsionEnabledChange,
+  onMinDistanceChange,
 }: Grid2DControlPanelProps) {
   const playbackSpeeds = [0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
 
@@ -325,6 +333,40 @@ export function Grid2DControlPanel({
               ? '1st order symplectic, bounded energy error'
               : '2nd order symplectic, excellent energy conservation'}
           </p>
+        </div>
+
+        <div style={styles.parameterControl}>
+          <label style={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={repulsionEnabled}
+              onChange={(e) => onRepulsionEnabledChange?.(e.target.checked)}
+              disabled={isInitialized}
+              style={styles.checkbox}
+            />
+            <span style={styles.checkboxText}>Enable Repulsion (Collision Avoidance)</span>
+          </label>
+          {repulsionEnabled && (
+            <>
+              <label style={styles.parameterLabel}>
+                <span style={styles.parameterName}>Min Distance (m)</span>
+                <span style={styles.parameterValue}>{minDistance.toFixed(3)}</span>
+              </label>
+              <input
+                type="range"
+                min="0.01"
+                max="0.2"
+                step="0.005"
+                value={minDistance}
+                onChange={(e) => onMinDistanceChange?.(parseFloat(e.target.value))}
+                disabled={isInitialized}
+                style={styles.slider}
+              />
+              <p style={styles.infoTextSmall}>
+                Steep repulsive force activates when masses get closer than this distance
+              </p>
+            </>
+          )}
         </div>
       </div>
 

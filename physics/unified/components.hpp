@@ -113,20 +113,28 @@ struct ComponentTraits<PointMass2D<T>> {
  * State: none
  * Requires: Position2D, Velocity2D (from both ports)
  * Provides: Force2D (to both ports)
+ *
+ * Optional collision avoidance via steep repulsion when masses get too close.
+ * Uses inverse formula: F_repulsion = k_rep * (r_min/r - 1) when r < r_min
  */
 template<Scalar T>
 struct Spring2D {
     double stiffness;
     double rest_length;
     double damping;
+    double min_distance;          // Collision radius (m) - repulsion below this
+    double repulsion_stiffness;   // Repulsion strength (N/m)
 
     static constexpr size_t state_size = 0;
     static constexpr size_t num_ports = 2;
     static constexpr uint32_t required = FunctionMask<Position2D, Velocity2D>;
     static constexpr uint32_t provided = FunctionMask<Force2D>;
 
-    constexpr Spring2D(double k, double L0, double c = 0.0)
-        : stiffness(k), rest_length(L0), damping(c) {}
+    constexpr Spring2D(double k, double L0, double c = 0.0,
+                       double min_dist = 0.0, double rep_stiff = -1.0)
+        : stiffness(k), rest_length(L0), damping(c),
+          min_distance(min_dist),
+          repulsion_stiffness(rep_stiff > 0.0 ? rep_stiff : 10.0 * k) {}
 
     void initState(std::span<T> /*state*/) const {}
 
@@ -159,6 +167,13 @@ struct Spring2D {
         T rel_vel = dvx * ux + dvy * uy;
 
         T F = T(stiffness) * extension + T(damping) * rel_vel;
+
+        // Steep repulsion when masses get too close (only if min_distance > 0)
+        // Uses inverse formula: F_repulsion = k_rep * (r_min/r - 1) when r < r_min
+        if (min_distance > 0.0 && value_of(len) < min_distance) {
+            T repulsion = -T(repulsion_stiffness) * (T(min_distance) / len_safe - T(1.0));
+            F += repulsion;
+        }
 
         std::array<T, 2> force_on_0 = {F * ux, F * uy};
         std::array<T, 2> force_on_1 = {-F * ux, -F * uy};

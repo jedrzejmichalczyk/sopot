@@ -159,6 +159,11 @@ export interface Grid2DSimulator {
   setStiffness(stiffness: number): void;
   setDamping(damping: number): void;
   setTimestep(dt: number): void;
+  // Repulsion (collision avoidance)
+  setRepulsion(minDistance: number, repulsionStiffness?: number): void;
+  getMinDistance(): number;
+  getRepulsionStiffness(): number;
+  isRepulsionEnabled(): boolean;
 
   // Initialization
   initialize(): void;

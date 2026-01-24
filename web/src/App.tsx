@@ -302,11 +302,15 @@ function App() {
                   damping={gridSim.damping}
                   gridType={gridSim.gridType}
                   integrator={gridSim.integrator}
+                  repulsionEnabled={gridSim.repulsionEnabled}
+                  minDistance={gridSim.minDistance}
                   onMassChange={gridSim.setMass}
                   onStiffnessChange={gridSim.setStiffness}
                   onDampingChange={gridSim.setDamping}
                   onGridTypeChange={gridSim.setGridType}
                   onIntegratorChange={gridSim.setIntegrator}
+                  onRepulsionEnabledChange={gridSim.setRepulsionEnabled}
+                  onMinDistanceChange={gridSim.setMinDistance}
                 />
               ) : (
                 <InvertedPendulumControlPanel
@@ -470,11 +474,15 @@ function App() {
                 damping={gridSim.damping}
                 gridType={gridSim.gridType}
                 integrator={gridSim.integrator}
+                repulsionEnabled={gridSim.repulsionEnabled}
+                minDistance={gridSim.minDistance}
                 onMassChange={gridSim.setMass}
                 onStiffnessChange={gridSim.setStiffness}
                 onDampingChange={gridSim.setDamping}
                 onGridTypeChange={gridSim.setGridType}
                 onIntegratorChange={gridSim.setIntegrator}
+                onRepulsionEnabledChange={gridSim.setRepulsionEnabled}
+                onMinDistanceChange={gridSim.setMinDistance}
               />
             ) : (
               <InvertedPendulumControlPanel

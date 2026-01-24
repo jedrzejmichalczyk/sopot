@@ -225,6 +225,8 @@ private:
     double m_spacing{0.5};
     double m_stiffness{100.0};
     double m_damping{1.0};
+    double m_min_distance{0.0};          // Repulsion collision radius (0 = disabled)
+    double m_repulsion_stiffness{-1.0};  // Repulsion strength (-1 = auto: 10x stiffness)
     GridType m_grid_type{GridType::Quad};
     Integrator m_integrator{Integrator::RK4};
 
@@ -401,14 +403,16 @@ private:
         // Horizontal springs (rest length = spacing)
         for (size_t r = 0; r < Rows; ++r) {
             for (size_t c = 0; c < Cols - 1; ++c) {
-                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping,
+                                           m_min_distance, m_repulsion_stiffness));
             }
         }
 
         // Vertical springs (rest length = spacing)
         for (size_t r = 0; r < Rows - 1; ++r) {
             for (size_t c = 0; c < Cols; ++c) {
-                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping,
+                                           m_min_distance, m_repulsion_stiffness));
             }
         }
 
@@ -438,14 +442,16 @@ private:
         // Horizontal springs (rest length = spacing)
         for (size_t r = 0; r < Rows; ++r) {
             for (size_t c = 0; c < Cols - 1; ++c) {
-                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping,
+                                           m_min_distance, m_repulsion_stiffness));
             }
         }
 
         // Vertical springs (rest length = spacing)
         for (size_t r = 0; r < Rows - 1; ++r) {
             for (size_t c = 0; c < Cols; ++c) {
-                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping,
+                                           m_min_distance, m_repulsion_stiffness));
             }
         }
 
@@ -454,8 +460,10 @@ private:
         for (size_t r = 0; r < Rows - 1; ++r) {
             for (size_t c = 0; c < Cols - 1; ++c) {
                 // Two diagonals per cell (X pattern)
-                spring_batch.add(SpringType(m_stiffness, diagonal_length, m_damping));
-                spring_batch.add(SpringType(m_stiffness, diagonal_length, m_damping));
+                spring_batch.add(SpringType(m_stiffness, diagonal_length, m_damping,
+                                           m_min_distance, m_repulsion_stiffness));
+                spring_batch.add(SpringType(m_stiffness, diagonal_length, m_damping,
+                                           m_min_distance, m_repulsion_stiffness));
             }
         }
 
@@ -582,6 +590,24 @@ public:
     void setStiffness(double stiffness) { m_stiffness = stiffness; }
     void setDamping(double damping) { m_damping = damping; }
     void setTimestep(double dt) { m_dt = dt; }
+
+    /**
+     * Set repulsion parameters for collision avoidance
+     *
+     * @param min_distance Collision radius (m). When masses get closer than this,
+     *                     a steep repulsive force is applied. Set to 0 to disable.
+     * @param repulsion_stiffness Strength of repulsion (N/m). Default -1 = auto (10x stiffness)
+     */
+    void setRepulsion(double min_distance, double repulsion_stiffness = -1.0) {
+        m_min_distance = min_distance;
+        m_repulsion_stiffness = repulsion_stiffness;
+    }
+
+    double getMinDistance() const { return m_min_distance; }
+    double getRepulsionStiffness() const {
+        return m_repulsion_stiffness > 0.0 ? m_repulsion_stiffness : 10.0 * m_stiffness;
+    }
+    bool isRepulsionEnabled() const { return m_min_distance > 0.0; }
 
     /**
      * Set grid type (topology): "quad" or "triangle"
@@ -860,6 +886,10 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
         .function("setStiffness", &Grid2DSimulator::setStiffness)
         .function("setDamping", &Grid2DSimulator::setDamping)
         .function("setTimestep", &Grid2DSimulator::setTimestep)
+        .function("setRepulsion", &Grid2DSimulator::setRepulsion)
+        .function("getMinDistance", &Grid2DSimulator::getMinDistance)
+        .function("getRepulsionStiffness", &Grid2DSimulator::getRepulsionStiffness)
+        .function("isRepulsionEnabled", &Grid2DSimulator::isRepulsionEnabled)
 
         // Initialization
         .function("initialize", &Grid2DSimulator::initialize)
