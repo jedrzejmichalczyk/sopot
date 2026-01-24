@@ -461,6 +461,8 @@ function App() {
                 showGrid={showGrid}
                 onShowVelocitiesChange={setShowVelocities}
                 onShowGridChange={setShowGrid}
+                gridSize={gridSim.gridSize}
+                onGridSizeChange={gridSim.setGridSize}
                 mass={gridSim.mass}
                 stiffness={gridSim.stiffness}
                 damping={gridSim.damping}
