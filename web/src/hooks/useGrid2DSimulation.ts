@@ -180,10 +180,11 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       simulator.setTimestep(getTimestepForGridSize(gridSize));
 
       // Configure repulsion (collision avoidance)
+      // Second param -1 means use default stiffness
       if (repulsionEnabled) {
-        simulator.setRepulsion(minDistance);
+        simulator.setRepulsion(minDistance, -1);
       } else {
-        simulator.setRepulsion(0);  // Disabled
+        simulator.setRepulsion(0, -1);  // Disabled
       }
 
       // Initialize
