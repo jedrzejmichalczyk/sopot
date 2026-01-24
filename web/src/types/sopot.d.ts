@@ -121,7 +121,7 @@ export interface Grid2DWasmState {
 /**
  * Grid topology type - determines the spring connectivity pattern
  * - 'quad': Horizontal and vertical springs only (standard grid)
- * - 'triangle': Adds diagonal springs in X pattern (more stable)
+ * - 'triangle': Adds diagonal springs in X pattern (more stable, cloth-like)
  */
 export type GridTopology = 'quad' | 'triangle';
 
@@ -134,14 +134,15 @@ export interface Grid2DSystemInfo {
   numMasses: number;
   numSprings: number;
   stateSize: number;
+  gridType: GridTopology;
   architecture: string;
 }
 
 export interface Grid2DSimulator {
   // Configuration
   setGridSize(rows: number, cols: number): void;
-  setGridType?(gridType: GridTopology): void;  // Optional - may not exist in new implementation
-  getGridType?(): GridTopology;
+  setGridType(gridType: GridTopology): void;
+  getGridType(): GridTopology;
   setMass(mass: number): void;
   setSpacing(spacing: number): void;
   setStiffness(stiffness: number): void;

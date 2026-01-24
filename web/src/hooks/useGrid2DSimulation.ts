@@ -7,14 +7,37 @@ import { loadSopotWasmModule } from '../utils/wasmLoader';
 export type GridSize = 5 | 10 | 20 | 50 | 100;
 export const SUPPORTED_GRID_SIZES: GridSize[] = [5, 10, 20, 50, 100];
 
+// Physics tuning constants for different grid sizes
+const TIMESTEP_LARGE_GRID = 0.0005;  // For grids >= 50x50 (stability)
+const TIMESTEP_SMALL_GRID = 0.001;   // For grids < 50x50
+const SPACING_LARGE_GRID = 0.2;      // For grids > 20x20 (fit in view)
+const SPACING_MEDIUM_GRID = 0.3;     // For grids 11-20
+const SPACING_SMALL_GRID = 0.5;      // For grids <= 10
+
+/** Get appropriate timestep for grid size (smaller for stability on large grids) */
+function getTimestepForGridSize(size: GridSize): number {
+  return size >= 50 ? TIMESTEP_LARGE_GRID : TIMESTEP_SMALL_GRID;
+}
+
+/** Get appropriate spacing for grid size (smaller for large grids to fit in view) */
+function getSpacingForGridSize(size: GridSize): number {
+  if (size > 20) return SPACING_LARGE_GRID;
+  if (size > 10) return SPACING_MEDIUM_GRID;
+  return SPACING_SMALL_GRID;
+}
+
 /**
  * Hook for 2D Grid simulation using WASM
  *
  * All physics computations run in C++ via WebAssembly.
  * The frontend only handles visualization.
  *
- * Now supports grids up to 100x100 (10,000 masses) using the
+ * Supports grids up to 100x100 (10,000 masses) using the
  * Unified Graph Architecture with O(K) template instantiations.
+ *
+ * Grid types:
+ * - 'quad': Horizontal + vertical springs only (standard grid)
+ * - 'triangle': H + V + diagonal springs (X pattern, more stable, cloth-like)
  */
 export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
   const [isReady, setIsReady] = useState(false);
@@ -130,15 +153,12 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
 
       // Configure grid - using new unified graph architecture
       simulator.setGridSize(gridSize, gridSize);
+      simulator.setGridType(gridType);
       simulator.setMass(mass);
-      // Adjust spacing for larger grids so they fit in view
-      const spacing = gridSize > 20 ? 0.2 : (gridSize > 10 ? 0.3 : 0.5);
-      simulator.setSpacing(spacing);
+      simulator.setSpacing(getSpacingForGridSize(gridSize));
       simulator.setStiffness(stiffness);
       simulator.setDamping(damping);
-      // Smaller timestep for larger grids to maintain stability
-      const dt = gridSize >= 50 ? 0.0005 : 0.001;
-      simulator.setTimestep(dt);
+      simulator.setTimestep(getTimestepForGridSize(gridSize));
 
       // Initialize
       simulator.initialize();
@@ -163,7 +183,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [gridSize, mass, stiffness, damping, wasmToVizState]);
+  }, [gridSize, gridType, mass, stiffness, damping, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -217,8 +237,9 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       lastTimeRef.current = currentTime;
 
       if (deltaTime > 0 && deltaTime < 0.1 && simulatorRef.current) {
-        // Calculate timestep based on grid size
-        const dt = gridSize >= 50 ? 0.0005 : 0.001;
+        // Use consistent timestep calculation
+        const dt = getTimestepForGridSize(gridSize);
+        // More steps per frame for large grids to compensate for smaller timestep
         const baseStepsPerFrame = gridSize >= 50 ? 10 : 5;
 
         // Run multiple physics steps for stability

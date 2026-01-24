@@ -253,6 +253,44 @@ export function Grid2DControlPanel({
             style={styles.slider}
           />
         </div>
+
+        <div style={styles.parameterControl}>
+          <label style={styles.parameterLabel}>
+            <span style={styles.parameterName}>Grid Type</span>
+            <span style={styles.parameterValue}>{gridType}</span>
+          </label>
+          <div style={styles.gridTypeGrid}>
+            <button
+              onClick={() => onGridTypeChange?.('quad')}
+              disabled={isInitialized}
+              className="touch-button"
+              style={{
+                ...styles.gridTypeButton,
+                ...(gridType === 'quad' ? styles.gridTypeButtonActive : {}),
+                ...(isInitialized ? styles.buttonDisabled : {}),
+              }}
+            >
+              Quad
+            </button>
+            <button
+              onClick={() => onGridTypeChange?.('triangle')}
+              disabled={isInitialized}
+              className="touch-button"
+              style={{
+                ...styles.gridTypeButton,
+                ...(gridType === 'triangle' ? styles.gridTypeButtonActive : {}),
+                ...(isInitialized ? styles.buttonDisabled : {}),
+              }}
+            >
+              Triangle
+            </button>
+          </div>
+          <p style={styles.infoTextSmall}>
+            {gridType === 'quad'
+              ? 'Horizontal + vertical springs'
+              : 'H + V + diagonal springs (more stable)'}
+          </p>
+        </div>
       </div>
 
       {/* Visualization Options */}
@@ -447,6 +485,12 @@ const styles = {
     width: '100%',
     cursor: 'pointer',
   },
+  gridTypeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '8px',
+    marginTop: '8px',
+  },
   gridTypeButton: {
     padding: '10px 16px',
     fontSize: '13px',
@@ -462,6 +506,12 @@ const styles = {
     borderColor: 'var(--accent-cyan)',
     backgroundColor: 'var(--accent-cyan)',
     color: '#fff',
+  },
+  infoTextSmall: {
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    marginTop: '6px',
+    fontStyle: 'italic' as const,
   },
   gridSizeGrid: {
     display: 'grid',
