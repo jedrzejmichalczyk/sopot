@@ -1,18 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import type { GridTopology } from '../types/sopot';
-
-// Constants for touch interaction and visualization
-const TOUCH_RADIUS_PX = 30; // pixels - hit detection radius for touch targets
-const TOUCH_FEEDBACK_DURATION_MS = 200; // milliseconds - visual feedback duration
-const PERTURB_STRENGTH_M = 0.2; // meters - vertical perturbation strength
-const CANVAS_PADDING_PX = 50; // pixels - padding around visualization area
-const MASS_RADIUS_NORMAL_PX = 4; // pixels - normal mass render radius
-const MASS_RADIUS_TOUCHED_PX = 6; // pixels - touched mass render radius
-const MASS_GLOW_RADIUS_NORMAL_PX = 8; // pixels - normal mass glow radius
-const MASS_GLOW_RADIUS_TOUCHED_PX = 12; // pixels - touched mass glow radius
-const MASS_GLOW_OPACITY_NORMAL = 0.3; // opacity for normal glow
-const MASS_GLOW_OPACITY_TOUCHED = 0.6; // opacity for touched glow
-const DIAGONAL_EDGE_OPACITY = 0.6; // opacity for diagonal edges in triangular grid
+import { useEffect, useRef, useState } from 'react';
 
 export interface Grid2DState {
   time: number;
@@ -20,18 +6,12 @@ export interface Grid2DState {
   cols: number;
   positions: Array<{ x: number; y: number }>; // Position of each mass
   velocities: Array<{ vx: number; vy: number }>; // Velocity of each mass
-  centerOfMass?: { x: number; y: number }; // Center of mass
-  kineticEnergy?: number; // Kinetic energy
-  potentialEnergy?: number; // Potential energy
-  totalEnergy?: number; // Total energy
 }
 
 interface Grid2DVisualizationProps {
   state: Grid2DState | null;
   showVelocities?: boolean;
   showGrid?: boolean;
-  gridType?: GridTopology;
-  onMassPerturb?: (row: number, col: number, dx: number, dy: number) => void;
 }
 
 /**
@@ -48,13 +28,10 @@ export function Grid2DVisualization({
   state,
   showVelocities = false,
   showGrid = true,
-  gridType = 'quad',
-  onMassPerturb,
 }: Grid2DVisualizationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [touchedMass, setTouchedMass] = useState<number | null>(null);
 
   // Handle canvas resizing
   useEffect(() => {
@@ -69,105 +46,6 @@ export function Grid2DVisualization({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
-
-  // Handle touch/click interaction with masses
-  const handleMassInteraction = useCallback((clientX: number, clientY: number) => {
-    if (!canvasRef.current || !state || !onMassPerturb) return;
-
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const canvasX = clientX - rect.left;
-    const canvasY = clientY - rect.top;
-
-    // Calculate scaling parameters (same as in rendering)
-    const positions = state.positions;
-    if (positions.length === 0) return;
-
-    const xs = positions.map((p) => p.x);
-    const ys = positions.map((p) => p.y);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
-
-    // Center of bounding box (for transformation)
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-
-    const padding = CANVAS_PADDING_PX;
-    const estimatedSpacing = Math.max(
-      (maxX - minX) / (state.cols - 1 || 1),
-      (maxY - minY) / (state.rows - 1 || 1)
-    ) || 0.5;
-
-    const rangeX = Math.max(maxX - minX, estimatedSpacing);
-    const rangeY = Math.max(maxY - minY, estimatedSpacing);
-    const scaleX = (dimensions.width - 2 * padding) / rangeX;
-    const scaleY = (dimensions.height - 2 * padding) / rangeY;
-    const scale = Math.min(scaleX, scaleY);
-
-    // Transform functions - center the view on the bounding box center
-    const canvasCenterX = dimensions.width / 2;
-    const canvasCenterY = dimensions.height / 2;
-    const toCanvasX = (x: number) => canvasCenterX + (x - centerX) * scale;
-    const toCanvasY = (y: number) => canvasCenterY - (y - centerY) * scale; // Flip Y axis
-
-    // Find closest mass
-    let closestIdx = -1;
-    let closestDist = Infinity;
-    const touchRadius = TOUCH_RADIUS_PX;
-
-    positions.forEach((pos, idx) => {
-      const massCanvasX = toCanvasX(pos.x);
-      const massCanvasY = toCanvasY(pos.y);
-      const dist = Math.sqrt(
-        Math.pow(canvasX - massCanvasX, 2) + Math.pow(canvasY - massCanvasY, 2)
-      );
-      if (dist < closestDist && dist < touchRadius) {
-        closestDist = dist;
-        closestIdx = idx;
-      }
-    });
-
-    if (closestIdx !== -1) {
-      // Convert index to row/col
-      const row = Math.floor(closestIdx / state.cols);
-      const col = closestIdx % state.cols;
-
-      // Apply upward perturbation
-      onMassPerturb(row, col, 0, PERTURB_STRENGTH_M);
-
-      // Visual feedback
-      setTouchedMass(closestIdx);
-      setTimeout(() => setTouchedMass(null), TOUCH_FEEDBACK_DURATION_MS);
-    }
-  }, [state, dimensions, onMassPerturb]);
-
-  // Touch event handlers
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !state) return;
-
-    const handleTouch = (e: TouchEvent) => {
-      e.preventDefault();
-      const touch = e.touches[0] || e.changedTouches[0];
-      if (touch) {
-        handleMassInteraction(touch.clientX, touch.clientY);
-      }
-    };
-
-    const handleClick = (e: MouseEvent) => {
-      handleMassInteraction(e.clientX, e.clientY);
-    };
-
-    canvas.addEventListener('touchstart', handleTouch, { passive: false });
-    canvas.addEventListener('click', handleClick);
-
-    return () => {
-      canvas.removeEventListener('touchstart', handleTouch);
-      canvas.removeEventListener('click', handleClick);
-    };
-  }, [handleMassInteraction, state]);
 
   // Render the grid
   useEffect(() => {
@@ -192,13 +70,8 @@ export function Grid2DVisualization({
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
-    // Use center of mass as the view center (NOT bounding box center)
-    // This keeps the CoM visually stationary on screen, as it should be in physics
-    const centerX = state.centerOfMass?.x ?? (minX + maxX) / 2;
-    const centerY = state.centerOfMass?.y ?? (minY + maxY) / 2;
-
     // Add padding
-    const padding = CANVAS_PADDING_PX;
+    const padding = 50;
 
     // Use grid-based fallback for better scaling when points are collinear
     // Estimate grid spacing from number of rows/cols
@@ -214,11 +87,10 @@ export function Grid2DVisualization({
     const scale = Math.min(scaleX, scaleY);
 
     // Transform from simulation coordinates to canvas coordinates
-    // Center the view on the CENTER OF MASS to keep it visually stationary
-    const canvasCenterX = dimensions.width / 2;
-    const canvasCenterY = dimensions.height / 2;
-    const toCanvasX = (x: number) => canvasCenterX + (x - centerX) * scale;
-    const toCanvasY = (y: number) => canvasCenterY - (y - centerY) * scale; // Flip Y axis
+    const toCanvasX = (x: number) =>
+      padding + (x - minX) * scale;
+    const toCanvasY = (y: number) =>
+      dimensions.height - (padding + (y - minY) * scale); // Flip Y axis
 
     // Draw grid edges (springs)
     if (showGrid) {
@@ -255,40 +127,6 @@ export function Grid2DVisualization({
           ctx.lineTo(toCanvasX(p2.x), toCanvasY(p2.y));
           ctx.stroke();
         }
-      }
-
-      // Diagonal edges (only for triangular grid)
-      if (gridType === 'triangle') {
-        ctx.strokeStyle = getCSSVariable('--bg-tertiary');
-        ctx.lineWidth = 1;
-        ctx.globalAlpha = DIAGONAL_EDGE_OPACITY; // Make diagonals slightly transparent
-
-        for (let r = 0; r < rows - 1; r++) {
-          for (let c = 0; c < cols - 1; c++) {
-            const idx_tl = r * cols + c;           // Top-left
-            const idx_tr = r * cols + c + 1;       // Top-right
-            const idx_bl = (r + 1) * cols + c;     // Bottom-left
-            const idx_br = (r + 1) * cols + c + 1; // Bottom-right
-
-            // Main diagonal (top-left to bottom-right)
-            const p_tl = positions[idx_tl];
-            const p_br = positions[idx_br];
-            ctx.beginPath();
-            ctx.moveTo(toCanvasX(p_tl.x), toCanvasY(p_tl.y));
-            ctx.lineTo(toCanvasX(p_br.x), toCanvasY(p_br.y));
-            ctx.stroke();
-
-            // Anti-diagonal (top-right to bottom-left)
-            const p_tr = positions[idx_tr];
-            const p_bl = positions[idx_bl];
-            ctx.beginPath();
-            ctx.moveTo(toCanvasX(p_tr.x), toCanvasY(p_tr.y));
-            ctx.lineTo(toCanvasX(p_bl.x), toCanvasY(p_bl.y));
-            ctx.stroke();
-          }
-        }
-
-        ctx.globalAlpha = 1.0; // Reset alpha
       }
     }
 
@@ -332,98 +170,38 @@ export function Grid2DVisualization({
     }
 
     // Draw masses as circles
-    positions.forEach((pos, idx) => {
+    positions.forEach((pos) => {
       const x = toCanvasX(pos.x);
       const y = toCanvasY(pos.y);
-      const isTouched = idx === touchedMass;
-
-      // Glow effect (larger if touched)
-      const redColor = getCSSVariable('--accent-red');
-      const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-      const opacity = isTouched ? MASS_GLOW_OPACITY_TOUCHED : MASS_GLOW_OPACITY_NORMAL;
-      if (rgb) {
-        ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, ${opacity})`;
-      } else {
-        ctx.fillStyle = `rgba(255, 59, 59, ${opacity})`;
-      }
-      ctx.beginPath();
-      const glowRadius = isTouched ? MASS_GLOW_RADIUS_TOUCHED_PX : MASS_GLOW_RADIUS_NORMAL_PX;
-      ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
-      ctx.fill();
 
       // Mass point
       ctx.fillStyle = getCSSVariable('--accent-red');
       ctx.beginPath();
-      const massRadius = isTouched ? MASS_RADIUS_TOUCHED_PX : MASS_RADIUS_NORMAL_PX;
-      ctx.arc(x, y, massRadius, 0, 2 * Math.PI);
+      ctx.arc(x, y, 4, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Glow effect (derive from red accent with transparency)
+      const redColor = getCSSVariable('--accent-red');
+      // Convert hex to rgba with 0.3 opacity
+      const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+      if (rgb) {
+        ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, 0.3)`;
+      } else {
+        ctx.fillStyle = 'rgba(255, 59, 59, 0.3)'; // Fallback
+      }
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, 2 * Math.PI);
       ctx.fill();
     });
 
-    // Draw center of mass with different color
-    if (state.centerOfMass) {
-      const comX = toCanvasX(state.centerOfMass.x);
-      const comY = toCanvasY(state.centerOfMass.y);
-
-      // Glow effect for center of mass (cyan color)
-      const cyanColor = getCSSVariable('--accent-cyan');
-      const cyanRgb = cyanColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
-      if (cyanRgb) {
-        ctx.fillStyle = `rgba(${parseInt(cyanRgb[1], 16)}, ${parseInt(cyanRgb[2], 16)}, ${parseInt(cyanRgb[3], 16)}, 0.4)`;
-      } else {
-        ctx.fillStyle = 'rgba(59, 174, 218, 0.4)';
-      }
-      ctx.beginPath();
-      ctx.arc(comX, comY, 12, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Center of mass point
-      ctx.fillStyle = getCSSVariable('--accent-cyan');
-      ctx.beginPath();
-      ctx.arc(comX, comY, 6, 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Add label
-      ctx.fillStyle = getCSSVariable('--text-primary');
-      ctx.font = '12px monospace';
-      ctx.fillText('CoM', comX + 10, comY - 10);
-    }
-
     // Draw time display
     ctx.fillStyle = getCSSVariable('--text-primary');
-    ctx.font = '14px monospace';
-    ctx.fillText(`t = ${state.time.toFixed(3)}s`, 10, 20);
+    ctx.font = '16px monospace';
+    ctx.fillText(`t = ${state.time.toFixed(3)}s`, 10, 25);
 
     // Draw grid info
-    ctx.fillText(`Grid: ${state.rows}×${state.cols}`, 10, 38);
-
-    // Draw grid topology indicator
-    const topologyLabel = gridType === 'triangle' ? 'Triangular' : 'Quadrilateral';
-    const topologyColor = gridType === 'triangle' ? '--accent-green' : '--text-secondary';
-    ctx.fillStyle = getCSSVariable(topologyColor);
-    ctx.fillText(`Type: ${topologyLabel}`, 10, 56);
-
-    // Draw energy info
-    if (state.totalEnergy !== undefined) {
-      const ke = state.kineticEnergy ?? 0;
-      const pe = state.potentialEnergy ?? 0;
-      const total = state.totalEnergy;
-
-      ctx.fillStyle = getCSSVariable('--accent-cyan');
-      ctx.fillText(`KE: ${ke.toFixed(3)} J`, 10, 74);
-
-      ctx.fillStyle = getCSSVariable('--accent-amber');
-      ctx.fillText(`PE: ${pe.toFixed(3)} J`, 10, 92);
-
-      ctx.fillStyle = getCSSVariable('--accent-green');
-      ctx.fillText(`E:  ${total.toFixed(3)} J`, 10, 110);
-    }
-
-    // Draw center of mass coordinates (should be constant with no external forces)
-    if (state.centerOfMass) {
-      ctx.fillStyle = getCSSVariable('--accent-cyan');
-      ctx.fillText(`CoM: (${state.centerOfMass.x.toFixed(3)}, ${state.centerOfMass.y.toFixed(3)})`, 10, 128);
-    }
-  }, [state, dimensions, showVelocities, showGrid, gridType, touchedMass]);
+    ctx.fillText(`Grid: ${state.rows}×${state.cols}`, 10, 45);
+  }, [state, dimensions, showVelocities, showGrid]);
 
   return (
     <div ref={containerRef} style={styles.container}>

@@ -177,8 +177,6 @@ function App() {
             state={gridSim.currentState}
             showVelocities={showVelocities}
             showGrid={showGrid}
-            gridType={gridSim.gridType}
-            onMassPerturb={gridSim.perturbMass}
           />
         );
       }
@@ -192,7 +190,6 @@ function App() {
             visualizationData={pendulumSim.visualizationData}
             showTelemetry={true}
             showForceArrow={true}
-            onApplyImpulse={pendulumSim.applyDisturbance}
           />
         );
       }
@@ -295,14 +292,6 @@ function App() {
                   showGrid={showGrid}
                   onShowVelocitiesChange={setShowVelocities}
                   onShowGridChange={setShowGrid}
-                  mass={gridSim.mass}
-                  stiffness={gridSim.stiffness}
-                  damping={gridSim.damping}
-                  gridType={gridSim.gridType}
-                  onMassChange={gridSim.setMass}
-                  onStiffnessChange={gridSim.setStiffness}
-                  onDampingChange={gridSim.setDamping}
-                  onGridTypeChange={gridSim.setGridType}
                 />
               ) : (
                 <InvertedPendulumControlPanel
@@ -313,15 +302,7 @@ function App() {
                   controllerEnabled={pendulumSim.controllerEnabled}
                   playbackSpeed={pendulumSim.playbackSpeed}
                   lqrGains={pendulumSim.getLQRGains()}
-                  onInitialize={(t1, t2) => pendulumSim.initialize(
-                    /* cartMass */ undefined,
-                    /* m1 */ undefined,
-                    /* m2 */ undefined,
-                    /* L1 */ undefined,
-                    /* L2 */ undefined,
-                    t1,
-                    t2
-                  )}
+                  onInitialize={(t1, t2) => pendulumSim.initialize(undefined, undefined, undefined, undefined, undefined, t1, t2)}
                   onStart={pendulumSim.start}
                   onPause={pendulumSim.pause}
                   onReset={pendulumSim.reset}
@@ -459,14 +440,6 @@ function App() {
                 showGrid={showGrid}
                 onShowVelocitiesChange={setShowVelocities}
                 onShowGridChange={setShowGrid}
-                mass={gridSim.mass}
-                stiffness={gridSim.stiffness}
-                damping={gridSim.damping}
-                gridType={gridSim.gridType}
-                onMassChange={gridSim.setMass}
-                onStiffnessChange={gridSim.setStiffness}
-                onDampingChange={gridSim.setDamping}
-                onGridTypeChange={gridSim.setGridType}
               />
             ) : (
               <InvertedPendulumControlPanel
@@ -477,15 +450,7 @@ function App() {
                 controllerEnabled={pendulumSim.controllerEnabled}
                 playbackSpeed={pendulumSim.playbackSpeed}
                 lqrGains={pendulumSim.getLQRGains()}
-                onInitialize={(t1, t2) => pendulumSim.initialize(
-                  /* cartMass */ undefined,
-                  /* m1 */ undefined,
-                  /* m2 */ undefined,
-                  /* L1 */ undefined,
-                  /* L2 */ undefined,
-                  t1,
-                  t2
-                )}
+                onInitialize={(t1, t2) => pendulumSim.initialize(undefined, undefined, undefined, undefined, undefined, t1, t2)}
                 onStart={pendulumSim.start}
                 onPause={pendulumSim.pause}
                 onReset={pendulumSim.reset}

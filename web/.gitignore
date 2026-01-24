@@ -31,7 +31,3 @@ yarn-error.log*
 # Playwright
 playwright-report/
 test-results/
-
-# WebAssembly build outputs (copied from ../wasm/)
-public/sopot.js
-public/sopot.wasm

@@ -13,11 +13,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Include directories (SOPOT is header-only)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
-# Source files - rocket, grid2d, and inverted pendulum in single module
+# Source files - both rocket and grid2d in single module
 set(SOURCES
     wasm_rocket.cpp
     wasm_grid2d.cpp
-    wasm_inverted_pendulum.cpp
 )
 
 # Emscripten-specific compiler flags

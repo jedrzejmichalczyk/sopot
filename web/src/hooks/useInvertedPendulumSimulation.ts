@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { SopotModule } from '../types/sopot';
 import type { PendulumState, PendulumVisualizationData } from '../components/InvertedPendulumVisualization';
-import { loadSopotWasmModule } from '../utils/wasmLoader';
 
 /**
  * Interface for the InvertedPendulumSimulator from WASM
@@ -112,8 +111,28 @@ export function useInvertedPendulumSimulation() {
       try {
         console.log('[Pendulum] Loading WASM module...');
 
-        // Load the SOPOT WebAssembly module
-        const module = await loadSopotWasmModule();
+        // Use base URL to handle GitHub Pages deployment path
+        const basePath = import.meta.env.BASE_URL || '/';
+        const moduleUrl = `${basePath}sopot.js`;
+
+        console.log(`[Pendulum] Loading from: ${moduleUrl}`);
+
+        // Fetch the module and create a blob URL to bypass Vite's transform
+        const response = await fetch(moduleUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${moduleUrl}: ${response.status}`);
+        }
+        const moduleText = await response.text();
+        const blob = new Blob([moduleText], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        // @ts-ignore - Dynamic import of WebAssembly
+        const createSopotModule = await import(/* @vite-ignore */ blobUrl);
+        URL.revokeObjectURL(blobUrl);
+
+        if (!mounted) return;
+
+        const module = await createSopotModule.default();
 
         if (!mounted) return;
 
@@ -198,8 +217,8 @@ export function useInvertedPendulumSimulation() {
           cartMass ?? 1.0,
           m1 ?? 0.5,
           m2 ?? 0.5,
-          L1 ?? 0.7,
-          L2 ?? 0.7,
+          L1 ?? 0.5,
+          L2 ?? 0.5,
           9.81
         );
       }

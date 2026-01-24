@@ -35,6 +35,7 @@ private:
     double m_initial_position;
     double m_initial_velocity;
     std::string m_name;
+    mutable size_t m_offset{0};
 
 public:
     PointMass(
@@ -50,6 +51,8 @@ public:
             throw std::invalid_argument("Mass must be positive");
         }
     }
+
+    void setOffset(size_t off) const { m_offset = off; }
 
     //=========================================================================
     // Required Component Interface
@@ -88,11 +91,11 @@ public:
     //=========================================================================
 
     T compute(typename TagSet::Position, std::span<const T> state) const {
-        return this->getGlobalState(state, 0);
+        return state[m_offset];
     }
 
     T compute(typename TagSet::Velocity, std::span<const T> state) const {
-        return this->getGlobalState(state, 1);
+        return state[m_offset + 1];
     }
 
     T compute(typename TagSet::Mass, [[maybe_unused]] std::span<const T> state) const {
