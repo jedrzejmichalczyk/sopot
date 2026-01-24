@@ -189,8 +189,8 @@ export interface Grid2DSimulator {
   getState(): Grid2DWasmState;
   getMassPosition(row: number, col: number): { x: number; y: number };
   getKineticEnergy(): number;
-  getPotentialEnergy?(): number;  // Optional
-  getTotalEnergy?(): number;      // Optional
+  getPotentialEnergy(): number;
+  getTotalEnergy(): number;
   getCenterOfMass(): { x: number; y: number };
   getTotalMomentum(): { px: number; py: number };
   getSystemInfo?(): Grid2DSystemInfo;  // System info for debugging

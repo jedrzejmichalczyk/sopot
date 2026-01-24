@@ -136,9 +136,8 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
     // Get center of mass and energy values
     const centerOfMass = simulator.getCenterOfMass();
     const kineticEnergy = simulator.getKineticEnergy();
-    // potentialEnergy and totalEnergy may not exist in new implementation
-    const potentialEnergy = simulator.getPotentialEnergy?.() ?? 0;
-    const totalEnergy = simulator.getTotalEnergy?.() ?? kineticEnergy;
+    const potentialEnergy = simulator.getPotentialEnergy();
+    const totalEnergy = simulator.getTotalEnergy();
 
     return {
       time: wasmState.time,

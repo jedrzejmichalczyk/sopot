@@ -878,6 +878,67 @@ public:
         return ke;
     }
 
+    double getPotentialEnergy() const {
+        if (!m_initialized) return 0.0;
+
+        double pe = 0.0;
+        double diagonal_length = std::sqrt(2.0) * m_spacing;
+
+        // Helper to compute spring PE between two mass indices
+        auto spring_pe = [&](size_t i, size_t j, double rest_length) {
+            double x1 = m_state[i * 6 + 0];
+            double y1 = m_state[i * 6 + 1];
+            double x2 = m_state[j * 6 + 0];
+            double y2 = m_state[j * 6 + 1];
+            double dx = x2 - x1;
+            double dy = y2 - y1;
+            double dist = std::sqrt(dx*dx + dy*dy);
+            double stretch = dist - rest_length;
+            return 0.5 * m_stiffness * stretch * stretch;
+        };
+
+        // Horizontal springs: (r, c) to (r, c+1)
+        for (size_t r = 0; r < m_rows; ++r) {
+            for (size_t c = 0; c < m_cols - 1; ++c) {
+                size_t i = r * m_cols + c;
+                size_t j = r * m_cols + c + 1;
+                pe += spring_pe(i, j, m_spacing);
+            }
+        }
+
+        // Vertical springs: (r, c) to (r+1, c)
+        for (size_t r = 0; r < m_rows - 1; ++r) {
+            for (size_t c = 0; c < m_cols; ++c) {
+                size_t i = r * m_cols + c;
+                size_t j = (r + 1) * m_cols + c;
+                pe += spring_pe(i, j, m_spacing);
+            }
+        }
+
+        // Diagonal springs (triangle grid only)
+        if (m_grid_type == GridType::Triangle) {
+            for (size_t r = 0; r < m_rows - 1; ++r) {
+                for (size_t c = 0; c < m_cols - 1; ++c) {
+                    // Main diagonal: (r, c) to (r+1, c+1)
+                    size_t i1 = r * m_cols + c;
+                    size_t j1 = (r + 1) * m_cols + c + 1;
+                    pe += spring_pe(i1, j1, diagonal_length);
+
+                    // Anti-diagonal: (r, c+1) to (r+1, c)
+                    size_t i2 = r * m_cols + c + 1;
+                    size_t j2 = (r + 1) * m_cols + c;
+                    pe += spring_pe(i2, j2, diagonal_length);
+                }
+            }
+        }
+
+        return pe;
+    }
+
+    double getTotalEnergy() const {
+        return getKineticEnergy() + getPotentialEnergy();
+    }
+
     val getCenterOfMass() const {
         val result = val::object();
         if (!m_initialized) {
@@ -994,6 +1055,8 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
         .function("getState", &Grid2DSimulator::getState)
         .function("getMassPosition", &Grid2DSimulator::getMassPosition)
         .function("getKineticEnergy", &Grid2DSimulator::getKineticEnergy)
+        .function("getPotentialEnergy", &Grid2DSimulator::getPotentialEnergy)
+        .function("getTotalEnergy", &Grid2DSimulator::getTotalEnergy)
         .function("getCenterOfMass", &Grid2DSimulator::getCenterOfMass)
         .function("getTotalMomentum", &Grid2DSimulator::getTotalMomentum)
         .function("getSystemInfo", &Grid2DSimulator::getSystemInfo);
