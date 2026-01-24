@@ -1,6 +1,6 @@
-import type { GridTopology } from '../types/sopot';
+import type { GridTopology, IntegratorType } from '../types/sopot';
 import type { GridSize } from '../hooks/useGrid2DSimulation';
-import { SUPPORTED_GRID_SIZES } from '../hooks/useGrid2DSimulation';
+import { SUPPORTED_GRID_SIZES, SUPPORTED_INTEGRATORS, INTEGRATOR_LABELS } from '../hooks/useGrid2DSimulation';
 
 interface Grid2DControlPanelProps {
   isReady: boolean;
@@ -27,10 +27,12 @@ interface Grid2DControlPanelProps {
   stiffness?: number;
   damping?: number;
   gridType?: GridTopology;
+  integrator?: IntegratorType;
   onMassChange?: (mass: number) => void;
   onStiffnessChange?: (stiffness: number) => void;
   onDampingChange?: (damping: number) => void;
   onGridTypeChange?: (gridType: GridTopology) => void;
+  onIntegratorChange?: (integrator: IntegratorType) => void;
 }
 
 export function Grid2DControlPanel({
@@ -55,10 +57,12 @@ export function Grid2DControlPanel({
   stiffness = 100.0,
   damping = 1.0,
   gridType = 'quad',
+  integrator = 'rk4',
   onMassChange,
   onStiffnessChange,
   onDampingChange,
   onGridTypeChange,
+  onIntegratorChange,
 }: Grid2DControlPanelProps) {
   const playbackSpeeds = [0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
 
@@ -289,6 +293,37 @@ export function Grid2DControlPanel({
             {gridType === 'quad'
               ? 'Horizontal + vertical springs'
               : 'H + V + diagonal springs (more stable)'}
+          </p>
+        </div>
+
+        <div style={styles.parameterControl}>
+          <label style={styles.parameterLabel}>
+            <span style={styles.parameterName}>Integrator</span>
+            <span style={styles.parameterValue}>{INTEGRATOR_LABELS[integrator]}</span>
+          </label>
+          <div style={styles.integratorGrid}>
+            {SUPPORTED_INTEGRATORS.map((integ) => (
+              <button
+                key={integ}
+                onClick={() => onIntegratorChange?.(integ)}
+                disabled={isInitialized}
+                className="touch-button"
+                style={{
+                  ...styles.integratorButton,
+                  ...(integrator === integ ? styles.integratorButtonActive : {}),
+                  ...(isInitialized ? styles.buttonDisabled : {}),
+                }}
+              >
+                {integ === 'rk4' ? 'RK4' : integ === 'symplectic' ? 'Symplectic' : 'Semi-Implicit'}
+              </button>
+            ))}
+          </div>
+          <p style={styles.infoTextSmall}>
+            {integrator === 'rk4'
+              ? 'High accuracy, 4 derivative evals/step'
+              : integrator === 'symplectic'
+              ? 'Energy-preserving, best for undamped systems'
+              : 'Stable for stiff/damped systems'}
           </p>
         </div>
       </div>
@@ -531,6 +566,28 @@ const styles = {
     transition: 'all 0.2s ease',
   },
   gridSizeButtonActive: {
+    borderColor: 'var(--accent-cyan)',
+    backgroundColor: 'var(--accent-cyan)',
+    color: '#fff',
+  },
+  integratorGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  integratorButton: {
+    padding: '10px 8px',
+    fontSize: '11px',
+    fontWeight: 'bold' as const,
+    border: '2px solid var(--bg-tertiary)',
+    borderRadius: '4px',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  integratorButtonActive: {
     borderColor: 'var(--accent-cyan)',
     backgroundColor: 'var(--accent-cyan)',
     color: '#fff',

@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { SopotModule, Grid2DSimulator, GridTopology } from '../types/sopot';
+import type { SopotModule, Grid2DSimulator, GridTopology, IntegratorType } from '../types/sopot';
 import type { Grid2DState } from '../components/Grid2DVisualization';
 import { loadSopotWasmModule } from '../utils/wasmLoader';
 
 // Supported grid sizes (must match WASM implementation)
 export type GridSize = 5 | 10 | 20 | 50 | 100;
 export const SUPPORTED_GRID_SIZES: GridSize[] = [5, 10, 20, 50, 100];
+
+// Supported integrators
+export const SUPPORTED_INTEGRATORS: IntegratorType[] = ['rk4', 'symplectic', 'semiimplicit'];
+export const INTEGRATOR_LABELS: Record<IntegratorType, string> = {
+  'rk4': 'RK4 (Accurate)',
+  'symplectic': 'Symplectic (Energy-preserving)',
+  'semiimplicit': 'Semi-implicit (Stable)',
+};
 
 // Physics tuning constants for different grid sizes
 const TIMESTEP_LARGE_GRID = 0.0005;  // For grids >= 50x50 (stability)
@@ -60,6 +68,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
   const [stiffness, setStiffness] = useState(100.0);
   const [damping, setDamping] = useState(1.0);
   const [gridType, setGridType] = useState<GridTopology>('quad');
+  const [integrator, setIntegrator] = useState<IntegratorType>('rk4');
 
   // Load WASM module (same approach as useRocketSimulation)
   useEffect(() => {
@@ -154,6 +163,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       // Configure grid - using new unified graph architecture
       simulator.setGridSize(gridSize, gridSize);
       simulator.setGridType(gridType);
+      simulator.setIntegrator(integrator);
       simulator.setMass(mass);
       simulator.setSpacing(getSpacingForGridSize(gridSize));
       simulator.setStiffness(stiffness);
@@ -183,7 +193,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [gridSize, gridType, mass, stiffness, damping, wasmToVizState]);
+  }, [gridSize, gridType, integrator, mass, stiffness, damping, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -310,6 +320,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
     stiffness,
     damping,
     gridType,
+    integrator,
     initialize,
     start,
     pause,
@@ -321,6 +332,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
     setStiffness,
     setDamping,
     setGridType,
+    setIntegrator,
     perturbMass,
   };
 }

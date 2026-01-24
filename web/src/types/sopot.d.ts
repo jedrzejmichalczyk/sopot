@@ -126,6 +126,14 @@ export interface Grid2DWasmState {
 export type GridTopology = 'quad' | 'triangle';
 
 /**
+ * Integrator type - determines the numerical integration method
+ * - 'rk4': 4th-order Runge-Kutta (default) - highest accuracy, 4 derivative evals/step
+ * - 'symplectic': Symplectic Euler - energy-preserving, best for long undamped simulations
+ * - 'semiimplicit': Semi-implicit Euler - stable for stiff/damped systems
+ */
+export type IntegratorType = 'rk4' | 'symplectic' | 'semiimplicit';
+
+/**
  * System info returned by getSystemInfo()
  */
 export interface Grid2DSystemInfo {
@@ -135,6 +143,7 @@ export interface Grid2DSystemInfo {
   numSprings: number;
   stateSize: number;
   gridType: GridTopology;
+  integrator: IntegratorType;
   architecture: string;
 }
 
@@ -143,6 +152,8 @@ export interface Grid2DSimulator {
   setGridSize(rows: number, cols: number): void;
   setGridType(gridType: GridTopology): void;
   getGridType(): GridTopology;
+  setIntegrator(integrator: IntegratorType): void;
+  getIntegrator(): IntegratorType;
   setMass(mass: number): void;
   setSpacing(spacing: number): void;
   setStiffness(stiffness: number): void;

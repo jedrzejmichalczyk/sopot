@@ -56,6 +56,12 @@ using GridSystem = ValidatedSystem<double, Topology, MassType, SpringType>;
 // Grid type enumeration (exposed to JavaScript)
 enum class GridType { Quad, Triangle };
 
+// Integrator type enumeration (exposed to JavaScript)
+// - RK4: 4th-order Runge-Kutta, high accuracy, good for validation
+// - SymplecticEuler: 1st-order symplectic, preserves energy over long runs
+// - SemiImplicitEuler: 1st-order, stable for stiff/damped systems
+enum class Integrator { RK4, SymplecticEuler, SemiImplicitEuler };
+
 // =============================================================================
 // GRID SIMULATOR
 // =============================================================================
@@ -76,6 +82,7 @@ private:
     double m_stiffness{100.0};
     double m_damping{1.0};
     GridType m_grid_type{GridType::Quad};
+    Integrator m_integrator{Integrator::RK4};
 
     // Simulation state
     std::vector<double> m_state;
@@ -120,6 +127,72 @@ private:
 
         for (size_t i = 0; i < n; ++i) {
             m_state[i] += (dt / 6.0) * (k1[i] + 2.0*k2[i] + 2.0*k3[i] + k4[i]);
+        }
+
+        m_time += dt;
+    }
+
+    /**
+     * Symplectic Euler integrator (position-first variant)
+     *
+     * Updates position first, then velocity using the new position.
+     * This preserves the symplectic structure of Hamiltonian systems,
+     * meaning energy is conserved over long simulations (no drift).
+     *
+     * Order: 1st order
+     * Best for: Undamped or lightly damped oscillatory systems
+     */
+    template<typename System>
+    void symplecticEulerStep(System& system, double dt) {
+        const size_t num_masses = m_rows * m_cols;
+
+        // Get accelerations at current positions
+        auto derivs = system.computeDerivatives(m_time, m_state);
+
+        // Update positions first: x_{n+1} = x_n + dt * v_n
+        for (size_t i = 0; i < num_masses; ++i) {
+            m_state[i * 4 + 0] += dt * m_state[i * 4 + 2];  // x += dt * vx
+            m_state[i * 4 + 1] += dt * m_state[i * 4 + 3];  // y += dt * vy
+        }
+
+        // Get accelerations at NEW positions
+        auto derivs_new = system.computeDerivatives(m_time + dt, m_state);
+
+        // Update velocities: v_{n+1} = v_n + dt * a(x_{n+1})
+        for (size_t i = 0; i < num_masses; ++i) {
+            m_state[i * 4 + 2] += dt * derivs_new[i * 4 + 2];  // vx += dt * ax
+            m_state[i * 4 + 3] += dt * derivs_new[i * 4 + 3];  // vy += dt * ay
+        }
+
+        m_time += dt;
+    }
+
+    /**
+     * Semi-implicit Euler integrator (velocity-first variant)
+     *
+     * Updates velocity first, then position using the new velocity.
+     * More stable than explicit Euler for stiff systems with damping.
+     *
+     * Order: 1st order
+     * Best for: Damped systems, stiff springs
+     */
+    template<typename System>
+    void semiImplicitEulerStep(System& system, double dt) {
+        const size_t num_masses = m_rows * m_cols;
+
+        // Get accelerations at current state
+        auto derivs = system.computeDerivatives(m_time, m_state);
+
+        // Update velocities first: v_{n+1} = v_n + dt * a(x_n, v_n)
+        for (size_t i = 0; i < num_masses; ++i) {
+            m_state[i * 4 + 2] += dt * derivs[i * 4 + 2];  // vx += dt * ax
+            m_state[i * 4 + 3] += dt * derivs[i * 4 + 3];  // vy += dt * ay
+        }
+
+        // Update positions using NEW velocities: x_{n+1} = x_n + dt * v_{n+1}
+        for (size_t i = 0; i < num_masses; ++i) {
+            m_state[i * 4 + 0] += dt * m_state[i * 4 + 2];  // x += dt * vx_new
+            m_state[i * 4 + 1] += dt * m_state[i * 4 + 3];  // y += dt * vy_new
         }
 
         m_time += dt;
@@ -259,22 +332,38 @@ private:
         }
     }
 
+    // Helper to step a specific system with the selected integrator
+    template<typename System>
+    void stepWithIntegrator(System& system, double dt) {
+        switch (m_integrator) {
+            case Integrator::RK4:
+                rk4Step(system, dt);
+                break;
+            case Integrator::SymplecticEuler:
+                symplecticEulerStep(system, dt);
+                break;
+            case Integrator::SemiImplicitEuler:
+                semiImplicitEulerStep(system, dt);
+                break;
+        }
+    }
+
     void stepSystem() {
         if (m_grid_type == GridType::Quad) {
             switch (m_grid_size) {
-                case GridSize::G5:   rk4Step(*m_quad_5, m_dt); break;
-                case GridSize::G10:  rk4Step(*m_quad_10, m_dt); break;
-                case GridSize::G20:  rk4Step(*m_quad_20, m_dt); break;
-                case GridSize::G50:  rk4Step(*m_quad_50, m_dt); break;
-                case GridSize::G100: rk4Step(*m_quad_100, m_dt); break;
+                case GridSize::G5:   stepWithIntegrator(*m_quad_5, m_dt); break;
+                case GridSize::G10:  stepWithIntegrator(*m_quad_10, m_dt); break;
+                case GridSize::G20:  stepWithIntegrator(*m_quad_20, m_dt); break;
+                case GridSize::G50:  stepWithIntegrator(*m_quad_50, m_dt); break;
+                case GridSize::G100: stepWithIntegrator(*m_quad_100, m_dt); break;
             }
         } else {
             switch (m_grid_size) {
-                case GridSize::G5:   rk4Step(*m_triangle_5, m_dt); break;
-                case GridSize::G10:  rk4Step(*m_triangle_10, m_dt); break;
-                case GridSize::G20:  rk4Step(*m_triangle_20, m_dt); break;
-                case GridSize::G50:  rk4Step(*m_triangle_50, m_dt); break;
-                case GridSize::G100: rk4Step(*m_triangle_100, m_dt); break;
+                case GridSize::G5:   stepWithIntegrator(*m_triangle_5, m_dt); break;
+                case GridSize::G10:  stepWithIntegrator(*m_triangle_10, m_dt); break;
+                case GridSize::G20:  stepWithIntegrator(*m_triangle_20, m_dt); break;
+                case GridSize::G50:  stepWithIntegrator(*m_triangle_50, m_dt); break;
+                case GridSize::G100: stepWithIntegrator(*m_triangle_100, m_dt); break;
             }
         }
     }
@@ -329,6 +418,36 @@ public:
 
     std::string getGridType() const {
         return m_grid_type == GridType::Quad ? "quad" : "triangle";
+    }
+
+    /**
+     * Set integrator type: "rk4", "symplectic", or "semiimplicit"
+     *
+     * - rk4: 4th-order Runge-Kutta (default) - highest accuracy
+     * - symplectic: Symplectic Euler - energy-preserving for long runs
+     * - semiimplicit: Semi-implicit Euler - stable for damped systems
+     *
+     * Can be changed at any time during simulation.
+     */
+    void setIntegrator(const std::string& type) {
+        if (type == "rk4") {
+            m_integrator = Integrator::RK4;
+        } else if (type == "symplectic") {
+            m_integrator = Integrator::SymplecticEuler;
+        } else if (type == "semiimplicit") {
+            m_integrator = Integrator::SemiImplicitEuler;
+        } else {
+            throw std::runtime_error("Integrator must be 'rk4', 'symplectic', or 'semiimplicit'");
+        }
+    }
+
+    std::string getIntegrator() const {
+        switch (m_integrator) {
+            case Integrator::RK4: return "rk4";
+            case Integrator::SymplecticEuler: return "symplectic";
+            case Integrator::SemiImplicitEuler: return "semiimplicit";
+            default: return "rk4";
+        }
     }
 
     //=========================================================================
@@ -536,6 +655,7 @@ public:
         result.set("numSprings", static_cast<int>(h_springs + v_springs + d_springs));
         result.set("stateSize", static_cast<int>(m_state.size()));
         result.set("gridType", getGridType());
+        result.set("integrator", getIntegrator());
         result.set("architecture", std::string("Unified Graph (O(K) templates)"));
         return result;
     }
@@ -553,6 +673,8 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
         .function("setGridSize", &Grid2DSimulator::setGridSize)
         .function("setGridType", &Grid2DSimulator::setGridType)
         .function("getGridType", &Grid2DSimulator::getGridType)
+        .function("setIntegrator", &Grid2DSimulator::setIntegrator)
+        .function("getIntegrator", &Grid2DSimulator::getIntegrator)
         .function("setMass", &Grid2DSimulator::setMass)
         .function("setSpacing", &Grid2DSimulator::setSpacing)
         .function("setStiffness", &Grid2DSimulator::setStiffness)
