@@ -45,6 +45,12 @@ else()
     # Note: With algorithmic optimizations, template depth rarely exceeds 50 levels,
     # so this limit is very conservative. Previously needed for O(N) recursive patterns.
 
+    # macOS linker workaround: reduce symbol visibility to avoid symbol name length limits
+    # The ld64 linker has a maximum symbol name length (affects deeply nested templates)
+    if(APPLE)
+        add_compile_options(-fvisibility=hidden -fvisibility-inlines-hidden)
+    endif()
+
     # Optional: Enable compilation time tracing (Clang only)
     # Uncomment to generate time-trace JSON files for analysis
     # add_compile_options($<$<CXX_COMPILER_ID:Clang>:-ftime-trace>)
