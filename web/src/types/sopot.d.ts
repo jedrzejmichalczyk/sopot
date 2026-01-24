@@ -159,6 +159,8 @@ export interface Grid2DSimulator {
   setStiffness(stiffness: number): void;
   setDamping(damping: number): void;
   setTimestep(dt: number): void;
+  setRadius?(radius: number): void;  // Mass radius for rotational dynamics
+  getRadius?(): number;
   // Repulsion (collision avoidance)
   setRepulsion(minDistance: number, repulsionStiffness?: number): void;
   getMinDistance(): number;
@@ -174,7 +176,7 @@ export interface Grid2DSimulator {
   // Simulation
   step(): void;
   stepWithDt(dt: number): void;
-  stepMultiple?(count: number): void;  // New: run multiple steps efficiently
+  stepMultiple?(count: number): void;  // Run multiple steps efficiently
 
   // State queries
   getTime(): number;
@@ -183,6 +185,7 @@ export interface Grid2DSimulator {
   isInitialized(): boolean;
   getPositions(): number[];
   getVelocities(): number[];
+  getAngularVelocities(): number[];  // Angular velocities (ω) for each mass
   getState(): Grid2DWasmState;
   getMassPosition(row: number, col: number): { x: number; y: number };
   getKineticEnergy(): number;
@@ -190,7 +193,7 @@ export interface Grid2DSimulator {
   getTotalEnergy?(): number;      // Optional
   getCenterOfMass(): { x: number; y: number };
   getTotalMomentum(): { px: number; py: number };
-  getSystemInfo?(): Grid2DSystemInfo;  // New: system info for debugging
+  getSystemInfo?(): Grid2DSystemInfo;  // System info for debugging
 }
 
 /**

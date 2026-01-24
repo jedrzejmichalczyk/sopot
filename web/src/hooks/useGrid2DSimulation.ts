@@ -129,6 +129,10 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       });
     }
 
+    // Get angular velocities for rotational visualization
+    const angularVelocitiesRaw = simulator.getAngularVelocities();
+    const angularVelocities = Array.from(angularVelocitiesRaw);
+
     // Get center of mass and energy values
     const centerOfMass = simulator.getCenterOfMass();
     const kineticEnergy = simulator.getKineticEnergy();
@@ -142,6 +146,7 @@ export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
       cols: wasmState.cols,
       positions,
       velocities,
+      angularVelocities,
       centerOfMass,
       kineticEnergy,
       potentialEnergy,
