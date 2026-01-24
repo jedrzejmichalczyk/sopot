@@ -1,6 +1,6 @@
-import type { GridTopology } from '../types/sopot';
+import type { GridTopology, IntegratorType } from '../types/sopot';
 import type { GridSize } from '../hooks/useGrid2DSimulation';
-import { SUPPORTED_GRID_SIZES } from '../hooks/useGrid2DSimulation';
+import { SUPPORTED_GRID_SIZES, SUPPORTED_INTEGRATORS, INTEGRATOR_LABELS } from '../hooks/useGrid2DSimulation';
 
 interface Grid2DControlPanelProps {
   isReady: boolean;
@@ -27,10 +27,16 @@ interface Grid2DControlPanelProps {
   stiffness?: number;
   damping?: number;
   gridType?: GridTopology;
+  integrator?: IntegratorType;
+  repulsionEnabled?: boolean;
+  minDistance?: number;
   onMassChange?: (mass: number) => void;
   onStiffnessChange?: (stiffness: number) => void;
   onDampingChange?: (damping: number) => void;
   onGridTypeChange?: (gridType: GridTopology) => void;
+  onIntegratorChange?: (integrator: IntegratorType) => void;
+  onRepulsionEnabledChange?: (enabled: boolean) => void;
+  onMinDistanceChange?: (distance: number) => void;
 }
 
 export function Grid2DControlPanel({
@@ -55,10 +61,16 @@ export function Grid2DControlPanel({
   stiffness = 100.0,
   damping = 1.0,
   gridType = 'quad',
+  integrator = 'rk4',
+  repulsionEnabled = false,
+  minDistance = 0.05,
   onMassChange,
   onStiffnessChange,
   onDampingChange,
   onGridTypeChange,
+  onIntegratorChange,
+  onRepulsionEnabledChange,
+  onMinDistanceChange,
 }: Grid2DControlPanelProps) {
   const playbackSpeeds = [0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
 
@@ -290,6 +302,71 @@ export function Grid2DControlPanel({
               ? 'Horizontal + vertical springs'
               : 'H + V + diagonal springs (more stable)'}
           </p>
+        </div>
+
+        <div style={styles.parameterControl}>
+          <label style={styles.parameterLabel}>
+            <span style={styles.parameterName}>Integrator</span>
+            <span style={styles.parameterValue}>{INTEGRATOR_LABELS[integrator]}</span>
+          </label>
+          <div style={styles.integratorGrid}>
+            {SUPPORTED_INTEGRATORS.map((integ) => (
+              <button
+                key={integ}
+                onClick={() => onIntegratorChange?.(integ)}
+                disabled={isInitialized}
+                className="touch-button"
+                style={{
+                  ...styles.integratorButton,
+                  ...(integrator === integ ? styles.integratorButtonActive : {}),
+                  ...(isInitialized ? styles.buttonDisabled : {}),
+                }}
+              >
+                {integ === 'rk4' ? 'RK4' : integ === 'symplectic' ? 'Symplectic' : 'Verlet'}
+              </button>
+            ))}
+          </div>
+          <p style={styles.infoTextSmall}>
+            {integrator === 'rk4'
+              ? '4th order, highest accuracy, 4 evals/step'
+              : integrator === 'symplectic'
+              ? '1st order symplectic, bounded energy error'
+              : '2nd order symplectic, excellent energy conservation'}
+          </p>
+        </div>
+
+        <div style={styles.parameterControl}>
+          <label style={styles.checkboxLabel}>
+            <input
+              type="checkbox"
+              checked={repulsionEnabled}
+              onChange={(e) => onRepulsionEnabledChange?.(e.target.checked)}
+              disabled={isInitialized}
+              style={styles.checkbox}
+            />
+            <span style={styles.checkboxText}>Enable Repulsion (Collision Avoidance)</span>
+          </label>
+          {repulsionEnabled && (
+            <>
+              <label style={styles.parameterLabel}>
+                <span style={styles.parameterName}>Min Distance (m)</span>
+                <span style={styles.parameterValue}>{minDistance.toFixed(3)}</span>
+              </label>
+              <input
+                type="range"
+                min="0.01"
+                max="0.2"
+                step="0.005"
+                value={minDistance}
+                onChange={(e) => onMinDistanceChange?.(parseFloat(e.target.value))}
+                disabled={isInitialized}
+                style={styles.slider}
+              />
+              <p style={styles.infoTextSmall}>
+                Steep repulsive force activates when masses get closer than this distance
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -531,6 +608,28 @@ const styles = {
     transition: 'all 0.2s ease',
   },
   gridSizeButtonActive: {
+    borderColor: 'var(--accent-cyan)',
+    backgroundColor: 'var(--accent-cyan)',
+    color: '#fff',
+  },
+  integratorGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '8px',
+    marginTop: '8px',
+  },
+  integratorButton: {
+    padding: '10px 8px',
+    fontSize: '11px',
+    fontWeight: 'bold' as const,
+    border: '2px solid var(--bg-tertiary)',
+    borderRadius: '4px',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  integratorButtonActive: {
     borderColor: 'var(--accent-cyan)',
     backgroundColor: 'var(--accent-cyan)',
     color: '#fff',

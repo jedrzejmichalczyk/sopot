@@ -28,12 +28,62 @@ function getSpringLineWidth(gridSize: number): number {
   return gridSize <= 20 ? 1 : 0.5;
 }
 
+/**
+ * Map angular velocity to color for rotation visualization
+ * - Positive ω (counterclockwise): red
+ * - Zero ω (stationary): white
+ * - Negative ω (clockwise): blue
+ *
+ * @param omega Angular velocity in rad/s
+ * @param maxOmega Maximum expected angular velocity for normalization (default 10 rad/s)
+ * @returns CSS color string
+ */
+function angularVelocityToColor(omega: number, maxOmega: number = 10): string {
+  // Normalize to [-1, 1] range
+  const normalized = Math.max(-1, Math.min(1, omega / maxOmega));
+
+  if (normalized < 0) {
+    // Clockwise (negative ω): interpolate from white to blue
+    const t = Math.abs(normalized);
+    const r = Math.round(255 * (1 - t));
+    const g = Math.round(255 * (1 - t));
+    const b = 255;
+    return `rgb(${r}, ${g}, ${b})`;
+  } else if (normalized > 0) {
+    // Counterclockwise (positive ω): interpolate from white to red
+    const t = normalized;
+    const r = 255;
+    const g = Math.round(255 * (1 - t));
+    const b = Math.round(255 * (1 - t));
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  // Stationary: white
+  return 'rgb(255, 255, 255)';
+}
+
+/**
+ * Extract RGB components from a CSS color string for glow effect
+ */
+function colorToRgb(color: string): { r: number; g: number; b: number } {
+  const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+  if (match) {
+    return {
+      r: parseInt(match[1], 10),
+      g: parseInt(match[2], 10),
+      b: parseInt(match[3], 10),
+    };
+  }
+  return { r: 255, g: 255, b: 255 }; // Default white
+}
+
 export interface Grid2DState {
   time: number;
   rows: number;
   cols: number;
   positions: Array<{ x: number; y: number }>; // Position of each mass
   velocities: Array<{ vx: number; vy: number }>; // Velocity of each mass
+  angularVelocities?: number[]; // Angular velocity (ω) of each mass
   centerOfMass?: { x: number; y: number }; // Center of mass
   kineticEnergy?: number; // Kinetic energy
   potentialEnergy?: number; // Potential energy
@@ -346,22 +396,30 @@ export function Grid2DVisualization({
     }
 
     // Draw masses as circles (size scales with grid size)
+    // Color based on angular velocity: blue=clockwise, white=stationary, red=counterclockwise
     const gridSize = state.rows;
+    const hasAngularVelocities = state.angularVelocities && state.angularVelocities.length > 0;
+
     positions.forEach((pos, idx) => {
       const x = toCanvasX(pos.x);
       const y = toCanvasY(pos.y);
       const isTouched = idx === touchedMass;
 
+      // Determine mass color based on angular velocity
+      let massColor: string;
+      if (hasAngularVelocities && state.angularVelocities) {
+        const omega = state.angularVelocities[idx] || 0;
+        massColor = angularVelocityToColor(omega, 10); // maxOmega = 10 rad/s
+      } else {
+        // Fallback to red if no angular velocities
+        massColor = getCSSVariable('--accent-red');
+      }
+
       // Glow effect (larger if touched) - skip glow for very large grids
       if (gridSize <= 50) {
-        const redColor = getCSSVariable('--accent-red');
-        const rgb = redColor.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
+        const rgb = colorToRgb(massColor);
         const opacity = isTouched ? MASS_GLOW_OPACITY_TOUCHED : MASS_GLOW_OPACITY_NORMAL;
-        if (rgb) {
-          ctx.fillStyle = `rgba(${parseInt(rgb[1], 16)}, ${parseInt(rgb[2], 16)}, ${parseInt(rgb[3], 16)}, ${opacity})`;
-        } else {
-          ctx.fillStyle = `rgba(255, 59, 59, ${opacity})`;
-        }
+        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity})`;
         ctx.beginPath();
         const glowRadius = getGlowRadius(gridSize, isTouched);
         ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
@@ -369,7 +427,7 @@ export function Grid2DVisualization({
       }
 
       // Mass point
-      ctx.fillStyle = getCSSVariable('--accent-red');
+      ctx.fillStyle = massColor;
       ctx.beginPath();
       const massRadius = getMassRadius(gridSize, isTouched);
       ctx.arc(x, y, massRadius, 0, 2 * Math.PI);

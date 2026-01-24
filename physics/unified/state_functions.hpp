@@ -24,6 +24,7 @@ struct MassValue    { static constexpr uint32_t id = 3; };
 struct Angle        { static constexpr uint32_t id = 4; };
 struct AngularVel   { static constexpr uint32_t id = 5; };
 struct Torque       { static constexpr uint32_t id = 6; };
+struct Radius       { static constexpr uint32_t id = 7; };
 
 constexpr uint32_t MAX_FUNCTIONS = 16;
 
@@ -49,6 +50,7 @@ struct NodeData {
     std::array<T, 2> velocity = {T(0), T(0)};
     std::array<T, 2> force = {T(0), T(0)};
     T mass = T(0);
+    T radius = T(0);
     T angle = T(0);
     T angular_vel = T(0);
     T torque = T(0);
@@ -56,6 +58,7 @@ struct NodeData {
     bool has_position = false;
     bool has_velocity = false;
     bool has_mass = false;
+    bool has_radius = false;
     bool has_angle = false;
     bool has_angular_vel = false;
 

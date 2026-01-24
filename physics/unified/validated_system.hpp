@@ -155,7 +155,7 @@ public:
             });
         }
 
-        // Phase 2: Compute forces from stateless 2-port components
+        // Phase 2: Compute forces and torques from stateless 2-port components
         for (size_t i = 0; i < m_nodes.size(); ++i) {
             const auto& node = m_nodes[i];
 
@@ -171,10 +171,24 @@ public:
                     size_t neighbor0 = m_adjacency[i][0][0].node;
                     size_t neighbor1 = m_adjacency[i][1][0].node;
 
-                    auto forces = component.computeForces(node_data[neighbor0], node_data[neighbor1]);
+                    // Check if this component also provides torque
+                    if constexpr (hasFunction<Torque>(CompType::provided)) {
+                        // Use computeForcesAndTorques for components with rotational coupling
+                        auto result = component.computeForcesAndTorques(
+                            node_data[neighbor0], node_data[neighbor1]);
 
-                    node_data[neighbor0].addForce(forces[0]);
-                    node_data[neighbor1].addForce(forces[1]);
+                        node_data[neighbor0].addForce(result.force_on_0);
+                        node_data[neighbor1].addForce(result.force_on_1);
+                        node_data[neighbor0].addTorque(result.torque_on_0);
+                        node_data[neighbor1].addTorque(result.torque_on_1);
+                    } else {
+                        // Legacy path for components without torque
+                        auto forces = component.computeForces(
+                            node_data[neighbor0], node_data[neighbor1]);
+
+                        node_data[neighbor0].addForce(forces[0]);
+                        node_data[neighbor1].addForce(forces[1]);
+                    }
                 }
             });
         }
