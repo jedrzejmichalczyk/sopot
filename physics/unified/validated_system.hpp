@@ -115,6 +115,69 @@ public:
     size_t getEdgeCount() const { return m_edges.size(); }
 
     // -------------------------------------------------------------------------
+    // Energy computation (state functions)
+    // -------------------------------------------------------------------------
+
+    T computeKineticEnergy(std::span<const T> state) const {
+        T total_ke = T(0);
+
+        for (size_t i = 0; i < m_nodes.size(); ++i) {
+            const auto& node = m_nodes[i];
+            if (node.state_size > 0) {
+                std::span<const T> local_state(state.data() + node.state_offset, node.state_size);
+                visitNode(node, [&](const auto& component) {
+                    using CompType = std::decay_t<decltype(component)>;
+                    if constexpr (hasFunction<KineticEnergy>(CompType::provided)) {
+                        NodeData<T> data;
+                        component.exportValues(local_state, data);
+                        total_ke += data.kinetic_energy;
+                    }
+                });
+            }
+        }
+        return total_ke;
+    }
+
+    T computePotentialEnergy(std::span<const T> state) const {
+        T total_pe = T(0);
+        std::vector<NodeData<T>> node_data(m_nodes.size());
+
+        // Phase 1: Export values from all stateful nodes
+        for (size_t i = 0; i < m_nodes.size(); ++i) {
+            const auto& node = m_nodes[i];
+            if (node.state_size > 0) {
+                std::span<const T> local_state(state.data() + node.state_offset, node.state_size);
+                visitNode(node, [&](const auto& component) {
+                    component.exportValues(local_state, node_data[i]);
+                });
+            }
+        }
+
+        // Phase 2: Compute PE from springs
+        for (size_t i = 0; i < m_nodes.size(); ++i) {
+            const auto& node = m_nodes[i];
+            visitNode(node, [&](const auto& component) {
+                using CompType = std::decay_t<decltype(component)>;
+                if constexpr (CompType::state_size == 0 &&
+                              CompType::num_ports == 2 &&
+                              hasFunction<PotentialEnergy>(CompType::provided)) {
+                    if (m_adjacency[i][0].empty() || m_adjacency[i][1].empty()) return;
+                    size_t neighbor0 = m_adjacency[i][0][0].node;
+                    size_t neighbor1 = m_adjacency[i][1][0].node;
+                    auto result = component.computeForcesAndTorques(
+                        node_data[neighbor0], node_data[neighbor1]);
+                    total_pe += result.potential_energy;
+                }
+            });
+        }
+        return total_pe;
+    }
+
+    T computeTotalEnergy(std::span<const T> state) const {
+        return computeKineticEnergy(state) + computePotentialEnergy(state);
+    }
+
+    // -------------------------------------------------------------------------
     // ODE System interface
     // -------------------------------------------------------------------------
 

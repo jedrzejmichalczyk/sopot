@@ -60,7 +60,7 @@ struct PointMass2D {
     static constexpr size_t state_size = 6;  // [x, y, vx, vy, θ, ω]
     static constexpr size_t num_ports = 4;   // Can connect to up to 4 neighbors
     static constexpr uint32_t required = FunctionMask<Force2D, Torque>;
-    static constexpr uint32_t provided = FunctionMask<Position2D, Velocity2D, MassValue, Radius, Angle, AngularVel>;
+    static constexpr uint32_t provided = FunctionMask<Position2D, Velocity2D, MassValue, Radius, Angle, AngularVel, KineticEnergy>;
 
     constexpr PointMass2D(double m, std::array<double, 2> pos = {}, std::array<double, 2> vel = {},
                           double r = 0.05, double angle = 0.0, double ang_vel = 0.0)
@@ -98,6 +98,15 @@ struct PointMass2D {
     // Moment of inertia for uniform disk: I = ½mr²
     T getMomentOfInertia() const { return T(0.5) * T(mass) * T(radius) * T(radius); }
 
+    // Kinetic energy: KE = ½mv² + ½Iω²
+    T getKineticEnergy(std::span<const T> state) const {
+        T vx = state[2];
+        T vy = state[3];
+        T omega = state[5];
+        T I = getMomentOfInertia();
+        return T(0.5) * T(mass) * (vx*vx + vy*vy) + T(0.5) * I * omega * omega;
+    }
+
     // Export provided values to NodeData
     void exportValues(std::span<const T> state, NodeData<T>& data) const {
         data.position = getPosition(state);
@@ -106,6 +115,7 @@ struct PointMass2D {
         data.radius = getRadius();
         data.angle = getAngle(state);
         data.angular_vel = getAngularVel(state);
+        data.kinetic_energy = getKineticEnergy(state);
         data.has_position = true;
         data.has_velocity = true;
         data.has_mass = true;
@@ -168,7 +178,7 @@ struct Spring2D {
     static constexpr size_t state_size = 0;
     static constexpr size_t num_ports = 2;
     static constexpr uint32_t required = FunctionMask<Position2D, Velocity2D, Angle, AngularVel, Radius>;
-    static constexpr uint32_t provided = FunctionMask<Force2D, Torque>;
+    static constexpr uint32_t provided = FunctionMask<Force2D, Torque, PotentialEnergy>;
 
     constexpr Spring2D(double k, double L0, double c = 0.0,
                        double min_dist = 0.0, double rep_stiff = -1.0,
@@ -183,12 +193,13 @@ struct Spring2D {
 
     void exportValues(std::span<const T> /*state*/, NodeData<T>& /*data*/) const {}
 
-    // Result structure for forces and torques
+    // Result structure for forces, torques, and potential energy
     struct ForcesAndTorques {
         std::array<T, 2> force_on_0;
         std::array<T, 2> force_on_1;
         T torque_on_0;
         T torque_on_1;
+        T potential_energy;  // Elastic PE = ½k(L-L0)²
     };
 
     // Compute force and torque outputs given neighbor data
@@ -273,7 +284,10 @@ struct Spring2D {
         // Torque on mass 1 from force at offset1
         T torque_on_1 = offset1_x * force_on_1[1] - offset1_y * force_on_1[0];
 
-        return {force_on_0, force_on_1, torque_on_0, torque_on_1};
+        // Elastic potential energy: PE = ½k(L-L0)²
+        T pe = T(0.5) * T(stiffness) * extension * extension;
+
+        return {force_on_0, force_on_1, torque_on_0, torque_on_1, pe};
     }
 
     // Legacy computeForces for backward compatibility (ignores rotation)

@@ -862,77 +862,61 @@ public:
         return result;
     }
 
+    // Helper to compute energy using the system's state function methods
+    template<typename System>
+    double computeSystemKE(const System& system) const {
+        return system.computeKineticEnergy(std::span<const double>(m_state));
+    }
+
+    template<typename System>
+    double computeSystemPE(const System& system) const {
+        return system.computePotentialEnergy(std::span<const double>(m_state));
+    }
+
     double getKineticEnergy() const {
         if (!m_initialized) return 0.0;
 
-        double ke = 0.0;
-        size_t num_masses = m_rows * m_cols;
-        for (size_t i = 0; i < num_masses; ++i) {
-            double vx = m_state[i * 6 + 2];
-            double vy = m_state[i * 6 + 3];
-            double omega = m_state[i * 6 + 5];
-            // KE = 0.5*m*v² + 0.5*I*ω² where I = 0.5*m*r²
-            double I = 0.5 * m_mass * m_radius * m_radius;
-            ke += 0.5 * m_mass * (vx*vx + vy*vy) + 0.5 * I * omega * omega;
+        if (m_grid_type == GridType::Quad) {
+            switch (m_grid_size) {
+                case GridSize::G5:   return computeSystemKE(*m_quad_5);
+                case GridSize::G10:  return computeSystemKE(*m_quad_10);
+                case GridSize::G20:  return computeSystemKE(*m_quad_20);
+                case GridSize::G50:  return computeSystemKE(*m_quad_50);
+                case GridSize::G100: return computeSystemKE(*m_quad_100);
+            }
+        } else {
+            switch (m_grid_size) {
+                case GridSize::G5:   return computeSystemKE(*m_triangle_5);
+                case GridSize::G10:  return computeSystemKE(*m_triangle_10);
+                case GridSize::G20:  return computeSystemKE(*m_triangle_20);
+                case GridSize::G50:  return computeSystemKE(*m_triangle_50);
+                case GridSize::G100: return computeSystemKE(*m_triangle_100);
+            }
         }
-        return ke;
+        return 0.0;
     }
 
     double getPotentialEnergy() const {
         if (!m_initialized) return 0.0;
 
-        double pe = 0.0;
-        double diagonal_length = std::sqrt(2.0) * m_spacing;
-
-        // Helper to compute spring PE between two mass indices
-        auto spring_pe = [&](size_t i, size_t j, double rest_length) {
-            double x1 = m_state[i * 6 + 0];
-            double y1 = m_state[i * 6 + 1];
-            double x2 = m_state[j * 6 + 0];
-            double y2 = m_state[j * 6 + 1];
-            double dx = x2 - x1;
-            double dy = y2 - y1;
-            double dist = std::sqrt(dx*dx + dy*dy);
-            double stretch = dist - rest_length;
-            return 0.5 * m_stiffness * stretch * stretch;
-        };
-
-        // Horizontal springs: (r, c) to (r, c+1)
-        for (size_t r = 0; r < m_rows; ++r) {
-            for (size_t c = 0; c < m_cols - 1; ++c) {
-                size_t i = r * m_cols + c;
-                size_t j = r * m_cols + c + 1;
-                pe += spring_pe(i, j, m_spacing);
+        if (m_grid_type == GridType::Quad) {
+            switch (m_grid_size) {
+                case GridSize::G5:   return computeSystemPE(*m_quad_5);
+                case GridSize::G10:  return computeSystemPE(*m_quad_10);
+                case GridSize::G20:  return computeSystemPE(*m_quad_20);
+                case GridSize::G50:  return computeSystemPE(*m_quad_50);
+                case GridSize::G100: return computeSystemPE(*m_quad_100);
+            }
+        } else {
+            switch (m_grid_size) {
+                case GridSize::G5:   return computeSystemPE(*m_triangle_5);
+                case GridSize::G10:  return computeSystemPE(*m_triangle_10);
+                case GridSize::G20:  return computeSystemPE(*m_triangle_20);
+                case GridSize::G50:  return computeSystemPE(*m_triangle_50);
+                case GridSize::G100: return computeSystemPE(*m_triangle_100);
             }
         }
-
-        // Vertical springs: (r, c) to (r+1, c)
-        for (size_t r = 0; r < m_rows - 1; ++r) {
-            for (size_t c = 0; c < m_cols; ++c) {
-                size_t i = r * m_cols + c;
-                size_t j = (r + 1) * m_cols + c;
-                pe += spring_pe(i, j, m_spacing);
-            }
-        }
-
-        // Diagonal springs (triangle grid only)
-        if (m_grid_type == GridType::Triangle) {
-            for (size_t r = 0; r < m_rows - 1; ++r) {
-                for (size_t c = 0; c < m_cols - 1; ++c) {
-                    // Main diagonal: (r, c) to (r+1, c+1)
-                    size_t i1 = r * m_cols + c;
-                    size_t j1 = (r + 1) * m_cols + c + 1;
-                    pe += spring_pe(i1, j1, diagonal_length);
-
-                    // Anti-diagonal: (r, c+1) to (r+1, c)
-                    size_t i2 = r * m_cols + c + 1;
-                    size_t j2 = (r + 1) * m_cols + c;
-                    pe += spring_pe(i2, j2, diagonal_length);
-                }
-            }
-        }
-
-        return pe;
+        return 0.0;
     }
 
     double getTotalEnergy() const {

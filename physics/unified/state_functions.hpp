@@ -17,14 +17,16 @@ namespace sopot::unified {
 // STATE FUNCTION TAGS
 // =============================================================================
 
-struct Position2D   { static constexpr uint32_t id = 0; };
-struct Velocity2D   { static constexpr uint32_t id = 1; };
-struct Force2D      { static constexpr uint32_t id = 2; };
-struct MassValue    { static constexpr uint32_t id = 3; };
-struct Angle        { static constexpr uint32_t id = 4; };
-struct AngularVel   { static constexpr uint32_t id = 5; };
-struct Torque       { static constexpr uint32_t id = 6; };
-struct Radius       { static constexpr uint32_t id = 7; };
+struct Position2D     { static constexpr uint32_t id = 0; };
+struct Velocity2D     { static constexpr uint32_t id = 1; };
+struct Force2D        { static constexpr uint32_t id = 2; };
+struct MassValue      { static constexpr uint32_t id = 3; };
+struct Angle          { static constexpr uint32_t id = 4; };
+struct AngularVel     { static constexpr uint32_t id = 5; };
+struct Torque         { static constexpr uint32_t id = 6; };
+struct Radius         { static constexpr uint32_t id = 7; };
+struct KineticEnergy  { static constexpr uint32_t id = 8; };
+struct PotentialEnergy { static constexpr uint32_t id = 9; };
 
 constexpr uint32_t MAX_FUNCTIONS = 16;
 
@@ -54,6 +56,8 @@ struct NodeData {
     T angle = T(0);
     T angular_vel = T(0);
     T torque = T(0);
+    T kinetic_energy = T(0);
+    T potential_energy = T(0);
 
     bool has_position = false;
     bool has_velocity = false;
@@ -69,6 +73,14 @@ struct NodeData {
 
     void addTorque(T t) {
         torque += t;
+    }
+
+    void addKineticEnergy(T ke) {
+        kinetic_energy += ke;
+    }
+
+    void addPotentialEnergy(T pe) {
+        potential_energy += pe;
     }
 };
 
