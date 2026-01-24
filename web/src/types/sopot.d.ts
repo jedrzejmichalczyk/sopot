@@ -128,10 +128,10 @@ export type GridTopology = 'quad' | 'triangle';
 /**
  * Integrator type - determines the numerical integration method
  * - 'rk4': 4th-order Runge-Kutta (default) - highest accuracy, 4 derivative evals/step
- * - 'symplectic': Symplectic Euler - energy-preserving, best for long undamped simulations
- * - 'semiimplicit': Semi-implicit Euler - stable for stiff/damped systems
+ * - 'symplectic': Symplectic Euler (1st order) - bounded energy error, fast
+ * - 'verlet': Velocity Verlet (2nd order) - excellent energy conservation
  */
-export type IntegratorType = 'rk4' | 'symplectic' | 'semiimplicit';
+export type IntegratorType = 'rk4' | 'symplectic' | 'verlet';
 
 /**
  * System info returned by getSystemInfo()

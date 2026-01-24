@@ -8,11 +8,11 @@ export type GridSize = 5 | 10 | 20 | 50 | 100;
 export const SUPPORTED_GRID_SIZES: GridSize[] = [5, 10, 20, 50, 100];
 
 // Supported integrators
-export const SUPPORTED_INTEGRATORS: IntegratorType[] = ['rk4', 'symplectic', 'semiimplicit'];
+export const SUPPORTED_INTEGRATORS: IntegratorType[] = ['rk4', 'symplectic', 'verlet'];
 export const INTEGRATOR_LABELS: Record<IntegratorType, string> = {
-  'rk4': 'RK4 (Accurate)',
-  'symplectic': 'Symplectic (Energy-preserving)',
-  'semiimplicit': 'Semi-implicit (Stable)',
+  'rk4': 'RK4 (4th order)',
+  'symplectic': 'Symplectic Euler',
+  'verlet': 'Velocity Verlet',
 };
 
 // Physics tuning constants for different grid sizes

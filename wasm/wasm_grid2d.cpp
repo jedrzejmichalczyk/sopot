@@ -57,10 +57,10 @@ using GridSystem = ValidatedSystem<double, Topology, MassType, SpringType>;
 enum class GridType { Quad, Triangle };
 
 // Integrator type enumeration (exposed to JavaScript)
-// - RK4: 4th-order Runge-Kutta, high accuracy, good for validation
-// - SymplecticEuler: 1st-order symplectic, preserves energy over long runs
-// - SemiImplicitEuler: 1st-order, stable for stiff/damped systems
-enum class Integrator { RK4, SymplecticEuler, SemiImplicitEuler };
+// - RK4: 4th-order Runge-Kutta, highest accuracy, 4 derivative evals/step
+// - SymplecticEuler: 1st-order symplectic (velocity-first), bounded energy error
+// - VelocityVerlet: 2nd-order symplectic, excellent energy conservation
+enum class Integrator { RK4, SymplecticEuler, VelocityVerlet };
 
 // =============================================================================
 // GRID SIMULATOR
@@ -133,51 +133,22 @@ private:
     }
 
     /**
-     * Symplectic Euler integrator (position-first variant)
+     * Symplectic Euler integrator (velocity-first, a.k.a. Euler-Cromer)
      *
-     * Updates position first, then velocity using the new position.
-     * This preserves the symplectic structure of Hamiltonian systems,
-     * meaning energy is conserved over long simulations (no drift).
+     * Updates velocity first using current accelerations, then updates
+     * position using the NEW velocity. This is the correct symplectic Euler
+     * that preserves the symplectic structure of Hamiltonian systems.
      *
      * Order: 1st order
-     * Best for: Undamped or lightly damped oscillatory systems
+     * Properties: Symplectic (preserves phase space volume), bounded energy error
+     * Best for: Long simulations of undamped or lightly damped oscillatory systems
+     *
+     * Algorithm:
+     *   v_{n+1} = v_n + dt * a(x_n, v_n)
+     *   x_{n+1} = x_n + dt * v_{n+1}
      */
     template<typename System>
     void symplecticEulerStep(System& system, double dt) {
-        const size_t num_masses = m_rows * m_cols;
-
-        // Get accelerations at current positions
-        auto derivs = system.computeDerivatives(m_time, m_state);
-
-        // Update positions first: x_{n+1} = x_n + dt * v_n
-        for (size_t i = 0; i < num_masses; ++i) {
-            m_state[i * 4 + 0] += dt * m_state[i * 4 + 2];  // x += dt * vx
-            m_state[i * 4 + 1] += dt * m_state[i * 4 + 3];  // y += dt * vy
-        }
-
-        // Get accelerations at NEW positions
-        auto derivs_new = system.computeDerivatives(m_time + dt, m_state);
-
-        // Update velocities: v_{n+1} = v_n + dt * a(x_{n+1})
-        for (size_t i = 0; i < num_masses; ++i) {
-            m_state[i * 4 + 2] += dt * derivs_new[i * 4 + 2];  // vx += dt * ax
-            m_state[i * 4 + 3] += dt * derivs_new[i * 4 + 3];  // vy += dt * ay
-        }
-
-        m_time += dt;
-    }
-
-    /**
-     * Semi-implicit Euler integrator (velocity-first variant)
-     *
-     * Updates velocity first, then position using the new velocity.
-     * More stable than explicit Euler for stiff systems with damping.
-     *
-     * Order: 1st order
-     * Best for: Damped systems, stiff springs
-     */
-    template<typename System>
-    void semiImplicitEulerStep(System& system, double dt) {
         const size_t num_masses = m_rows * m_cols;
 
         // Get accelerations at current state
@@ -193,6 +164,49 @@ private:
         for (size_t i = 0; i < num_masses; ++i) {
             m_state[i * 4 + 0] += dt * m_state[i * 4 + 2];  // x += dt * vx_new
             m_state[i * 4 + 1] += dt * m_state[i * 4 + 3];  // y += dt * vy_new
+        }
+
+        m_time += dt;
+    }
+
+    /**
+     * Velocity Verlet integrator (Störmer-Verlet)
+     *
+     * A 2nd-order symplectic integrator that provides better accuracy than
+     * symplectic Euler while still preserving the symplectic structure.
+     * Commonly used in molecular dynamics simulations.
+     *
+     * Order: 2nd order
+     * Properties: Symplectic, time-reversible, excellent energy conservation
+     * Best for: High-precision simulations where energy conservation matters
+     *
+     * Algorithm:
+     *   x_{n+1} = x_n + dt * v_n + 0.5 * dt^2 * a_n
+     *   a_{n+1} = a(x_{n+1})
+     *   v_{n+1} = v_n + 0.5 * dt * (a_n + a_{n+1})
+     */
+    template<typename System>
+    void velocityVerletStep(System& system, double dt) {
+        const size_t num_masses = m_rows * m_cols;
+
+        // Get accelerations at current state: a_n
+        auto derivs = system.computeDerivatives(m_time, m_state);
+
+        // Update positions: x_{n+1} = x_n + dt * v_n + 0.5 * dt^2 * a_n
+        const double half_dt_sq = 0.5 * dt * dt;
+        for (size_t i = 0; i < num_masses; ++i) {
+            m_state[i * 4 + 0] += dt * m_state[i * 4 + 2] + half_dt_sq * derivs[i * 4 + 2];
+            m_state[i * 4 + 1] += dt * m_state[i * 4 + 3] + half_dt_sq * derivs[i * 4 + 3];
+        }
+
+        // Get accelerations at new positions: a_{n+1}
+        auto derivs_new = system.computeDerivatives(m_time + dt, m_state);
+
+        // Update velocities: v_{n+1} = v_n + 0.5 * dt * (a_n + a_{n+1})
+        const double half_dt = 0.5 * dt;
+        for (size_t i = 0; i < num_masses; ++i) {
+            m_state[i * 4 + 2] += half_dt * (derivs[i * 4 + 2] + derivs_new[i * 4 + 2]);
+            m_state[i * 4 + 3] += half_dt * (derivs[i * 4 + 3] + derivs_new[i * 4 + 3]);
         }
 
         m_time += dt;
@@ -342,8 +356,8 @@ private:
             case Integrator::SymplecticEuler:
                 symplecticEulerStep(system, dt);
                 break;
-            case Integrator::SemiImplicitEuler:
-                semiImplicitEulerStep(system, dt);
+            case Integrator::VelocityVerlet:
+                velocityVerletStep(system, dt);
                 break;
         }
     }
@@ -421,11 +435,11 @@ public:
     }
 
     /**
-     * Set integrator type: "rk4", "symplectic", or "semiimplicit"
+     * Set integrator type: "rk4", "symplectic", or "verlet"
      *
-     * - rk4: 4th-order Runge-Kutta (default) - highest accuracy
-     * - symplectic: Symplectic Euler - energy-preserving for long runs
-     * - semiimplicit: Semi-implicit Euler - stable for damped systems
+     * - rk4: 4th-order Runge-Kutta (default) - highest accuracy, 4 derivative evals/step
+     * - symplectic: Symplectic Euler (1st order) - bounded energy error, 1 eval/step
+     * - verlet: Velocity Verlet (2nd order) - excellent energy conservation, 2 evals/step
      *
      * Can be changed at any time during simulation.
      */
@@ -434,10 +448,10 @@ public:
             m_integrator = Integrator::RK4;
         } else if (type == "symplectic") {
             m_integrator = Integrator::SymplecticEuler;
-        } else if (type == "semiimplicit") {
-            m_integrator = Integrator::SemiImplicitEuler;
+        } else if (type == "verlet") {
+            m_integrator = Integrator::VelocityVerlet;
         } else {
-            throw std::runtime_error("Integrator must be 'rk4', 'symplectic', or 'semiimplicit'");
+            throw std::runtime_error("Integrator must be 'rk4', 'symplectic', or 'verlet'");
         }
     }
 
@@ -445,7 +459,7 @@ public:
         switch (m_integrator) {
             case Integrator::RK4: return "rk4";
             case Integrator::SymplecticEuler: return "symplectic";
-            case Integrator::SemiImplicitEuler: return "semiimplicit";
+            case Integrator::VelocityVerlet: return "verlet";
             default: return "rk4";
         }
     }

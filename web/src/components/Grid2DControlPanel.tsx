@@ -314,16 +314,16 @@ export function Grid2DControlPanel({
                   ...(isInitialized ? styles.buttonDisabled : {}),
                 }}
               >
-                {integ === 'rk4' ? 'RK4' : integ === 'symplectic' ? 'Symplectic' : 'Semi-Implicit'}
+                {integ === 'rk4' ? 'RK4' : integ === 'symplectic' ? 'Symplectic' : 'Verlet'}
               </button>
             ))}
           </div>
           <p style={styles.infoTextSmall}>
             {integrator === 'rk4'
-              ? 'High accuracy, 4 derivative evals/step'
+              ? '4th order, highest accuracy, 4 evals/step'
               : integrator === 'symplectic'
-              ? 'Energy-preserving, best for undamped systems'
-              : 'Stable for stiff/damped systems'}
+              ? '1st order symplectic, bounded energy error'
+              : '2nd order symplectic, excellent energy conservation'}
           </p>
         </div>
       </div>
