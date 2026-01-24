@@ -98,8 +98,9 @@ else
         -s ENVIRONMENT=web,worker \
         -s NO_DISABLE_EXCEPTION_CATCHING \
         -fexceptions \
-        -ftemplate-depth=512 \
-        -fconstexpr-depth=512 \
+        -ftemplate-depth=2048 \
+        -fconstexpr-depth=2048 \
+        -fconstexpr-steps=100000000 \
         -I.. \
         wasm_rocket.cpp \
         wasm_grid2d.cpp \
