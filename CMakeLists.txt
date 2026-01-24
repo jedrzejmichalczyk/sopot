@@ -219,9 +219,10 @@ target_link_libraries(acausal_system_test sopot_core sopot_physics)
 target_compile_features(acausal_system_test PRIVATE cxx_std_20)
 add_test(NAME acausal_system_test COMMAND acausal_system_test)
 
-# Unified graph tests - skip on macOS due to linker symbol name length limits
-# The macOS ld64 linker has issues with deeply nested template symbol names
-if(NOT APPLE)
+# Unified graph tests - skip on macOS and Windows due to platform-specific limitations
+# - macOS: ld64 linker has maximum symbol name length exceeded by deeply nested templates
+# - Windows: MSVC has stricter constexpr evaluation limits
+if(NOT APPLE AND NOT MSVC)
     add_executable(unified_compile_time_test tests/unified_compile_time_test.cpp)
     target_link_libraries(unified_compile_time_test sopot_core sopot_physics)
     target_compile_features(unified_compile_time_test PRIVATE cxx_std_20)
@@ -271,7 +272,7 @@ set(CORE_TESTS
     named_expression_test inverted_pendulum_test acausal_test acausal_system_test
 )
 
-if(NOT APPLE)
+if(NOT APPLE AND NOT MSVC)
     set(ALL_TESTS ${CORE_TESTS} unified_compile_time_test unified_scalability_test validated_graph_test)
 else()
     set(ALL_TESTS ${CORE_TESTS})
