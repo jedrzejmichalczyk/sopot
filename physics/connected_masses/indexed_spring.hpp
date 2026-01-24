@@ -5,6 +5,7 @@
 #include "indexed_tags.hpp"
 #include <string>
 #include <stdexcept>
+#include <cmath>
 
 namespace sopot::connected_masses {
 
@@ -32,6 +33,8 @@ private:
     double m_stiffness;      // Spring constant k (N/m)
     double m_rest_length;    // Rest length L0 (m)
     double m_damping;        // Damping coefficient c (N·s/m)
+    double m_min_distance;   // Collision radius (m) - steep repulsion below this
+    double m_repulsion_stiffness;  // Repulsion strength (N/m)
     std::string m_name;
 
 public:
@@ -41,16 +44,24 @@ public:
      * @param stiffness Spring constant k (N/m) - must be positive
      * @param rest_length Natural length L0 (m) - must be non-negative
      * @param damping Damping coefficient c (N·s/m), default 0 - must be non-negative
+     * @param min_distance Collision radius (m) - steep repulsion below this distance
+     *                     Default: 10% of rest_length (or 0.01 if rest_length is 0)
+     * @param repulsion_stiffness Strength of repulsion force (N/m)
+     *                            Default: 10x stiffness
      * @throws std::invalid_argument if parameters are invalid
      */
     explicit IndexedSpring(
         double stiffness,
         double rest_length,
-        double damping = 0.0
+        double damping = 0.0,
+        double min_distance = -1.0,
+        double repulsion_stiffness = -1.0
     )
         : m_stiffness(stiffness)
         , m_rest_length(rest_length)
         , m_damping(damping)
+        , m_min_distance(min_distance)  // Default 0 = no repulsion
+        , m_repulsion_stiffness(repulsion_stiffness > 0.0 ? repulsion_stiffness : 10.0 * stiffness)
         , m_name("Spring" + std::to_string(Index1) + "_" + std::to_string(Index2))
     {
         if (stiffness <= 0.0) {
@@ -91,6 +102,7 @@ public:
      * @brief Compute force on mass 1 (registry-aware)
      *
      * Force pulls mass 1 toward mass 2 when extended.
+     * Includes steep repulsion when masses get too close.
      */
     template<typename Registry>
     T compute(
@@ -98,6 +110,8 @@ public:
         std::span<const T> state,
         const Registry& registry
     ) const {
+        using std::sqrt;
+
         // Query positions of both masses
         T x1 = registry.template computeFunction<typename TagSet1::Position>(state);
         T x2 = registry.template computeFunction<typename TagSet2::Position>(state);
@@ -116,6 +130,21 @@ public:
             T relative_velocity = v1 - v2;
             T damping_force = -T(m_damping) * relative_velocity;
             spring_force += damping_force;
+        }
+
+        // Steep repulsion when masses get too close (only if min_distance > 0)
+        // Uses inverse formula: F_repulsion = k_rep * (r_min/r - 1) when |x1-x2| < r_min
+        if (m_min_distance > 0.0) {
+            T dx = x1 - x2;
+            T distance = sqrt(dx * dx);  // Works with autodiff
+            if (value_of(distance) < m_min_distance) {
+                T distance_safe = distance < T(1e-10) ? T(1e-10) : distance;
+                // Direction: +1 if x1 > x2, -1 if x1 < x2
+                T direction = dx / distance_safe;
+                // Repulsion pushes masses apart
+                T repulsion_magnitude = T(m_repulsion_stiffness) * (T(m_min_distance) / distance_safe - T(1.0));
+                spring_force += repulsion_magnitude * direction;
+            }
         }
 
         return spring_force;
