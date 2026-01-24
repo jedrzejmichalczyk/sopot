@@ -36,7 +36,11 @@ else()
 
     # GCC/Clang template compilation optimizations
     add_compile_options(-ftemplate-depth=2048)  # Increase template instantiation depth
-    add_compile_options(-fconstexpr-ops-limit=100000000)  # Allow large constexpr graph validation
+
+    # Constexpr limits: GCC uses -fconstexpr-ops-limit, Clang uses -fconstexpr-steps
+    add_compile_options($<$<CXX_COMPILER_ID:GNU>:-fconstexpr-ops-limit=100000000>)
+    add_compile_options($<$<CXX_COMPILER_ID:Clang>:-fconstexpr-steps=100000000>)
+    add_compile_options($<$<CXX_COMPILER_ID:AppleClang>:-fconstexpr-steps=100000000>)
 
     # Note: With algorithmic optimizations, template depth rarely exceeds 50 levels,
     # so this limit is very conservative. Previously needed for O(N) recursive patterns.
