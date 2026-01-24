@@ -33,7 +33,7 @@ function App() {
   // but inactive simulations are reset when switching types to free resources.
   // The WASM module loads on mount for the selected simulation type.
   const rocketSim = useRocketSimulation();
-  const gridSim = useGrid2DSimulation(5, 5);
+  const gridSim = useGrid2DSimulation(10);  // Default 10x10 grid
   const pendulumSim = useInvertedPendulumSimulation();
 
   const [trajectoryHistory, setTrajectoryHistory] = useState<
@@ -295,6 +295,8 @@ function App() {
                   showGrid={showGrid}
                   onShowVelocitiesChange={setShowVelocities}
                   onShowGridChange={setShowGrid}
+                  gridSize={gridSim.gridSize}
+                  onGridSizeChange={gridSim.setGridSize}
                   mass={gridSim.mass}
                   stiffness={gridSim.stiffness}
                   damping={gridSim.damping}

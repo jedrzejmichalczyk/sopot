@@ -125,11 +125,23 @@ export interface Grid2DWasmState {
  */
 export type GridTopology = 'quad' | 'triangle';
 
+/**
+ * System info returned by getSystemInfo()
+ */
+export interface Grid2DSystemInfo {
+  rows: number;
+  cols: number;
+  numMasses: number;
+  numSprings: number;
+  stateSize: number;
+  architecture: string;
+}
+
 export interface Grid2DSimulator {
   // Configuration
   setGridSize(rows: number, cols: number): void;
-  setGridType(gridType: GridTopology): void;
-  getGridType(): GridTopology;
+  setGridType?(gridType: GridTopology): void;  // Optional - may not exist in new implementation
+  getGridType?(): GridTopology;
   setMass(mass: number): void;
   setSpacing(spacing: number): void;
   setStiffness(stiffness: number): void;
@@ -145,6 +157,7 @@ export interface Grid2DSimulator {
   // Simulation
   step(): void;
   stepWithDt(dt: number): void;
+  stepMultiple?(count: number): void;  // New: run multiple steps efficiently
 
   // State queries
   getTime(): number;
@@ -156,9 +169,11 @@ export interface Grid2DSimulator {
   getState(): Grid2DWasmState;
   getMassPosition(row: number, col: number): { x: number; y: number };
   getKineticEnergy(): number;
-  getPotentialEnergy(): number;
-  getTotalEnergy(): number;
+  getPotentialEnergy?(): number;  // Optional
+  getTotalEnergy?(): number;      // Optional
   getCenterOfMass(): { x: number; y: number };
+  getTotalMomentum(): { px: number; py: number };
+  getSystemInfo?(): Grid2DSystemInfo;  // New: system info for debugging
 }
 
 /**
