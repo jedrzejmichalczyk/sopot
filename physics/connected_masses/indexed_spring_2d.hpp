@@ -45,6 +45,8 @@ private:
     double m_stiffness;     // k (N/m)
     double m_rest_length;   // L0 (m)
     double m_damping;       // c (N·s/m)
+    double m_min_distance;  // Collision radius (m) - steep repulsion below this
+    double m_repulsion_stiffness;  // Repulsion strength (N/m)
     std::string m_name;
 
 public:
@@ -54,16 +56,24 @@ public:
      * @param stiffness Spring constant k (N/m) - must be non-negative
      * @param rest_length Natural length L0 (m) - must be positive
      * @param damping Damping coefficient c (N·s/m) - must be non-negative
+     * @param min_distance Collision radius (m) - steep repulsion below this distance
+     *                     Default: 10% of rest_length
+     * @param repulsion_stiffness Strength of repulsion force (N/m)
+     *                            Default: 10x stiffness
      * @throws std::invalid_argument if parameters are invalid
      */
     explicit IndexedSpring2D(
         double stiffness,
         double rest_length,
-        double damping = 0.0
+        double damping = 0.0,
+        double min_distance = -1.0,
+        double repulsion_stiffness = -1.0
     )
         : m_stiffness(stiffness)
         , m_rest_length(rest_length)
         , m_damping(damping)
+        , m_min_distance(min_distance)  // Default 0 = no repulsion
+        , m_repulsion_stiffness(repulsion_stiffness > 0.0 ? repulsion_stiffness : 10.0 * stiffness)
         , m_name("Spring2D_" + std::to_string(I) + "_" + std::to_string(J))
     {
         if (stiffness < 0.0) {
@@ -128,6 +138,16 @@ public:
 
         // Spring force magnitude (Hooke's law + damping)
         T force_magnitude = T(m_stiffness) * extension + T(m_damping) * relative_velocity;
+
+        // Steep repulsion when masses get too close (only if min_distance > 0)
+        // Uses inverse formula: F_repulsion = k_rep * (r_min/r - 1) when r < r_min
+        // This creates a force that increases steeply as r approaches 0
+        if (m_min_distance > 0.0 && value_of(length) < m_min_distance) {
+            // Repulsion force magnitude (negative = pushes apart)
+            // The (r_min/r - 1) term goes to infinity as r -> 0
+            T repulsion = -T(m_repulsion_stiffness) * (T(m_min_distance) / length_safe - T(1.0));
+            force_magnitude += repulsion;
+        }
 
         // Force vector on mass I (points from I toward J when spring is stretched)
         std::array<T, 2> force_on_i = {
