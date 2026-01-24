@@ -193,6 +193,9 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   useEffect(() => {
     if (!isRunning || !simulatorRef.current) return;
 
+    let frameCount = 0;
+    let initialCoM: { x: number; y: number } | null = null;
+
     const animate = (currentTime: number) => {
       const deltaTime = (currentTime - lastTimeRef.current) / 1000;
       lastTimeRef.current = currentTime;
@@ -204,6 +207,27 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
           simulatorRef.current.step();
         }
         setCurrentState(wasmToVizState(simulatorRef.current));
+
+        // Log diagnostics every 100 frames
+        frameCount++;
+        if (frameCount % 100 === 0 && simulatorRef.current) {
+          const com = simulatorRef.current.getCenterOfMass();
+          const momentum = simulatorRef.current.getTotalMomentum();
+          const time = simulatorRef.current.getTime();
+
+          if (!initialCoM) {
+            initialCoM = { ...com };
+          }
+
+          const comDrift = Math.sqrt(
+            Math.pow(com.x - initialCoM.x, 2) + Math.pow(com.y - initialCoM.y, 2)
+          );
+          const momentumMag = Math.sqrt(momentum.px * momentum.px + momentum.py * momentum.py);
+
+          console.log(
+            `[Grid2D] t=${time.toFixed(2)}s | CoM=(${com.x.toFixed(4)}, ${com.y.toFixed(4)}) drift=${comDrift.toFixed(6)} | p=(${momentum.px.toFixed(6)}, ${momentum.py.toFixed(6)}) |p|=${momentumMag.toFixed(6)}`
+          );
+        }
       }
 
       animationFrameRef.current = requestAnimationFrame(animate);
