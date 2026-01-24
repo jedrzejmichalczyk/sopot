@@ -4,56 +4,107 @@
  * This file provides Emscripten embind bindings to expose the C++ 2D grid
  * mass-spring simulation to JavaScript/TypeScript.
  *
- * All physics computations run in C++ - the frontend only visualizes.
+ * Uses the Unified Graph Architecture for O(K) template instantiations,
+ * enabling simulations up to 100x100 grids (10,000 masses) with compile-time
+ * validated state function resolution.
  */
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
-#include "../physics/connected_masses/connectivity_matrix_2d.hpp"
-#include "../core/solver.hpp"
+#include "../physics/unified/validated_system.hpp"
+#include "../physics/unified/constexpr_topology.hpp"
+#include "../physics/unified/components.hpp"
 #include <memory>
 #include <vector>
 #include <cmath>
-#include <utility>
 
 using namespace emscripten;
 using namespace sopot;
-using namespace sopot::connected_masses;
+using namespace sopot::unified;
+
+// =============================================================================
+// COMPILE-TIME GRID TOPOLOGIES
+// =============================================================================
+// These are validated at compile time - if state function resolution fails,
+// compilation will fail with a static_assert.
+
+// Quad topology (horizontal + vertical springs only)
+constexpr auto quad_5x5 = makeGridTopology<5, 5>();
+constexpr auto quad_10x10 = makeGridTopology<10, 10>();
+constexpr auto quad_20x20 = makeGridTopology<20, 20>();
+constexpr auto quad_50x50 = makeGridTopology<50, 50>();
+constexpr auto quad_100x100 = makeGridTopology<100, 100>();
+
+// Triangle topology (horizontal + vertical + diagonal springs)
+// More stable, better approximates cloth-like behavior
+constexpr auto triangle_5x5 = makeTriangleGridTopology<5, 5>();
+constexpr auto triangle_10x10 = makeTriangleGridTopology<10, 10>();
+constexpr auto triangle_20x20 = makeTriangleGridTopology<20, 20>();
+constexpr auto triangle_50x50 = makeTriangleGridTopology<50, 50>();
+constexpr auto triangle_100x100 = makeTriangleGridTopology<100, 100>();
+
+// =============================================================================
+// TYPE ALIASES
+// =============================================================================
+
+using MassType = PointMass2D<double>;
+using SpringType = Spring2D<double>;
+
+template<auto& Topology>
+using GridSystem = ValidatedSystem<double, Topology, MassType, SpringType>;
+
+// Grid type enumeration (exposed to JavaScript)
+enum class GridType { Quad, Triangle };
+
+// =============================================================================
+// GRID SIMULATOR
+// =============================================================================
 
 /**
  * Grid2DSimulator: JavaScript-friendly wrapper for 2D mass-spring grid
  *
- * Since the C++ grid uses compile-time template parameters, we support
- * a few common grid sizes. The simulation runs entirely in C++.
+ * Now supports grids up to 100x100 using the Unified Graph Architecture.
+ * Topology validation happens at COMPILE TIME.
  */
 class Grid2DSimulator {
 private:
     // Grid configuration
-    size_t m_rows{5};
-    size_t m_cols{5};
+    size_t m_rows{10};
+    size_t m_cols{10};
     double m_mass{1.0};
     double m_spacing{0.5};
-    double m_stiffness{50.0};
-    double m_damping{0.5};
+    double m_stiffness{100.0};
+    double m_damping{1.0};
+    GridType m_grid_type{GridType::Quad};
 
     // Simulation state
     std::vector<double> m_state;
     double m_time{0.0};
-    double m_dt{0.005};  // Default timestep: 5ms (smaller for stability)
+    double m_dt{0.001};  // Smaller timestep for larger grids
     bool m_initialized{false};
 
-    // We store derivatives function pointer based on grid size
-    // Limited to 6x6 to keep WASM compilation time reasonable
-    enum class GridSize { G3x3, G4x4, G5x5, G6x6 };
-    GridSize m_grid_size{GridSize::G5x5};
+    // Supported grid sizes
+    enum class GridSize { G5, G10, G20, G50, G100 };
+    GridSize m_grid_size{GridSize::G10};
 
-    // Template-based systems for different grid sizes
-    // Each is created on-demand when initialize() is called
+    // Quad topology systems (created on demand)
+    std::unique_ptr<GridSystem<quad_5x5>> m_quad_5;
+    std::unique_ptr<GridSystem<quad_10x10>> m_quad_10;
+    std::unique_ptr<GridSystem<quad_20x20>> m_quad_20;
+    std::unique_ptr<GridSystem<quad_50x50>> m_quad_50;
+    std::unique_ptr<GridSystem<quad_100x100>> m_quad_100;
 
-    // RK4 step function - works with any system
+    // Triangle topology systems (created on demand)
+    std::unique_ptr<GridSystem<triangle_5x5>> m_triangle_5;
+    std::unique_ptr<GridSystem<triangle_10x10>> m_triangle_10;
+    std::unique_ptr<GridSystem<triangle_20x20>> m_triangle_20;
+    std::unique_ptr<GridSystem<triangle_50x50>> m_triangle_50;
+    std::unique_ptr<GridSystem<triangle_100x100>> m_triangle_100;
+
+    // RK4 integrator
     template<typename System>
     void rk4Step(System& system, double dt) {
-        size_t n = m_state.size();
+        const size_t n = m_state.size();
 
         auto k1 = system.computeDerivatives(m_time, m_state);
 
@@ -74,43 +125,158 @@ private:
         m_time += dt;
     }
 
-    // Physics systems for each grid size (non-static to avoid cross-instance contamination)
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))> system_3x3;
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))> system_4x4;
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))> system_5x5;
-    std::unique_ptr<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))> system_6x6;
+    // Create and populate a quad grid system (horizontal + vertical springs only)
+    template<size_t Rows, size_t Cols, auto& Topology>
+    auto createQuadSystem() {
+        auto system = std::make_unique<GridSystem<Topology>>();
 
-    // Step functions for each grid size
-    void step3x3() {
-        if (!system_3x3) {
-            system_3x3 = std::make_unique<decltype(makeGrid2DSystem<double, 3, 3, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 3, 3, false>(m_mass, m_spacing, m_stiffness, m_damping));
+        static_assert(Rows * Cols > 0, "Grid must have at least one mass");
+
+        // Add masses with initial positions
+        auto& mass_batch = system->template getBatch<0>();
+        for (size_t r = 0; r < Rows; ++r) {
+            for (size_t c = 0; c < Cols; ++c) {
+                double x = c * m_spacing;
+                double y = r * m_spacing;
+                mass_batch.add(MassType(m_mass, {x, y}, {0.0, 0.0}));
+            }
         }
-        rk4Step(*system_3x3, m_dt);
+
+        // Add springs
+        auto& spring_batch = system->template getBatch<1>();
+
+        // Horizontal springs (rest length = spacing)
+        for (size_t r = 0; r < Rows; ++r) {
+            for (size_t c = 0; c < Cols - 1; ++c) {
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+            }
+        }
+
+        // Vertical springs (rest length = spacing)
+        for (size_t r = 0; r < Rows - 1; ++r) {
+            for (size_t c = 0; c < Cols; ++c) {
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+            }
+        }
+
+        return system;
     }
 
-    void step4x4() {
-        if (!system_4x4) {
-            system_4x4 = std::make_unique<decltype(makeGrid2DSystem<double, 4, 4, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 4, 4, false>(m_mass, m_spacing, m_stiffness, m_damping));
+    // Create and populate a triangle grid system (horizontal + vertical + diagonal springs)
+    template<size_t Rows, size_t Cols, auto& Topology>
+    auto createTriangleSystem() {
+        auto system = std::make_unique<GridSystem<Topology>>();
+
+        static_assert(Rows * Cols > 0, "Grid must have at least one mass");
+
+        // Add masses with initial positions
+        auto& mass_batch = system->template getBatch<0>();
+        for (size_t r = 0; r < Rows; ++r) {
+            for (size_t c = 0; c < Cols; ++c) {
+                double x = c * m_spacing;
+                double y = r * m_spacing;
+                mass_batch.add(MassType(m_mass, {x, y}, {0.0, 0.0}));
+            }
         }
-        rk4Step(*system_4x4, m_dt);
+
+        // Add springs
+        auto& spring_batch = system->template getBatch<1>();
+
+        // Horizontal springs (rest length = spacing)
+        for (size_t r = 0; r < Rows; ++r) {
+            for (size_t c = 0; c < Cols - 1; ++c) {
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+            }
+        }
+
+        // Vertical springs (rest length = spacing)
+        for (size_t r = 0; r < Rows - 1; ++r) {
+            for (size_t c = 0; c < Cols; ++c) {
+                spring_batch.add(SpringType(m_stiffness, m_spacing, m_damping));
+            }
+        }
+
+        // Diagonal springs (rest length = sqrt(2) * spacing)
+        double diagonal_length = std::sqrt(2.0) * m_spacing;
+        for (size_t r = 0; r < Rows - 1; ++r) {
+            for (size_t c = 0; c < Cols - 1; ++c) {
+                // Two diagonals per cell (X pattern)
+                spring_batch.add(SpringType(m_stiffness, diagonal_length, m_damping));
+                spring_batch.add(SpringType(m_stiffness, diagonal_length, m_damping));
+            }
+        }
+
+        return system;
     }
 
-    void step5x5() {
-        if (!system_5x5) {
-            system_5x5 = std::make_unique<decltype(makeGrid2DSystem<double, 5, 5, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 5, 5, false>(m_mass, m_spacing, m_stiffness, m_damping));
+    void createSystemForSize() {
+        if (m_grid_type == GridType::Quad) {
+            switch (m_grid_size) {
+                case GridSize::G5:
+                    m_quad_5 = createQuadSystem<5, 5, quad_5x5>();
+                    m_state = m_quad_5->getInitialState();
+                    break;
+                case GridSize::G10:
+                    m_quad_10 = createQuadSystem<10, 10, quad_10x10>();
+                    m_state = m_quad_10->getInitialState();
+                    break;
+                case GridSize::G20:
+                    m_quad_20 = createQuadSystem<20, 20, quad_20x20>();
+                    m_state = m_quad_20->getInitialState();
+                    break;
+                case GridSize::G50:
+                    m_quad_50 = createQuadSystem<50, 50, quad_50x50>();
+                    m_state = m_quad_50->getInitialState();
+                    break;
+                case GridSize::G100:
+                    m_quad_100 = createQuadSystem<100, 100, quad_100x100>();
+                    m_state = m_quad_100->getInitialState();
+                    break;
+            }
+        } else {
+            switch (m_grid_size) {
+                case GridSize::G5:
+                    m_triangle_5 = createTriangleSystem<5, 5, triangle_5x5>();
+                    m_state = m_triangle_5->getInitialState();
+                    break;
+                case GridSize::G10:
+                    m_triangle_10 = createTriangleSystem<10, 10, triangle_10x10>();
+                    m_state = m_triangle_10->getInitialState();
+                    break;
+                case GridSize::G20:
+                    m_triangle_20 = createTriangleSystem<20, 20, triangle_20x20>();
+                    m_state = m_triangle_20->getInitialState();
+                    break;
+                case GridSize::G50:
+                    m_triangle_50 = createTriangleSystem<50, 50, triangle_50x50>();
+                    m_state = m_triangle_50->getInitialState();
+                    break;
+                case GridSize::G100:
+                    m_triangle_100 = createTriangleSystem<100, 100, triangle_100x100>();
+                    m_state = m_triangle_100->getInitialState();
+                    break;
+            }
         }
-        rk4Step(*system_5x5, m_dt);
     }
 
-    void step6x6() {
-        if (!system_6x6) {
-            system_6x6 = std::make_unique<decltype(makeGrid2DSystem<double, 6, 6, false>(1.0, 0.5, 50.0, 0.5))>(
-                makeGrid2DSystem<double, 6, 6, false>(m_mass, m_spacing, m_stiffness, m_damping));
+    void stepSystem() {
+        if (m_grid_type == GridType::Quad) {
+            switch (m_grid_size) {
+                case GridSize::G5:   rk4Step(*m_quad_5, m_dt); break;
+                case GridSize::G10:  rk4Step(*m_quad_10, m_dt); break;
+                case GridSize::G20:  rk4Step(*m_quad_20, m_dt); break;
+                case GridSize::G50:  rk4Step(*m_quad_50, m_dt); break;
+                case GridSize::G100: rk4Step(*m_quad_100, m_dt); break;
+            }
+        } else {
+            switch (m_grid_size) {
+                case GridSize::G5:   rk4Step(*m_triangle_5, m_dt); break;
+                case GridSize::G10:  rk4Step(*m_triangle_10, m_dt); break;
+                case GridSize::G20:  rk4Step(*m_triangle_20, m_dt); break;
+                case GridSize::G50:  rk4Step(*m_triangle_50, m_dt); break;
+                case GridSize::G100: rk4Step(*m_triangle_100, m_dt); break;
+            }
         }
-        rk4Step(*system_6x6, m_dt);
     }
 
 public:
@@ -121,7 +287,7 @@ public:
     //=========================================================================
 
     /**
-     * Set grid dimensions (must be one of: 3x3, 4x4, 5x5, 6x6)
+     * Set grid dimensions (supported: 5, 10, 20, 50, 100)
      */
     void setGridSize(int rows, int cols) {
         if (rows != cols) {
@@ -132,12 +298,13 @@ public:
         m_cols = cols;
 
         switch (rows) {
-            case 3:  m_grid_size = GridSize::G3x3; break;
-            case 4:  m_grid_size = GridSize::G4x4; break;
-            case 5:  m_grid_size = GridSize::G5x5; break;
-            case 6:  m_grid_size = GridSize::G6x6; break;
+            case 5:   m_grid_size = GridSize::G5; break;
+            case 10:  m_grid_size = GridSize::G10; break;
+            case 20:  m_grid_size = GridSize::G20; break;
+            case 50:  m_grid_size = GridSize::G50; break;
+            case 100: m_grid_size = GridSize::G100; break;
             default:
-                throw std::runtime_error("Grid size must be 3, 4, 5, or 6");
+                throw std::runtime_error("Grid size must be 5, 10, 20, 50, or 100");
         }
     }
 
@@ -147,57 +314,62 @@ public:
     void setDamping(double damping) { m_damping = damping; }
     void setTimestep(double dt) { m_dt = dt; }
 
+    /**
+     * Set grid type (topology): "quad" or "triangle"
+     */
+    void setGridType(const std::string& type) {
+        if (type == "quad") {
+            m_grid_type = GridType::Quad;
+        } else if (type == "triangle") {
+            m_grid_type = GridType::Triangle;
+        } else {
+            throw std::runtime_error("Grid type must be 'quad' or 'triangle'");
+        }
+    }
+
+    std::string getGridType() const {
+        return m_grid_type == GridType::Quad ? "quad" : "triangle";
+    }
+
     //=========================================================================
     // INITIALIZATION
     //=========================================================================
 
-    /**
-     * Initialize the grid simulation
-     */
     void initialize() {
-        size_t num_masses = m_rows * m_cols;
-        size_t state_dim = num_masses * 4;  // x, y, vx, vy per mass
+        // Clear all systems
+        m_quad_5.reset();
+        m_quad_10.reset();
+        m_quad_20.reset();
+        m_quad_50.reset();
+        m_quad_100.reset();
+        m_triangle_5.reset();
+        m_triangle_10.reset();
+        m_triangle_20.reset();
+        m_triangle_50.reset();
+        m_triangle_100.reset();
 
-        m_state.resize(state_dim);
-
-        // Initialize positions on a grid, velocities to zero
-        for (size_t r = 0; r < m_rows; ++r) {
-            for (size_t c = 0; c < m_cols; ++c) {
-                size_t idx = r * m_cols + c;
-                m_state[idx * 4 + 0] = c * m_spacing;  // x
-                m_state[idx * 4 + 1] = r * m_spacing;  // y
-                m_state[idx * 4 + 2] = 0.0;            // vx
-                m_state[idx * 4 + 3] = 0.0;            // vy
-            }
-        }
+        // Create the system for current size and type
+        createSystemForSize();
 
         m_time = 0.0;
         m_initialized = true;
     }
 
-    /**
-     * Reset to initial state
-     */
     void reset() {
         initialize();
     }
 
-    /**
-     * Perturb a mass at given row/col by displacement
-     */
     void perturbMass(int row, int col, double dx, double dy) {
         if (!m_initialized) return;
         if (row < 0 || row >= static_cast<int>(m_rows)) return;
         if (col < 0 || col >= static_cast<int>(m_cols)) return;
 
         size_t idx = row * m_cols + col;
+        // State layout: [x, y, vx, vy] per mass
         m_state[idx * 4 + 0] += dx;
         m_state[idx * 4 + 1] += dy;
     }
 
-    /**
-     * Perturb center mass (convenience)
-     */
     void perturbCenter(double dx, double dy) {
         int center_row = m_rows / 2;
         int center_col = m_cols / 2;
@@ -208,28 +380,26 @@ public:
     // SIMULATION
     //=========================================================================
 
-    /**
-     * Advance simulation by one timestep
-     */
     void step() {
         if (!m_initialized) return;
-
-        switch (m_grid_size) {
-            case GridSize::G3x3:  step3x3(); break;
-            case GridSize::G4x4:  step4x4(); break;
-            case GridSize::G5x5:  step5x5(); break;
-            case GridSize::G6x6:  step6x6(); break;
-        }
+        stepSystem();
     }
 
-    /**
-     * Step with custom dt
-     */
     void stepWithDt(double dt) {
         double old_dt = m_dt;
         m_dt = dt;
         step();
         m_dt = old_dt;
+    }
+
+    /**
+     * Run multiple steps at once (more efficient for large grids)
+     */
+    void stepMultiple(int count) {
+        if (!m_initialized) return;
+        for (int i = 0; i < count; ++i) {
+            stepSystem();
+        }
     }
 
     //=========================================================================
@@ -241,9 +411,6 @@ public:
     int getCols() const { return m_cols; }
     bool isInitialized() const { return m_initialized; }
 
-    /**
-     * Get all positions as flat array [x0, y0, x1, y1, ...]
-     */
     val getPositions() const {
         if (!m_initialized) return val::array();
 
@@ -251,16 +418,13 @@ public:
         std::vector<double> positions(num_masses * 2);
 
         for (size_t i = 0; i < num_masses; ++i) {
-            positions[i * 2 + 0] = m_state[i * 4 + 0];  // x
-            positions[i * 2 + 1] = m_state[i * 4 + 1];  // y
+            positions[i * 2 + 0] = m_state[i * 4 + 0];
+            positions[i * 2 + 1] = m_state[i * 4 + 1];
         }
 
         return val::array(positions.begin(), positions.end());
     }
 
-    /**
-     * Get all velocities as flat array [vx0, vy0, vx1, vy1, ...]
-     */
     val getVelocities() const {
         if (!m_initialized) return val::array();
 
@@ -268,16 +432,13 @@ public:
         std::vector<double> velocities(num_masses * 2);
 
         for (size_t i = 0; i < num_masses; ++i) {
-            velocities[i * 2 + 0] = m_state[i * 4 + 2];  // vx
-            velocities[i * 2 + 1] = m_state[i * 4 + 3];  // vy
+            velocities[i * 2 + 0] = m_state[i * 4 + 2];
+            velocities[i * 2 + 1] = m_state[i * 4 + 3];
         }
 
         return val::array(velocities.begin(), velocities.end());
     }
 
-    /**
-     * Get full state as JavaScript object
-     */
     val getState() const {
         val result = val::object();
         result.set("time", m_time);
@@ -288,9 +449,6 @@ public:
         return result;
     }
 
-    /**
-     * Get position of specific mass
-     */
     val getMassPosition(int row, int col) const {
         val result = val::object();
         if (!m_initialized) return result;
@@ -303,9 +461,6 @@ public:
         return result;
     }
 
-    /**
-     * Compute total kinetic energy
-     */
     double getKineticEnergy() const {
         if (!m_initialized) return 0.0;
 
@@ -319,10 +474,6 @@ public:
         return ke;
     }
 
-    /**
-     * Compute center of mass position
-     * Returns {x, y} of the center of mass
-     */
     val getCenterOfMass() const {
         val result = val::object();
         if (!m_initialized) {
@@ -346,11 +497,6 @@ public:
         return result;
     }
 
-    /**
-     * Compute total momentum
-     * Returns {px, py} - total momentum vector
-     * For an isolated system, this should remain constant (zero if starting from rest)
-     */
     val getTotalMomentum() const {
         val result = val::object();
         if (!m_initialized) {
@@ -372,6 +518,27 @@ public:
         result.set("py", py);
         return result;
     }
+
+    /**
+     * Get system info for debugging
+     */
+    val getSystemInfo() const {
+        val result = val::object();
+        result.set("rows", static_cast<int>(m_rows));
+        result.set("cols", static_cast<int>(m_cols));
+        result.set("numMasses", static_cast<int>(m_rows * m_cols));
+
+        size_t h_springs = m_rows * (m_cols - 1);
+        size_t v_springs = (m_rows - 1) * m_cols;
+        size_t d_springs = m_grid_type == GridType::Triangle
+            ? 2 * (m_rows - 1) * (m_cols - 1)
+            : 0;
+        result.set("numSprings", static_cast<int>(h_springs + v_springs + d_springs));
+        result.set("stateSize", static_cast<int>(m_state.size()));
+        result.set("gridType", getGridType());
+        result.set("architecture", std::string("Unified Graph (O(K) templates)"));
+        return result;
+    }
 };
 
 //=============================================================================
@@ -384,6 +551,8 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
 
         // Configuration
         .function("setGridSize", &Grid2DSimulator::setGridSize)
+        .function("setGridType", &Grid2DSimulator::setGridType)
+        .function("getGridType", &Grid2DSimulator::getGridType)
         .function("setMass", &Grid2DSimulator::setMass)
         .function("setSpacing", &Grid2DSimulator::setSpacing)
         .function("setStiffness", &Grid2DSimulator::setStiffness)
@@ -399,6 +568,7 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
         // Simulation
         .function("step", &Grid2DSimulator::step)
         .function("stepWithDt", &Grid2DSimulator::stepWithDt)
+        .function("stepMultiple", &Grid2DSimulator::stepMultiple)
 
         // State queries
         .function("getTime", &Grid2DSimulator::getTime)
@@ -411,5 +581,6 @@ EMSCRIPTEN_BINDINGS(grid2d_module) {
         .function("getMassPosition", &Grid2DSimulator::getMassPosition)
         .function("getKineticEnergy", &Grid2DSimulator::getKineticEnergy)
         .function("getCenterOfMass", &Grid2DSimulator::getCenterOfMass)
-        .function("getTotalMomentum", &Grid2DSimulator::getTotalMomentum);
+        .function("getTotalMomentum", &Grid2DSimulator::getTotalMomentum)
+        .function("getSystemInfo", &Grid2DSimulator::getSystemInfo);
 }

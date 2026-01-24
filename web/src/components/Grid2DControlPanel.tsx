@@ -1,4 +1,6 @@
 import type { GridTopology } from '../types/sopot';
+import type { GridSize } from '../hooks/useGrid2DSimulation';
+import { SUPPORTED_GRID_SIZES } from '../hooks/useGrid2DSimulation';
 
 interface Grid2DControlPanelProps {
   isReady: boolean;
@@ -17,6 +19,9 @@ interface Grid2DControlPanelProps {
   showGrid?: boolean;
   onShowVelocitiesChange?: (show: boolean) => void;
   onShowGridChange?: (show: boolean) => void;
+  // Grid size
+  gridSize?: GridSize;
+  onGridSizeChange?: (size: GridSize) => void;
   // Physics parameters
   mass?: number;
   stiffness?: number;
@@ -44,9 +49,11 @@ export function Grid2DControlPanel({
   showGrid = true,
   onShowVelocitiesChange,
   onShowGridChange,
+  gridSize = 10,
+  onGridSizeChange,
   mass = 1.0,
-  stiffness = 50.0,
-  damping = 0.15,
+  stiffness = 100.0,
+  damping = 1.0,
   gridType = 'quad',
   onMassChange,
   onStiffnessChange,
@@ -167,37 +174,33 @@ export function Grid2DControlPanel({
 
         <div style={styles.parameterControl}>
           <label style={styles.parameterLabel}>
-            <span style={styles.parameterName}>Grid Type</span>
+            <span style={styles.parameterName}>Grid Size</span>
             <span style={styles.parameterValue}>
-              {gridType === 'quad' ? 'Quadrilateral' : 'Triangular'}
+              {gridSize}×{gridSize} ({gridSize * gridSize} masses)
             </span>
           </label>
-          <div style={styles.buttonGroup}>
-            <button
-              onClick={() => onGridTypeChange?.('quad')}
-              disabled={isInitialized}
-              className="touch-button"
-              style={{
-                ...styles.gridTypeButton,
-                ...(gridType === 'quad' ? styles.gridTypeButtonActive : {}),
-                ...(isInitialized ? styles.buttonDisabled : {}),
-              }}
-            >
-              Quadrilateral (Standard)
-            </button>
-            <button
-              onClick={() => onGridTypeChange?.('triangle')}
-              disabled={isInitialized}
-              className="touch-button"
-              style={{
-                ...styles.gridTypeButton,
-                ...(gridType === 'triangle' ? styles.gridTypeButtonActive : {}),
-                ...(isInitialized ? styles.buttonDisabled : {}),
-              }}
-            >
-              Triangular (More Stable)
-            </button>
+          <div style={styles.gridSizeGrid}>
+            {SUPPORTED_GRID_SIZES.map((size) => (
+              <button
+                key={size}
+                onClick={() => onGridSizeChange?.(size)}
+                disabled={isInitialized}
+                className="touch-button"
+                style={{
+                  ...styles.gridSizeButton,
+                  ...(gridSize === size ? styles.gridSizeButtonActive : {}),
+                  ...(isInitialized ? styles.buttonDisabled : {}),
+                }}
+              >
+                {size}×{size}
+              </button>
+            ))}
           </div>
+          {gridSize >= 50 && (
+            <p style={styles.warningText}>
+              Large grids ({gridSize * gridSize} masses) may run slower
+            </p>
+          )}
         </div>
 
         <div style={styles.parameterControl}>
@@ -250,6 +253,44 @@ export function Grid2DControlPanel({
             style={styles.slider}
           />
         </div>
+
+        <div style={styles.parameterControl}>
+          <label style={styles.parameterLabel}>
+            <span style={styles.parameterName}>Grid Type</span>
+            <span style={styles.parameterValue}>{gridType}</span>
+          </label>
+          <div style={styles.gridTypeGrid}>
+            <button
+              onClick={() => onGridTypeChange?.('quad')}
+              disabled={isInitialized}
+              className="touch-button"
+              style={{
+                ...styles.gridTypeButton,
+                ...(gridType === 'quad' ? styles.gridTypeButtonActive : {}),
+                ...(isInitialized ? styles.buttonDisabled : {}),
+              }}
+            >
+              Quad
+            </button>
+            <button
+              onClick={() => onGridTypeChange?.('triangle')}
+              disabled={isInitialized}
+              className="touch-button"
+              style={{
+                ...styles.gridTypeButton,
+                ...(gridType === 'triangle' ? styles.gridTypeButtonActive : {}),
+                ...(isInitialized ? styles.buttonDisabled : {}),
+              }}
+            >
+              Triangle
+            </button>
+          </div>
+          <p style={styles.infoTextSmall}>
+            {gridType === 'quad'
+              ? 'Horizontal + vertical springs'
+              : 'H + V + diagonal springs (more stable)'}
+          </p>
+        </div>
       </div>
 
       {/* Visualization Options */}
@@ -282,11 +323,14 @@ export function Grid2DControlPanel({
         <h3 style={styles.sectionTitle}>About</h3>
         <p style={styles.infoText}>
           2D mass-spring grid simulation using Hooke's law with damping.
-          Each mass has 4 states: (x, y, vx, vy).
+          Supports grids from 5×5 (25 masses) up to 100×100 (10,000 masses).
         </p>
         <p style={styles.infoText}>
-          The grid simulates cloth-like behavior with springs connecting
-          adjacent masses.
+          Uses the <strong>Unified Graph Architecture</strong> with O(K) template
+          instantiations and compile-time validated state function resolution.
+        </p>
+        <p style={styles.infoText}>
+          All physics runs in C++ via WebAssembly with zero runtime overhead.
         </p>
       </div>
     </div>
@@ -441,6 +485,12 @@ const styles = {
     width: '100%',
     cursor: 'pointer',
   },
+  gridTypeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '8px',
+    marginTop: '8px',
+  },
   gridTypeButton: {
     padding: '10px 16px',
     fontSize: '13px',
@@ -453,6 +503,34 @@ const styles = {
     transition: 'all 0.2s ease',
   },
   gridTypeButtonActive: {
+    borderColor: 'var(--accent-cyan)',
+    backgroundColor: 'var(--accent-cyan)',
+    color: '#fff',
+  },
+  infoTextSmall: {
+    fontSize: '11px',
+    color: 'var(--text-secondary)',
+    marginTop: '6px',
+    fontStyle: 'italic' as const,
+  },
+  gridSizeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(5, 1fr)',
+    gap: '6px',
+    marginTop: '8px',
+  },
+  gridSizeButton: {
+    padding: '10px 8px',
+    fontSize: '12px',
+    fontWeight: 'bold' as const,
+    border: '2px solid var(--bg-tertiary)',
+    borderRadius: '4px',
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  gridSizeButtonActive: {
     borderColor: 'var(--accent-cyan)',
     backgroundColor: 'var(--accent-cyan)',
     color: '#fff',

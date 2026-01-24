@@ -3,13 +3,43 @@ import type { SopotModule, Grid2DSimulator, GridTopology } from '../types/sopot'
 import type { Grid2DState } from '../components/Grid2DVisualization';
 import { loadSopotWasmModule } from '../utils/wasmLoader';
 
+// Supported grid sizes (must match WASM implementation)
+export type GridSize = 5 | 10 | 20 | 50 | 100;
+export const SUPPORTED_GRID_SIZES: GridSize[] = [5, 10, 20, 50, 100];
+
+// Physics tuning constants for different grid sizes
+const TIMESTEP_LARGE_GRID = 0.0005;  // For grids >= 50x50 (stability)
+const TIMESTEP_SMALL_GRID = 0.001;   // For grids < 50x50
+const SPACING_LARGE_GRID = 0.2;      // For grids > 20x20 (fit in view)
+const SPACING_MEDIUM_GRID = 0.3;     // For grids 11-20
+const SPACING_SMALL_GRID = 0.5;      // For grids <= 10
+
+/** Get appropriate timestep for grid size (smaller for stability on large grids) */
+function getTimestepForGridSize(size: GridSize): number {
+  return size >= 50 ? TIMESTEP_LARGE_GRID : TIMESTEP_SMALL_GRID;
+}
+
+/** Get appropriate spacing for grid size (smaller for large grids to fit in view) */
+function getSpacingForGridSize(size: GridSize): number {
+  if (size > 20) return SPACING_LARGE_GRID;
+  if (size > 10) return SPACING_MEDIUM_GRID;
+  return SPACING_SMALL_GRID;
+}
+
 /**
  * Hook for 2D Grid simulation using WASM
  *
  * All physics computations run in C++ via WebAssembly.
  * The frontend only handles visualization.
+ *
+ * Supports grids up to 100x100 (10,000 masses) using the
+ * Unified Graph Architecture with O(K) template instantiations.
+ *
+ * Grid types:
+ * - 'quad': Horizontal + vertical springs only (standard grid)
+ * - 'triangle': H + V + diagonal springs (X pattern, more stable, cloth-like)
  */
-export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
+export function useGrid2DSimulation(defaultGridSize: GridSize = 10) {
   const [isReady, setIsReady] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -22,14 +52,13 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
   const animationFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
 
-  // Grid configuration
-  const [rows] = useState(defaultRows);
-  const [cols] = useState(defaultCols);
+  // Grid configuration - now variable size
+  const [gridSize, setGridSize] = useState<GridSize>(defaultGridSize);
 
   // Physics parameters
   const [mass, setMass] = useState(1.0);
-  const [stiffness, setStiffness] = useState(50.0);
-  const [damping, setDamping] = useState(0.15);
+  const [stiffness, setStiffness] = useState(100.0);
+  const [damping, setDamping] = useState(1.0);
   const [gridType, setGridType] = useState<GridTopology>('quad');
 
   // Load WASM module (same approach as useRocketSimulation)
@@ -90,8 +119,9 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     // Get center of mass and energy values
     const centerOfMass = simulator.getCenterOfMass();
     const kineticEnergy = simulator.getKineticEnergy();
-    const potentialEnergy = simulator.getPotentialEnergy();
-    const totalEnergy = simulator.getTotalEnergy();
+    // potentialEnergy and totalEnergy may not exist in new implementation
+    const potentialEnergy = simulator.getPotentialEnergy?.() ?? 0;
+    const totalEnergy = simulator.getTotalEnergy?.() ?? kineticEnergy;
 
     return {
       time: wasmState.time,
@@ -114,40 +144,46 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     }
 
     try {
-      console.log(`[Grid2D] Initializing ${rows}x${cols} grid (C++ physics via WASM)`);
+      const numMasses = gridSize * gridSize;
+      const numSprings = 2 * gridSize * (gridSize - 1);
+      console.log(`[Grid2D] Initializing ${gridSize}x${gridSize} grid (${numMasses} masses, ${numSprings} springs)`);
 
       // Create new simulator
       const simulator = new moduleRef.current.Grid2DSimulator();
 
-      // Configure grid
-      simulator.setGridSize(rows, cols);
-      // IMPORTANT: setGridType must be called BEFORE initialize()
-      // The grid topology determines the spring connectivity pattern
+      // Configure grid - using new unified graph architecture
+      simulator.setGridSize(gridSize, gridSize);
       simulator.setGridType(gridType);
       simulator.setMass(mass);
-      simulator.setSpacing(0.5);
+      simulator.setSpacing(getSpacingForGridSize(gridSize));
       simulator.setStiffness(stiffness);
       simulator.setDamping(damping);
-      simulator.setTimestep(0.005);
+      simulator.setTimestep(getTimestepForGridSize(gridSize));
 
       // Initialize
       simulator.initialize();
 
       // Add initial perturbation to center
-      simulator.perturbCenter(0.0, 0.3);
+      const perturbAmount = gridSize > 20 ? 0.1 : 0.3;
+      simulator.perturbCenter(0.0, perturbAmount);
 
       simulatorRef.current = simulator;
       setCurrentState(wasmToVizState(simulator));
       setIsInitialized(true);
       setError(null);
 
-      console.log('[Grid2D] Initialized successfully');
+      // Log system info
+      if (simulator.getSystemInfo) {
+        const info = simulator.getSystemInfo();
+        console.log(`[Grid2D] System: ${info.numMasses} masses, ${info.numSprings} springs, ${info.stateSize} state vars`);
+        console.log(`[Grid2D] Architecture: ${info.architecture}`);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to initialize';
       console.error('[Grid2D] Initialization error:', err);
       setError(message);
     }
-  }, [rows, cols, mass, stiffness, damping, gridType, wasmToVizState]);
+  }, [gridSize, gridType, mass, stiffness, damping, wasmToVizState]);
 
   // Reset simulation
   const reset = useCallback(() => {
@@ -201,16 +237,29 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
       lastTimeRef.current = currentTime;
 
       if (deltaTime > 0 && deltaTime < 0.1 && simulatorRef.current) {
+        // Use consistent timestep calculation
+        const dt = getTimestepForGridSize(gridSize);
+        // More steps per frame for large grids to compensate for smaller timestep
+        const baseStepsPerFrame = gridSize >= 50 ? 10 : 5;
+
         // Run multiple physics steps for stability
-        const numSteps = Math.max(1, Math.floor(deltaTime * playbackSpeed / 0.005));
-        for (let i = 0; i < Math.min(numSteps, 20); i++) {
-          simulatorRef.current.step();
+        const numSteps = Math.max(1, Math.floor(deltaTime * playbackSpeed / dt));
+        const actualSteps = Math.min(numSteps, baseStepsPerFrame * 4);
+
+        // Use stepMultiple for efficiency on large grids
+        if (simulatorRef.current.stepMultiple && actualSteps > 1) {
+          simulatorRef.current.stepMultiple(actualSteps);
+        } else {
+          for (let i = 0; i < actualSteps; i++) {
+            simulatorRef.current.step();
+          }
         }
         setCurrentState(wasmToVizState(simulatorRef.current));
 
-        // Log diagnostics every 100 frames
+        // Log diagnostics every 100 frames (less frequently for large grids)
         frameCount++;
-        if (frameCount % 100 === 0 && simulatorRef.current) {
+        const logInterval = gridSize >= 50 ? 200 : 100;
+        if (frameCount % logInterval === 0 && simulatorRef.current) {
           const com = simulatorRef.current.getCenterOfMass();
           const momentum = simulatorRef.current.getTotalMomentum();
           const time = simulatorRef.current.getTime();
@@ -225,7 +274,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
           const momentumMag = Math.sqrt(momentum.px * momentum.px + momentum.py * momentum.py);
 
           console.log(
-            `[Grid2D] t=${time.toFixed(2)}s | CoM=(${com.x.toFixed(4)}, ${com.y.toFixed(4)}) drift=${comDrift.toFixed(6)} | p=(${momentum.px.toFixed(6)}, ${momentum.py.toFixed(6)}) |p|=${momentumMag.toFixed(6)}`
+            `[Grid2D ${gridSize}x${gridSize}] t=${time.toFixed(2)}s | CoM drift=${comDrift.toFixed(6)} | |p|=${momentumMag.toFixed(6)}`
           );
         }
       }
@@ -240,7 +289,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isRunning, playbackSpeed, wasmToVizState]);
+  }, [isRunning, playbackSpeed, gridSize, wasmToVizState]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -256,6 +305,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     error,
     currentState,
     playbackSpeed,
+    gridSize,
     mass,
     stiffness,
     damping,
@@ -266,6 +316,7 @@ export function useGrid2DSimulation(defaultRows = 5, defaultCols = 5) {
     reset,
     step,
     setPlaybackSpeed,
+    setGridSize,
     setMass,
     setStiffness,
     setDamping,

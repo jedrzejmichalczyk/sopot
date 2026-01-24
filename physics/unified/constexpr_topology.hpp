@@ -420,6 +420,91 @@ constexpr auto makeGridTopology() {
 }
 
 /**
+ * @brief Generate topology for a 2D triangulated grid of masses
+ *
+ * Creates a grid where masses are connected by horizontal, vertical,
+ * AND diagonal springs (X pattern in each cell). This provides more
+ * stability and better approximates cloth-like behavior.
+ *
+ *   - Type 0 = Mass (Rows * Cols nodes)
+ *   - Type 1 = Spring (horizontal + vertical + diagonal connections)
+ *
+ * @tparam Rows Number of rows
+ * @tparam Cols Number of columns
+ */
+template<size_t Rows, size_t Cols>
+constexpr auto makeTriangleGridTopology() {
+    constexpr size_t NumMasses = Rows * Cols;
+    constexpr size_t NumHSprings = Rows * (Cols - 1);           // Horizontal
+    constexpr size_t NumVSprings = (Rows - 1) * Cols;           // Vertical
+    constexpr size_t NumDiagSprings = 2 * (Rows - 1) * (Cols - 1);  // Diagonal (X pattern)
+    constexpr size_t NumSprings = NumHSprings + NumVSprings + NumDiagSprings;
+    constexpr size_t NumNodes = NumMasses + NumSprings;
+    constexpr size_t NumEdges = NumSprings * 2;  // Each spring connects 2 masses
+
+    GraphTopology<NumNodes, NumEdges> t;
+
+    // Add mass nodes (type 0)
+    for (size_t i = 0; i < NumMasses; ++i) {
+        t.nodes[i] = {0, i};
+    }
+
+    // Add spring nodes (type 1) and edges
+    size_t spring_idx = NumMasses;
+    size_t edge_idx = 0;
+
+    // Horizontal springs
+    for (size_t r = 0; r < Rows; ++r) {
+        for (size_t c = 0; c < Cols - 1; ++c) {
+            size_t mass_left = r * Cols + c;
+            size_t mass_right = r * Cols + c + 1;
+
+            t.nodes[spring_idx] = {1, spring_idx - NumMasses};
+            t.edges[edge_idx++] = {spring_idx, 0, mass_left, 0};
+            t.edges[edge_idx++] = {spring_idx, 1, mass_right, 1};
+            spring_idx++;
+        }
+    }
+
+    // Vertical springs
+    for (size_t r = 0; r < Rows - 1; ++r) {
+        for (size_t c = 0; c < Cols; ++c) {
+            size_t mass_top = r * Cols + c;
+            size_t mass_bottom = (r + 1) * Cols + c;
+
+            t.nodes[spring_idx] = {1, spring_idx - NumMasses};
+            t.edges[edge_idx++] = {spring_idx, 0, mass_top, 2};
+            t.edges[edge_idx++] = {spring_idx, 1, mass_bottom, 3};
+            spring_idx++;
+        }
+    }
+
+    // Diagonal springs (X pattern in each cell)
+    for (size_t r = 0; r < Rows - 1; ++r) {
+        for (size_t c = 0; c < Cols - 1; ++c) {
+            size_t mass_tl = r * Cols + c;           // Top-left
+            size_t mass_tr = r * Cols + c + 1;       // Top-right
+            size_t mass_bl = (r + 1) * Cols + c;     // Bottom-left
+            size_t mass_br = (r + 1) * Cols + c + 1; // Bottom-right
+
+            // Diagonal: top-left to bottom-right
+            t.nodes[spring_idx] = {1, spring_idx - NumMasses};
+            t.edges[edge_idx++] = {spring_idx, 0, mass_tl, 0};
+            t.edges[edge_idx++] = {spring_idx, 1, mass_br, 1};
+            spring_idx++;
+
+            // Diagonal: top-right to bottom-left
+            t.nodes[spring_idx] = {1, spring_idx - NumMasses};
+            t.edges[edge_idx++] = {spring_idx, 0, mass_tr, 0};
+            t.edges[edge_idx++] = {spring_idx, 1, mass_bl, 1};
+            spring_idx++;
+        }
+    }
+
+    return t;
+}
+
+/**
  * @brief Generate topology for a chain of masses connected by springs
  *
  * @tparam NumMasses Number of masses in the chain

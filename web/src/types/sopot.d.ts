@@ -121,9 +121,22 @@ export interface Grid2DWasmState {
 /**
  * Grid topology type - determines the spring connectivity pattern
  * - 'quad': Horizontal and vertical springs only (standard grid)
- * - 'triangle': Adds diagonal springs in X pattern (more stable)
+ * - 'triangle': Adds diagonal springs in X pattern (more stable, cloth-like)
  */
 export type GridTopology = 'quad' | 'triangle';
+
+/**
+ * System info returned by getSystemInfo()
+ */
+export interface Grid2DSystemInfo {
+  rows: number;
+  cols: number;
+  numMasses: number;
+  numSprings: number;
+  stateSize: number;
+  gridType: GridTopology;
+  architecture: string;
+}
 
 export interface Grid2DSimulator {
   // Configuration
@@ -145,6 +158,7 @@ export interface Grid2DSimulator {
   // Simulation
   step(): void;
   stepWithDt(dt: number): void;
+  stepMultiple?(count: number): void;  // New: run multiple steps efficiently
 
   // State queries
   getTime(): number;
@@ -156,9 +170,11 @@ export interface Grid2DSimulator {
   getState(): Grid2DWasmState;
   getMassPosition(row: number, col: number): { x: number; y: number };
   getKineticEnergy(): number;
-  getPotentialEnergy(): number;
-  getTotalEnergy(): number;
+  getPotentialEnergy?(): number;  // Optional
+  getTotalEnergy?(): number;      // Optional
   getCenterOfMass(): { x: number; y: number };
+  getTotalMomentum(): { px: number; py: number };
+  getSystemInfo?(): Grid2DSystemInfo;  // New: system info for debugging
 }
 
 /**
