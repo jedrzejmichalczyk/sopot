@@ -263,6 +263,11 @@ add_executable(symbolic_cas_demo examples/symbolic_cas_demo.cpp)
 target_include_directories(symbolic_cas_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_features(symbolic_cas_demo PRIVATE cxx_std_20)
 
+# Whip crack simulation example
+add_executable(whip_crack examples/whip_crack.cpp)
+target_link_libraries(whip_crack sopot_core sopot_physics)
+target_compile_features(whip_crack PRIVATE cxx_std_20)
+
 # Custom target to run all tests
 # Note: unified graph tests are excluded on macOS due to linker limitations
 set(CORE_TESTS
