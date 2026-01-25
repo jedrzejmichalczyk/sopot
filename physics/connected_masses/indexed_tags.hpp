@@ -89,6 +89,19 @@ struct SpringTag {
                    " and mass " + std::to_string(Index2);
         }
     };
+
+    // Force exerted by this spring on mass Index1 (force on Index2 is opposite)
+    struct Force : categories::Dynamics {
+        static std::string name() {
+            return "Spring" + std::to_string(Index1) + std::to_string(Index2) + "::Force";
+        }
+        static std::string symbol() {
+            return "F_" + std::to_string(Index1) + std::to_string(Index2);
+        }
+        static std::string description() {
+            return "Force from spring on mass " + std::to_string(Index1);
+        }
+    };
 };
 
 } // namespace sopot::connected_masses

@@ -2,6 +2,7 @@
 
 #include "indexed_point_mass.hpp"
 #include "indexed_spring.hpp"
+#include "force_aggregator.hpp"
 #include "core/typed_component.hpp"
 #include <array>
 #include <tuple>
@@ -219,8 +220,17 @@ auto makeConnectedMassSystem(
         std::make_index_sequence<Edges.size()>{}
     );
 
+    // Generate force aggregators for each mass
+    auto force_aggregator_tuple = detail::makeForceAggregatorsTuple<T, Edges>(
+        std::make_index_sequence<NumMasses>{}
+    );
+
     // Combine into single tuple
-    auto all_components = std::tuple_cat(std::move(mass_tuple), std::move(spring_tuple));
+    auto all_components = std::tuple_cat(
+        std::move(mass_tuple),
+        std::move(spring_tuple),
+        std::move(force_aggregator_tuple)
+    );
 
     // Create TypedODESystem from tuple
     return std::apply([](auto&&... comps) {
