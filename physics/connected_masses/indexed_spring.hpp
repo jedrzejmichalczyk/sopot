@@ -99,14 +99,17 @@ public:
     }
 
     /**
-     * @brief Compute force on mass 1 (registry-aware)
+     * @brief Compute force exerted by this spring on mass Index1 (registry-aware)
      *
-     * Force pulls mass 1 toward mass 2 when extended.
-     * Includes steep repulsion when masses get too close.
+     * Force pulls mass Index1 toward mass Index2 when spring is stretched.
+     * Uses proper signed distance convention matching 2D spring behavior.
+     *
+     * Note: This provides SpringTag::Force, not MassTag::Force.
+     * The ForceAggregator sums all spring forces to provide MassTag::Force.
      */
     template<typename Registry>
     T compute(
-        typename TagSet1::Force,
+        typename SpringTagSet::Force,
         std::span<const T> state,
         const Registry& registry
     ) const {
@@ -116,58 +119,48 @@ public:
         T x1 = registry.template computeFunction<typename TagSet1::Position>(state);
         T x2 = registry.template computeFunction<typename TagSet2::Position>(state);
 
-        // Extension = (x1 - x2) - rest_length
-        // Positive extension means stretched
-        T extension = x1 - x2 - T(m_rest_length);
+        // Vector from Index1 to Index2 (signed distance)
+        T dx = x2 - x1;
 
-        // Spring force: F = -k * extension (restoring force)
-        T spring_force = -T(m_stiffness) * extension;
+        // Distance (always positive)
+        T distance = sqrt(dx * dx);
+        T distance_safe = distance < T(1e-10) ? T(1e-10) : distance;
 
-        // Add damping force if present: F_damp = -c * (v1 - v2)
+        // Unit direction from Index1 toward Index2
+        T direction = dx / distance_safe;
+
+        // Extension (positive = stretched, negative = compressed)
+        T extension = distance - T(m_rest_length);
+
+        // Spring force magnitude: positive when stretched (pulls masses together)
+        T force_magnitude = T(m_stiffness) * extension;
+
+        // Add damping force if present
+        // Damping opposes relative velocity along spring direction
         if (m_damping > 0.0) {
             T v1 = registry.template computeFunction<typename TagSet1::Velocity>(state);
             T v2 = registry.template computeFunction<typename TagSet2::Velocity>(state);
-            T relative_velocity = v1 - v2;
-            T damping_force = -T(m_damping) * relative_velocity;
-            spring_force += damping_force;
+            // Relative velocity of Index2 w.r.t. Index1, projected onto spring direction
+            T relative_velocity = (v2 - v1) * direction;
+            force_magnitude += T(m_damping) * relative_velocity;
         }
 
         // Steep repulsion when masses get too close (only if min_distance > 0)
-        // Uses inverse formula: F_repulsion = k_rep * (r_min/r - 1) when |x1-x2| < r_min
-        if (m_min_distance > 0.0) {
-            T dx = x1 - x2;
-            T distance = sqrt(dx * dx);  // Works with autodiff
-            if (value_of(distance) < m_min_distance) {
-                T distance_safe = distance < T(1e-10) ? T(1e-10) : distance;
-                // Direction: +1 if x1 > x2, -1 if x1 < x2
-                T direction = dx / distance_safe;
-                // Repulsion pushes masses apart
-                T repulsion_magnitude = T(m_repulsion_stiffness) * (T(m_min_distance) / distance_safe - T(1.0));
-                spring_force += repulsion_magnitude * direction;
-            }
+        if (m_min_distance > 0.0 && value_of(distance) < m_min_distance) {
+            // Repulsion pushes masses apart (negative force_magnitude contribution)
+            T repulsion = -T(m_repulsion_stiffness) * (T(m_min_distance) / distance_safe - T(1.0));
+            force_magnitude += repulsion;
         }
 
-        return spring_force;
-    }
-
-    /**
-     * @brief Compute force on mass 2 (registry-aware)
-     *
-     * By Newton's third law: F2 = -F1
-     */
-    template<typename Registry>
-    T compute(
-        typename TagSet2::Force,
-        std::span<const T> state,
-        const Registry& registry
-    ) const {
-        // Force on mass 2 is opposite of force on mass 1
-        T force1 = compute(typename TagSet1::Force{}, state, registry);
-        return -force1;
+        // Force on mass Index1 points toward Index2 when force_magnitude > 0
+        return force_magnitude * direction;
     }
 
     /**
      * @brief Compute spring extension (registry-aware)
+     *
+     * Extension = distance - rest_length
+     * Positive = stretched, Negative = compressed
      */
     template<typename Registry>
     T compute(
@@ -175,9 +168,12 @@ public:
         std::span<const T> state,
         const Registry& registry
     ) const {
+        using std::sqrt;
         T x1 = registry.template computeFunction<typename TagSet1::Position>(state);
         T x2 = registry.template computeFunction<typename TagSet2::Position>(state);
-        return x1 - x2 - T(m_rest_length);
+        T dx = x2 - x1;
+        T distance = sqrt(dx * dx);
+        return distance - T(m_rest_length);
     }
 
     /**
@@ -195,21 +191,6 @@ public:
         return T(0.5) * T(m_stiffness) * extension * extension;
     }
 
-    // Fallback compute methods (throw error when registry not available)
-    // These should never be called - the registry-aware versions should always be used
-    T compute(typename TagSet1::Force, std::span<const T> /*state*/) const {
-        throw std::logic_error(
-            "Spring force computation requires registry access. "
-            "This fallback should never be called."
-        );
-    }
-
-    T compute(typename TagSet2::Force, std::span<const T> /*state*/) const {
-        throw std::logic_error(
-            "Spring force computation requires registry access. "
-            "This fallback should never be called."
-        );
-    }
 };
 
 } // namespace sopot::connected_masses
