@@ -3,9 +3,10 @@
 #include "core/typed_component.hpp"
 #include "core/scalar.hpp"
 #include "indexed_tags.hpp"
-#include <string>
-#include <stdexcept>
 #include <cmath>
+#include <span>
+#include <stdexcept>
+#include <string>
 
 namespace sopot::connected_masses {
 
