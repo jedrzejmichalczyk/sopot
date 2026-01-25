@@ -27,6 +27,7 @@
 #include <iostream>
 #include <iomanip>
 #include <cmath>
+#include <numbers>
 #include <vector>
 #include <array>
 #include <cassert>
@@ -235,11 +236,11 @@ int main() {
     //=========================================================================
     // Highest frequency: omega = sqrt(k/m_min), need dt << 2*pi/omega
     double omega_max = std::sqrt(SPRING_K / min_mass);
-    double period_min = 2.0 * M_PI / omega_max;
+    double period_min = 2.0 * std::numbers::pi / omega_max;
     double dt = period_min / 50.0;  // 50 samples per shortest period
 
     std::cout << "  Highest frequency: " << std::setprecision(1)
-              << (omega_max / (2.0 * M_PI)) << " Hz\n";
+              << (omega_max / (2.0 * std::numbers::pi)) << " Hz\n";
     std::cout << "  Timestep: " << std::scientific << std::setprecision(2)
               << dt << " s\n" << std::fixed;
 
