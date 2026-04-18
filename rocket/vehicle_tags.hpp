@@ -104,6 +104,12 @@ struct VehicleTags {
         static constexpr std::string_view name() { return "gravity_acceleration"; }
         static constexpr size_t type_id() { return base + 206; }
     };
+    // Lateral acceleration command from a guidance law, expressed in ENU [m/s^2].
+    // Every vehicle provides this tag; ballistic vehicles return zero.
+    struct GuidanceCommandENU : categories::RocketDynamics {
+        static constexpr std::string_view name() { return "guidance_command_enu"; }
+        static constexpr size_t type_id() { return base + 207; }
+    };
 
     // --- Aero (offsets 300..) ---
     struct AeroForceBody : categories::RocketAero {
