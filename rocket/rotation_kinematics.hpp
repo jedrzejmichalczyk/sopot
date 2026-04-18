@@ -1,18 +1,19 @@
 #pragma once
 
 #include "../core/typed_component.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include "quaternion.hpp"
 #include <span>
 
 namespace sopot::rocket {
 
-template<Scalar T = double>
+template<VehicleConcept Vehicle, Scalar T = double>
 class RotationKinematics final : public TypedComponent<4, T> {
 public:
     using Base = TypedComponent<4, T>;
     using typename Base::LocalState;
     using typename Base::LocalDerivative;
+    using Tags = VehicleTags<Vehicle>;
 
 private:
     Quaternion<T> m_initial_quaternion{T(0), T(0), T(0), T(1)};
@@ -40,12 +41,12 @@ public:
     LocalDerivative derivatives(T, std::span<const T> local, std::span<const T> global,
         const Registry& registry) const {
         Quaternion<T> q{local[0], local[1], local[2], local[3]};
-        Vector3<T> omega = registry.template computeFunction<kinematics::AngularVelocity>(global);
+        Vector3<T> omega = registry.template computeFunction<typename Tags::AngularVelocity>(global);
         Quaternion<T> dq = q.derivative(omega);
         return {dq.q1, dq.q2, dq.q3, dq.q4};
     }
 
-    Quaternion<T> compute(kinematics::AttitudeQuaternion, std::span<const T> state) const {
+    Quaternion<T> compute(typename Tags::AttitudeQuaternion, std::span<const T> state) const {
         return {
             this->getGlobalState(state, 0),
             this->getGlobalState(state, 1),

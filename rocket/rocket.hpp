@@ -2,7 +2,7 @@
 
 #include "../core/typed_component.hpp"
 #include "../core/solver.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include "vector3.hpp"
 #include "quaternion.hpp"
 #include "simulation_time.hpp"
@@ -24,52 +24,39 @@
 namespace sopot::rocket {
 
 /**
- * Rocket: Assembles components using TypedODESystem
+ * Rocket: Assembles one vehicle's worth of components using TypedODESystem.
  *
- * This class demonstrates the proper use of the framework:
- * 1. Components are created and configured
- * 2. makeTypedODESystem composes them with compile-time state function dispatch
- * 3. Components query each other through the registry pattern
+ * Templated on Vehicle (role tag — Missile, Interceptor, ...) and on Scalar T.
+ * Multiple Rocket<Vehicle, T> instances can later be merged into a single
+ * multi-vehicle TypedODESystem without tag collisions because every state
+ * function is scoped by VehicleTags<Vehicle>.
  *
- * State layout (14 states total):
- *   [0]     - Simulation time (derivative = 1)
- *   [1-3]   - Position ENU (x, y, z)
- *   [4-6]   - Velocity ENU (vx, vy, vz)
- *   [7-10]  - Quaternion (q1, q2, q3, q4)
- *   [11-13] - Angular velocity (wx, wy, wz)
- *
- * Data flow (all through registry state functions):
- *   SimulationTime → provides propulsion::Time
- *   TranslationKinematics → provides kinematics::PositionENU, Altitude
- *   TranslationDynamics → provides kinematics::VelocityENU
- *   RotationKinematics → provides kinematics::AttitudeQuaternion
- *   RotationDynamics → provides kinematics::AngularVelocity
- *   StandardAtmosphere → provides environment::AtmosphericDensity, Pressure, SpeedOfSound
- *   Gravity → provides dynamics::GravityAcceleration
- *   RocketBody → queries Time, provides dynamics::Mass, MomentOfInertia
- *   InterpolatedEngine → queries Time, Pressure, provides propulsion::ThrustForceBody
- *   AxisymmetricAerodynamics → queries VelocityENU, Quaternion, etc., provides aero::AeroForceENU, AeroMomentBody
- *   ForceAggregator → aggregates forces from above, provides dynamics::TotalForceENU, TotalTorqueBody
+ * State layout (14 states total for a single vehicle):
+ *   [0]     - Simulation time (global, sim::Time)
+ *   [1-3]   - Position ENU
+ *   [4-6]   - Velocity ENU
+ *   [7-10]  - Quaternion
+ *   [11-13] - Angular velocity
  */
-template<Scalar T = double>
+template<VehicleConcept Vehicle, Scalar T = double>
 class Rocket {
 public:
     using scalar_type = T;
+    using vehicle_type = Vehicle;
+    using Tags = VehicleTags<Vehicle>;
 
-    // Component types
-    using TimeComponent = SimulationTime<T>;
-    using PosComponent = TranslationKinematics<T>;
-    using VelComponent = TranslationDynamics<T>;
-    using QuatComponent = RotationKinematics<T>;
-    using OmegaComponent = RotationDynamics<T>;
-    using AtmoComponent = StandardAtmosphere<T>;
-    using GravComponent = Gravity<T>;
-    using BodyComponent = RocketBody<T>;
-    using EngineComponent = InterpolatedEngine<T>;
-    using AeroComponent = AxisymmetricAerodynamics<T>;
-    using ForceComponent = ForceAggregator<T>;
+    using TimeComponent   = SimulationTime<T>;
+    using PosComponent    = TranslationKinematics<Vehicle, T>;
+    using VelComponent    = TranslationDynamics<Vehicle, T>;
+    using QuatComponent   = RotationKinematics<Vehicle, T>;
+    using OmegaComponent  = RotationDynamics<Vehicle, T>;
+    using AtmoComponent   = StandardAtmosphere<Vehicle, T>;
+    using GravComponent   = Gravity<Vehicle, T>;
+    using BodyComponent   = RocketBody<Vehicle, T>;
+    using EngineComponent = InterpolatedEngine<Vehicle, T>;
+    using AeroComponent   = AxisymmetricAerodynamics<Vehicle, T>;
+    using ForceComponent  = ForceAggregator<Vehicle, T>;
 
-    // The composed ODE system type
     using SystemType = TypedODESystem<T,
         TimeComponent,
         PosComponent,
@@ -85,7 +72,6 @@ public:
     >;
 
 private:
-    // Owned components (configured before creating system)
     TimeComponent m_time;
     PosComponent m_position;
     VelComponent m_velocity;
@@ -98,10 +84,8 @@ private:
     AeroComponent m_aero;
     ForceComponent m_forces;
 
-    // The composed system (created in setupBeforeSimulation)
     std::unique_ptr<SystemType> m_system;
 
-    // Configuration
     T m_elevation_deg{90};
     T m_azimuth_deg{0};
 
@@ -148,7 +132,6 @@ public:
 
     double getBurnTime() const { return m_engine.getBurnTime(); }
 
-    // Access to aerodynamics component for additional configuration
     AeroComponent& aero() { return m_aero; }
     const AeroComponent& aero() const { return m_aero; }
 
@@ -157,14 +140,8 @@ public:
     //=========================================================================
 
     void setupBeforeSimulation() {
-        // Configure initial attitude from launcher angles
         m_attitude.setInitialFromLauncherAngles(m_elevation_deg, m_azimuth_deg);
 
-        // Create the composed ODE system using makeTypedODESystem
-        // This automatically:
-        // - Sets state offsets for each component
-        // - Creates the registry for compile-time state function dispatch
-        // - Enables components to query each other through registry
         m_system = std::make_unique<SystemType>(
             m_time,
             m_position,
@@ -179,15 +156,14 @@ public:
             m_forces
         );
 
-        // Verify state functions are available (compile-time checks)
-        static_assert(SystemType::template hasFunction<propulsion::Time>(),
-            "System must provide Time state function");
-        static_assert(SystemType::template hasFunction<dynamics::Mass>(),
-            "System must provide Mass state function");
-        static_assert(SystemType::template hasFunction<aero::AeroForceENU>(),
-            "System must provide AeroForceENU state function");
-        static_assert(SystemType::template hasFunction<dynamics::TotalForceENU>(),
-            "System must provide TotalForceENU state function");
+        static_assert(SystemType::template hasFunction<sim::Time>(),
+            "System must provide sim::Time state function");
+        static_assert(SystemType::template hasFunction<typename Tags::Mass>(),
+            "System must provide VehicleTags::Mass state function");
+        static_assert(SystemType::template hasFunction<typename Tags::AeroForceENU>(),
+            "System must provide VehicleTags::AeroForceENU state function");
+        static_assert(SystemType::template hasFunction<typename Tags::TotalForceENU>(),
+            "System must provide VehicleTags::TotalForceENU state function");
     }
 
     //=========================================================================
@@ -227,29 +203,28 @@ public:
         return m_system->template computeStateFunction<Tag>(state);
     }
 
-    // Convenience accessors
     T getTime(const std::vector<T>& state) const {
-        return queryStateFunction<propulsion::Time>(state);
+        return queryStateFunction<sim::Time>(state);
     }
 
     Vector3<T> getPosition(const std::vector<T>& state) const {
-        return queryStateFunction<kinematics::PositionENU>(state);
+        return queryStateFunction<typename Tags::PositionENU>(state);
     }
 
     Vector3<T> getVelocity(const std::vector<T>& state) const {
-        return queryStateFunction<kinematics::VelocityENU>(state);
+        return queryStateFunction<typename Tags::VelocityENU>(state);
     }
 
     Quaternion<T> getQuaternion(const std::vector<T>& state) const {
-        return queryStateFunction<kinematics::AttitudeQuaternion>(state);
+        return queryStateFunction<typename Tags::AttitudeQuaternion>(state);
     }
 
     T getAltitude(const std::vector<T>& state) const {
-        return queryStateFunction<kinematics::Altitude>(state);
+        return queryStateFunction<typename Tags::Altitude>(state);
     }
 
     T getMass(const std::vector<T>& state) const {
-        return queryStateFunction<dynamics::Mass>(state);
+        return queryStateFunction<typename Tags::Mass>(state);
     }
 
     T getSpeed(const std::vector<T>& state) const {
@@ -263,27 +238,23 @@ public:
 };
 
 /**
- * Simulate the rocket using the framework (returns raw SolutionResult)
+ * Simulate a single rocket (returns raw SolutionResult)
  */
-template<Scalar T = double>
+template<VehicleConcept Vehicle, Scalar T = double>
 SolutionResult simulateRocket(
-    Rocket<T>& rocket,
+    Rocket<Vehicle, T>& rocket,
     double t_end,
     double dt = 0.01
 ) {
-    // Setup creates the TypedODESystem
     rocket.setupBeforeSimulation();
 
-    // Get initial state from the system
     auto initial_state = rocket.getInitialState();
     size_t state_dim = rocket.getStateDimension();
 
-    // Create derivative function that uses the system
     auto derivs_func = [&rocket](double t, StateView state_view) -> StateDerivative {
         std::vector<T> state(state_view.begin(), state_view.end());
         auto derivs = rocket.computeDerivatives(T(t), state);
 
-        // Convert to StateDerivative (std::vector<double>)
         StateDerivative result(derivs.size());
         for (size_t i = 0; i < derivs.size(); ++i) {
             result[i] = value_of(derivs[i]);
@@ -291,13 +262,11 @@ SolutionResult simulateRocket(
         return result;
     };
 
-    // Convert initial state to double
     StateVector init_state(initial_state.size());
     for (size_t i = 0; i < initial_state.size(); ++i) {
         init_state[i] = value_of(initial_state[i]);
     }
 
-    // Solve using RK4
     auto solver = createRK4Solver();
     return solver.solve(derivs_func, state_dim, 0.0, t_end, dt, init_state);
 }
@@ -305,14 +274,14 @@ SolutionResult simulateRocket(
 /**
  * Simulate and return SimulationResult with state function interpolation
  */
-template<Scalar T = double>
-SimulationResult<Rocket<T>> simulate(
-    Rocket<T>& rocket,
+template<VehicleConcept Vehicle, Scalar T = double>
+SimulationResult<Rocket<Vehicle, T>> simulate(
+    Rocket<Vehicle, T>& rocket,
     double t_end,
     double dt = 0.01
 ) {
     auto solution = simulateRocket(rocket, t_end, dt);
-    auto result = SimulationResult<Rocket<T>>(rocket, std::move(solution));
+    auto result = SimulationResult<Rocket<Vehicle, T>>(rocket, std::move(solution));
     result.computeStatistics(rocket.getBurnTime());
     return result;
 }

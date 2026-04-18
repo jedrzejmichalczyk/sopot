@@ -88,7 +88,10 @@ void writeCSV(const std::string& filepath,
  */
 class RocketSimulator {
 private:
-    Rocket<double> m_rocket;
+    using VehicleRole = Missile;
+    using RocketType = Rocket<VehicleRole, double>;
+    using Tags = RocketType::Tags;
+    RocketType m_rocket;
     std::vector<double> m_state;
     double m_time{0.0};
     double m_dt{0.01};  // Default timestep: 10ms
@@ -215,7 +218,7 @@ private:
             // Try to get force data - use zeros if not available
             double accel_x = 0.0, accel_y = 0.0, accel_z = 0.0;
             try {
-                auto total_force = m_rocket.queryStateFunction<rocket::dynamics::TotalForceENU>(m_state);
+                auto total_force = m_rocket.queryStateFunction<typename Tags::TotalForceENU>(m_state);
                 accel_x = total_force.x / safe_mass;
                 accel_y = total_force.y / safe_mass;
                 accel_z = total_force.z / safe_mass;
@@ -229,7 +232,7 @@ private:
             // Try to get thrust data
             double thrust_mag = 0.0;
             try {
-                auto thrust = m_rocket.queryStateFunction<propulsion::ThrustForceBody>(m_state);
+                auto thrust = m_rocket.queryStateFunction<typename Tags::ThrustForceBody>(m_state);
                 thrust_mag = thrust.norm();
             } catch (...) {
                 // Thrust query failed, use zero
@@ -239,7 +242,7 @@ private:
             // Try to get gravity data
             double g = 9.81;  // Default fallback
             try {
-                g = m_rocket.queryStateFunction<rocket::dynamics::GravityAcceleration>(m_state);
+                g = m_rocket.queryStateFunction<typename Tags::GravityAcceleration>(m_state);
             } catch (...) {
                 // Gravity query failed, use default
             }

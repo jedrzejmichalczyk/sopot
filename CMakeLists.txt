@@ -128,7 +128,7 @@ endif()
 
 set(ROCKET_HEADERS
     rocket/rocket.hpp
-    rocket/rocket_tags.hpp
+    rocket/vehicle_tags.hpp
     rocket/rocket_body.hpp
     rocket/simulation_time.hpp
     rocket/translation_kinematics.hpp

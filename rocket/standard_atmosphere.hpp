@@ -1,19 +1,23 @@
 #pragma once
 
 #include "../core/typed_component.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include <cmath>
 #include <array>
 #include <span>
 
 namespace sopot::rocket {
 
-template<Scalar T = double>
+// Per-vehicle atmosphere: the USSA76 physics is shared, but each vehicle has
+// its own instance so it can provide its own VehicleTags<V>::AtmosphericDensity
+// (etc.) queried at its own altitude.
+template<VehicleConcept Vehicle, Scalar T = double>
 class StandardAtmosphere final : public TypedComponent<0, T> {
 public:
     using Base = TypedComponent<0, T>;
     using typename Base::LocalState;
     using typename Base::LocalDerivative;
+    using Tags = VehicleTags<Vehicle>;
 
     static constexpr double R = 8.3144598, M = 0.0289644, Rs = R / M;
     static constexpr double gamma = 1.4, g0 = 9.80665;
@@ -34,7 +38,7 @@ private:
 
 public:
     StandardAtmosphere(std::string_view name = "atmosphere") : m_name(name) {}
-    void setOffset(size_t) const {} // No state
+    void setOffset(size_t) const {}
 
     LocalState getInitialLocalState() const { return {}; }
     std::string_view getComponentType() const { return "StandardAtmosphere"; }
@@ -70,25 +74,24 @@ public:
     T computeDensity(T alt) const { return computePressure(alt) / (T(Rs) * computeTemperature(alt)); }
     T computeSpeedOfSound(T alt) const { return std::sqrt(T(gamma * Rs) * computeTemperature(alt)); }
 
-    // State functions query altitude from registry
     template<typename Registry>
-    T compute(environment::AtmosphericPressure, std::span<const T> state, const Registry& registry) const {
-        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+    T compute(typename Tags::AtmosphericPressure, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<typename Tags::Altitude>(state);
         return computePressure(altitude);
     }
     template<typename Registry>
-    T compute(environment::AtmosphericTemperature, std::span<const T> state, const Registry& registry) const {
-        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+    T compute(typename Tags::AtmosphericTemperature, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<typename Tags::Altitude>(state);
         return computeTemperature(altitude);
     }
     template<typename Registry>
-    T compute(environment::AtmosphericDensity, std::span<const T> state, const Registry& registry) const {
-        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+    T compute(typename Tags::AtmosphericDensity, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<typename Tags::Altitude>(state);
         return computeDensity(altitude);
     }
     template<typename Registry>
-    T compute(environment::SpeedOfSound, std::span<const T> state, const Registry& registry) const {
-        T altitude = registry.template computeFunction<kinematics::Altitude>(state);
+    T compute(typename Tags::SpeedOfSound, std::span<const T> state, const Registry& registry) const {
+        T altitude = registry.template computeFunction<typename Tags::Altitude>(state);
         return computeSpeedOfSound(altitude);
     }
 };

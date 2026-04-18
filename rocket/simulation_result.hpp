@@ -2,7 +2,7 @@
 
 #include "../core/solver.hpp"
 #include "../io/interpolation.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include "vector3.hpp"
 #include "quaternion.hpp"
 #include <vector>
@@ -24,6 +24,7 @@ template<typename RocketType>
 class SimulationResult {
 public:
     using T = typename RocketType::scalar_type;
+    using Tags = typename RocketType::Tags;
 
 private:
     const RocketType* m_rocket;
@@ -116,17 +117,17 @@ public:
 
     // Convenience: Position at time t
     Vector3<T> position(double t) const {
-        return query<kinematics::PositionENU>(t);
+        return query<typename Tags::PositionENU>(t);
     }
 
     // Convenience: Velocity at time t
     Vector3<T> velocity(double t) const {
-        return query<kinematics::VelocityENU>(t);
+        return query<typename Tags::VelocityENU>(t);
     }
 
     // Convenience: Altitude at time t
     T altitude(double t) const {
-        return query<kinematics::Altitude>(t);
+        return query<typename Tags::Altitude>(t);
     }
 
     // Convenience: Speed at time t
@@ -136,12 +137,12 @@ public:
 
     // Convenience: Mass at time t
     T mass(double t) const {
-        return query<dynamics::Mass>(t);
+        return query<typename Tags::Mass>(t);
     }
 
     // Convenience: Quaternion at time t
     Quaternion<T> attitude(double t) const {
-        return query<kinematics::AttitudeQuaternion>(t);
+        return query<typename Tags::AttitudeQuaternion>(t);
     }
 
     //=========================================================================

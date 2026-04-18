@@ -3,36 +3,32 @@
 #include "../core/typed_component.hpp"
 #include "../io/csv_parser.hpp"
 #include "../io/interpolation.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include "vector3.hpp"
 #include <span>
 
 namespace sopot::rocket {
 
 /**
- * RocketBody: Time-varying mass properties
+ * RocketBody: Time-varying mass properties for a single vehicle.
  *
- * Loads mass, center of gravity, and moments of inertia from CSV files
- *
- * State (0 elements): No own state (uses simulation time)
- *
- * Provides: dynamics::Mass, dynamics::MomentOfInertia, dynamics::CenterOfMass
- * Requires: propulsion::Time
+ * Provides: VehicleTags<V>::Mass, MomentOfInertia, CenterOfMass
+ * Requires: sim::Time
  */
-template<Scalar T = double>
+template<VehicleConcept Vehicle, Scalar T = double>
 class RocketBody final : public TypedComponent<0, T> {
 public:
     using Base = TypedComponent<0, T>;
     using typename Base::LocalState;
     using typename Base::LocalDerivative;
+    using Tags = VehicleTags<Vehicle>;
 
 private:
-    io::LinearInterpolator<T> m_mass;     // Mass vs time [kg]
-    io::LinearInterpolator<T> m_cog;      // Center of gravity X vs time [m]
-    io::LinearInterpolator<T> m_ix;       // Moment of inertia X vs time [kg·m²]
-    io::LinearInterpolator<T> m_iyz;      // Moment of inertia Y=Z vs time [kg·m²]
+    io::LinearInterpolator<T> m_mass;
+    io::LinearInterpolator<T> m_cog;
+    io::LinearInterpolator<T> m_ix;
+    io::LinearInterpolator<T> m_iyz;
 
-    // Constant values (if not interpolated)
     double m_const_mass{100.0};
     double m_const_cog{1.5};
     double m_const_ix{10.0};
@@ -44,7 +40,6 @@ private:
 public:
     RocketBody(std::string_view name = "rocket_body") : m_name(name) {}
 
-    // Set constant values
     void setConstantMass(double mass) { m_const_mass = mass; }
     void setConstantCoG(double cog) { m_const_cog = cog; }
     void setConstantInertia(double ix, double iyz) {
@@ -52,7 +47,6 @@ public:
         m_const_iyz = iyz;
     }
 
-    // Load from files
     void loadMass(const std::string& filename) {
         auto table = io::CsvParser::parseFile(filename);
         if (table.cols() >= 2) {
@@ -85,13 +79,12 @@ public:
         }
     }
 
-    void setOffset(size_t) const {} // No state
+    void setOffset(size_t) const {}
 
     LocalState getInitialLocalState() const { return {}; }
     std::string_view getComponentType() const { return "RocketBody"; }
     std::string_view getComponentName() const { return m_name; }
 
-    // Get mass at time t
     T getMass(T time) const {
         if (m_use_interpolation && !m_mass.empty()) {
             return m_mass.interpolate(time);
@@ -99,11 +92,9 @@ public:
         return T(m_const_mass);
     }
 
-    // Direct interpolator access for benchmarking
     const io::LinearInterpolator<T>& getMassInterpolator() const { return m_mass; }
     bool usesInterpolation() const { return m_use_interpolation; }
 
-    // Get center of gravity at time t
     T getCoG(T time) const {
         if (m_use_interpolation && !m_cog.empty()) {
             return m_cog.interpolate(time);
@@ -111,7 +102,6 @@ public:
         return T(m_const_cog);
     }
 
-    // Get moment of inertia at time t
     Vector3<T> getMomentOfInertia(T time) const {
         T ix, iyz;
         if (m_use_interpolation && !m_ix.empty()) {
@@ -126,55 +116,50 @@ public:
             iyz = T(m_const_iyz);
         }
 
-        return {ix, iyz, iyz};  // Axisymmetric: Iy = Iz
+        return {ix, iyz, iyz};
     }
 
-    // State function: Mass (fallback without registry - uses constant)
-    T compute(dynamics::Mass, [[maybe_unused]] std::span<const T>) const {
+    T compute(typename Tags::Mass, [[maybe_unused]] std::span<const T>) const {
         return T(m_const_mass);
     }
 
-    // State function: Mass - registry-aware version queries Time state function
     template<typename Registry>
-    T compute(dynamics::Mass, std::span<const T> state, const Registry& registry) const {
+    T compute(typename Tags::Mass, std::span<const T> state, const Registry& registry) const {
         if (m_use_interpolation && !m_mass.empty()) {
-            T time = registry.template computeFunction<propulsion::Time>(state);
+            T time = registry.template computeFunction<sim::Time>(state);
             return m_mass.interpolate(time);
         }
         return T(m_const_mass);
     }
 
-    // State function: Moment of inertia (fallback without registry)
-    Vector3<T> compute(dynamics::MomentOfInertia, [[maybe_unused]] std::span<const T>) const {
+    Vector3<T> compute(typename Tags::MomentOfInertia, [[maybe_unused]] std::span<const T>) const {
         return {T(m_const_ix), T(m_const_iyz), T(m_const_iyz)};
     }
 
-    // State function: Moment of inertia - registry-aware version
     template<typename Registry>
-    Vector3<T> compute(dynamics::MomentOfInertia, std::span<const T> state, const Registry& registry) const {
+    Vector3<T> compute(typename Tags::MomentOfInertia, std::span<const T> state, const Registry& registry) const {
         if (m_use_interpolation) {
-            T time = registry.template computeFunction<propulsion::Time>(state);
+            T time = registry.template computeFunction<sim::Time>(state);
             return getMomentOfInertia(time);
         }
         return {T(m_const_ix), T(m_const_iyz), T(m_const_iyz)};
     }
 };
 
-// Factory function
-template<Scalar T = double>
-RocketBody<T> createRocketBody(std::string_view name = "rocket_body") {
-    return RocketBody<T>(name);
+template<VehicleConcept Vehicle, Scalar T = double>
+RocketBody<Vehicle, T> createRocketBody(std::string_view name = "rocket_body") {
+    return RocketBody<Vehicle, T>(name);
 }
 
-template<Scalar T = double>
-RocketBody<T> createRocketBody(
+template<VehicleConcept Vehicle, Scalar T = double>
+RocketBody<Vehicle, T> createRocketBody(
     double mass,
     double cog,
     double ix,
     double iyz,
     std::string_view name = "rocket_body"
 ) {
-    RocketBody<T> body(name);
+    RocketBody<Vehicle, T> body(name);
     body.setConstantMass(mass);
     body.setConstantCoG(cog);
     body.setConstantInertia(ix, iyz);

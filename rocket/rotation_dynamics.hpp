@@ -1,18 +1,19 @@
 #pragma once
 
 #include "../core/typed_component.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include "vector3.hpp"
 #include <span>
 
 namespace sopot::rocket {
 
-template<Scalar T = double>
+template<VehicleConcept Vehicle, Scalar T = double>
 class RotationDynamics final : public TypedComponent<3, T> {
 public:
     using Base = TypedComponent<3, T>;
     using typename Base::LocalState;
     using typename Base::LocalDerivative;
+    using Tags = VehicleTags<Vehicle>;
 
 private:
     Vector3<T> m_initial_omega{T(0), T(0), T(0)};
@@ -36,8 +37,8 @@ public:
     LocalDerivative derivatives(T, std::span<const T> local, std::span<const T> global,
         const Registry& registry) const {
         Vector3<T> omega{local[0], local[1], local[2]};
-        Vector3<T> torque = registry.template computeFunction<dynamics::TotalTorqueBody>(global);
-        Vector3<T> moi = registry.template computeFunction<dynamics::MomentOfInertia>(global);
+        Vector3<T> torque = registry.template computeFunction<typename Tags::TotalTorqueBody>(global);
+        Vector3<T> moi = registry.template computeFunction<typename Tags::MomentOfInertia>(global);
 
         T dOmegaX = (torque.x - (moi.z - moi.y) * omega.y * omega.z) / moi.x;
         T dOmegaY = (torque.y - (moi.x - moi.z) * omega.x * omega.z) / moi.y;
@@ -46,7 +47,7 @@ public:
         return {dOmegaX, dOmegaY, dOmegaZ};
     }
 
-    Vector3<T> compute(kinematics::AngularVelocity, std::span<const T> state) const {
+    Vector3<T> compute(typename Tags::AngularVelocity, std::span<const T> state) const {
         return {
             this->getGlobalState(state, 0),
             this->getGlobalState(state, 1),

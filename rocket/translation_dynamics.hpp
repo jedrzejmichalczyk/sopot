@@ -1,18 +1,19 @@
 #pragma once
 
 #include "../core/typed_component.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include "vector3.hpp"
 #include <span>
 
 namespace sopot::rocket {
 
-template<Scalar T = double>
+template<VehicleConcept Vehicle, Scalar T = double>
 class TranslationDynamics final : public TypedComponent<3, T> {
 public:
     using Base = TypedComponent<3, T>;
     using typename Base::LocalState;
     using typename Base::LocalDerivative;
+    using Tags = VehicleTags<Vehicle>;
 
 private:
     Vector3<T> m_initial_velocity{T(0), T(0), T(0)};
@@ -35,13 +36,13 @@ public:
     template<typename Registry>
     LocalDerivative derivatives(T, std::span<const T>, std::span<const T> global,
         const Registry& registry) const {
-        Vector3<T> force = registry.template computeFunction<dynamics::TotalForceENU>(global);
-        T mass = registry.template computeFunction<dynamics::Mass>(global);
+        Vector3<T> force = registry.template computeFunction<typename Tags::TotalForceENU>(global);
+        T mass = registry.template computeFunction<typename Tags::Mass>(global);
         Vector3<T> acc = force / mass;
         return {acc.x, acc.y, acc.z};
     }
 
-    Vector3<T> compute(kinematics::VelocityENU, std::span<const T> state) const {
+    Vector3<T> compute(typename Tags::VelocityENU, std::span<const T> state) const {
         return {
             this->getGlobalState(state, 0),
             this->getGlobalState(state, 1),
