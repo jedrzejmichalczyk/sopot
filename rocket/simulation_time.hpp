@@ -1,22 +1,19 @@
 #pragma once
 
 #include "../core/typed_component.hpp"
-#include "rocket_tags.hpp"
+#include "vehicle_tags.hpp"
 #include <span>
 
 namespace sopot::rocket {
 
 /**
- * SimulationTime: Tracks simulation time as a state variable
+ * SimulationTime: Tracks simulation time as a state variable.
  *
- * This component allows other components to query current simulation time
- * through the registry pattern, enabling time-dependent computations
- * (like mass interpolation, thrust curves) to work with the state function system.
+ * This component is vehicle-agnostic. Every vehicle in a multi-vehicle
+ * system queries the same sim::Time.
  *
- * State (1 element): [t]
- * Derivative: dt/dt = 1
- *
- * Provides: propulsion::Time
+ * State (1 element): [t], dt/dt = 1
+ * Provides: sim::Time
  */
 template<Scalar T = double>
 class SimulationTime final : public TypedComponent<1, T> {
@@ -33,16 +30,11 @@ public:
     SimulationTime(T initial_time = T(0), std::string_view name = "simulation_time")
         : m_initial_time(initial_time), m_name(name) {}
 
-    // Component identification
     std::string_view getComponentType() const { return "SimulationTime"; }
     std::string_view getComponentName() const { return m_name; }
 
-    // Initial state
-    LocalState getInitialLocalState() const {
-        return {m_initial_time};
-    }
+    LocalState getInitialLocalState() const { return {m_initial_time}; }
 
-    // Derivative: dt/dt = 1 (non-virtual, called directly)
     template<typename Registry>
     LocalDerivative derivatives(
         [[maybe_unused]] T t,
@@ -53,13 +45,11 @@ public:
         return {T(1)};
     }
 
-    // State function: Current simulation time
-    T compute(propulsion::Time, std::span<const T> state) const {
-        return state[0];  // Time is at offset 0 for this component
+    T compute(sim::Time, std::span<const T> state) const {
+        return this->getGlobalState(state, 0);
     }
 };
 
-// Factory function
 template<Scalar T = double>
 SimulationTime<T> createSimulationTime(T initial_time = T(0), std::string_view name = "simulation_time") {
     return SimulationTime<T>(initial_time, name);

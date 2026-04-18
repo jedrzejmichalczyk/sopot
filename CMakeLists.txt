@@ -128,7 +128,7 @@ endif()
 
 set(ROCKET_HEADERS
     rocket/rocket.hpp
-    rocket/rocket_tags.hpp
+    rocket/vehicle_tags.hpp
     rocket/rocket_body.hpp
     rocket/simulation_time.hpp
     rocket/translation_kinematics.hpp
@@ -140,6 +140,7 @@ set(ROCKET_HEADERS
     rocket/interpolated_engine.hpp
     rocket/force_aggregator.hpp
     rocket/axisymmetric_aero.hpp
+    rocket/planar_engagement.hpp
     rocket/vector3.hpp
     rocket/quaternion.hpp
 )
@@ -168,6 +169,11 @@ add_executable(rocket_flight_test tests/rocket_flight_test.cpp)
 target_link_libraries(rocket_flight_test sopot_core sopot_rocket)
 target_compile_features(rocket_flight_test PRIVATE cxx_std_20)
 add_test(NAME rocket_flight_test COMMAND rocket_flight_test)
+
+add_executable(engagement_2d_test tests/engagement_2d_test.cpp)
+target_link_libraries(engagement_2d_test sopot_core sopot_rocket)
+target_compile_features(engagement_2d_test PRIVATE cxx_std_20)
+add_test(NAME engagement_2d_test COMMAND engagement_2d_test)
 
 add_executable(connected_masses_test tests/connected_masses_test.cpp)
 target_link_libraries(connected_masses_test sopot_core sopot_physics)
@@ -271,6 +277,7 @@ target_compile_features(whip_crack PRIVATE cxx_std_20)
 # Note: unified graph tests are excluded on macOS due to linker limitations
 set(CORE_TESTS
     compile_time_test autodiff_test coupled_oscillator_test rocket_flight_test
+    engagement_2d_test
     connected_masses_test connected_masses_validation_test grid_2d_test
     triangle_grid_test double_pendulum_test symbolic_diff_test
     named_expression_test inverted_pendulum_test acausal_test acausal_system_test

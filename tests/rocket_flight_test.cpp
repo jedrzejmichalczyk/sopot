@@ -1,6 +1,6 @@
 #include "../rocket/vector3.hpp"
 #include "../rocket/quaternion.hpp"
-#include "../rocket/rocket_tags.hpp"
+#include "../rocket/vehicle_tags.hpp"
 #include "../rocket/translation_kinematics.hpp"
 #include "../rocket/translation_dynamics.hpp"
 #include "../rocket/rotation_kinematics.hpp"
@@ -48,11 +48,11 @@ using namespace sopot::rocket;
 template<Scalar T = double>
 class SimplifiedRocket {
 public:
-    // Components
-    TranslationKinematics<T> position;
-    TranslationDynamics<T> velocity;
-    RotationKinematics<T> attitude;
-    RotationDynamics<T> angular_velocity;
+    // Components (parameterized on Missile for this single-rocket test)
+    TranslationKinematics<Missile, T> position;
+    TranslationDynamics<Missile, T> velocity;
+    RotationKinematics<Missile, T> attitude;
+    RotationDynamics<Missile, T> angular_velocity;
 
     // Parameters
     T mass{T(300)};
@@ -188,7 +188,7 @@ void test_quaternion() {
 void test_atmosphere() {
     std::cout << "\n3. Standard atmosphere..." << std::endl;
 
-    StandardAtmosphere<double> atm;
+    StandardAtmosphere<Missile, double> atm;
 
     // Sea level
     ASSERT_NEAR(atm.computeTemperature(0), 288.15, 0.1);
