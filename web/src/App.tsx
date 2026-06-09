@@ -316,8 +316,10 @@ function App() {
               ) : (
                 <InvertedPendulumControlPanel
                   state={pendulumSim.currentState}
+                  isReady={pendulumSim.isReady}
                   isRunning={pendulumSim.isRunning}
                   isInitialized={pendulumSim.isInitialized}
+                  error={pendulumSim.error}
                   simulationFailed={pendulumSim.simulationFailed}
                   controllerEnabled={pendulumSim.controllerEnabled}
                   playbackSpeed={pendulumSim.playbackSpeed}
@@ -481,8 +483,10 @@ function App() {
             ) : (
               <InvertedPendulumControlPanel
                 state={pendulumSim.currentState}
+                isReady={pendulumSim.isReady}
                 isRunning={pendulumSim.isRunning}
                 isInitialized={pendulumSim.isInitialized}
+                error={pendulumSim.error}
                 simulationFailed={pendulumSim.simulationFailed}
                 controllerEnabled={pendulumSim.controllerEnabled}
                 playbackSpeed={pendulumSim.playbackSpeed}

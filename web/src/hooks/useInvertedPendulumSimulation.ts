@@ -99,6 +99,11 @@ export function useInvertedPendulumSimulation() {
 
       simulator.setupDefault();
 
+      // Match the fixed physics step used by the animation loop. The stiff
+      // six-link chain needs a small step (the simulator defaults to 10ms,
+      // which is too coarse and lets the chain diverge once running).
+      simulator.setTimestep(0.002);
+
       if (cartMass !== undefined || linkMass !== undefined || linkLength !== undefined) {
         simulator.setUniformParameters(
           cartMass ?? 2.0,
