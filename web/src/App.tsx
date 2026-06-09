@@ -190,13 +190,14 @@ function App() {
           <InvertedPendulumVisualization
             state={pendulumSim.currentState}
             visualizationData={pendulumSim.visualizationData}
+            numLinks={pendulumSim.numLinks}
             showTelemetry={true}
             showForceArrow={true}
             onApplyImpulse={pendulumSim.applyDisturbance}
           />
         );
       }
-      return renderPlaceholder('⚖️ Inverted Double Pendulum', pendulumSim.isReady);
+      return renderPlaceholder('⚖️ Inverted 6-Pendulum on Cart', pendulumSim.isReady);
     }
   };
 
@@ -205,7 +206,7 @@ function App() {
     const description = simulationType === 'rocket'
       ? 'C++20 Physics Simulation compiled to WebAssembly'
       : simulationType === 'pendulum'
-        ? 'LQR-controlled inverted double pendulum with real-time stabilization'
+        ? 'LQR-controlled inverted six-pendulum chain with real-time stabilization'
         : 'High-performance physics simulation engine';
 
     const loadingText = 'Loading WebAssembly module...';
@@ -321,15 +322,8 @@ function App() {
                   controllerEnabled={pendulumSim.controllerEnabled}
                   playbackSpeed={pendulumSim.playbackSpeed}
                   lqrGains={pendulumSim.getLQRGains()}
-                  onInitialize={(t1, t2) => pendulumSim.initialize(
-                    /* cartMass */ undefined,
-                    /* m1 */ undefined,
-                    /* m2 */ undefined,
-                    /* L1 */ undefined,
-                    /* L2 */ undefined,
-                    t1,
-                    t2
-                  )}
+                  numLinks={pendulumSim.numLinks}
+                  onInitialize={pendulumSim.initialize}
                   onStart={pendulumSim.start}
                   onPause={pendulumSim.pause}
                   onReset={pendulumSim.reset}
@@ -387,12 +381,12 @@ function App() {
                       <span>{pendulumSim.currentState.x.toFixed(3)}m</span>
                     </div>
                     <div style={styles.infoRow}>
-                      <span>θ₁:</span>
-                      <span>{(pendulumSim.currentState.theta1 * 180 / Math.PI).toFixed(1)}°</span>
+                      <span>Links:</span>
+                      <span>{pendulumSim.currentState.numLinks}</span>
                     </div>
                     <div style={styles.infoRow}>
-                      <span>θ₂:</span>
-                      <span>{(pendulumSim.currentState.theta2 * 180 / Math.PI).toFixed(1)}°</span>
+                      <span>max |θ|:</span>
+                      <span>{(pendulumSim.currentState.angles.reduce((m, a) => Math.max(m, Math.abs(a)), 0) * 180 / Math.PI).toFixed(1)}°</span>
                     </div>
                     <div style={styles.infoRow}>
                       <span>Control Force:</span>
@@ -493,15 +487,8 @@ function App() {
                 controllerEnabled={pendulumSim.controllerEnabled}
                 playbackSpeed={pendulumSim.playbackSpeed}
                 lqrGains={pendulumSim.getLQRGains()}
-                onInitialize={(t1, t2) => pendulumSim.initialize(
-                  /* cartMass */ undefined,
-                  /* m1 */ undefined,
-                  /* m2 */ undefined,
-                  /* L1 */ undefined,
-                  /* L2 */ undefined,
-                  t1,
-                  t2
-                )}
+                numLinks={pendulumSim.numLinks}
+                onInitialize={pendulumSim.initialize}
                 onStart={pendulumSim.start}
                 onPause={pendulumSim.pause}
                 onReset={pendulumSim.reset}
@@ -551,20 +538,16 @@ function App() {
                       <span>{pendulumSim.currentState.xdot.toFixed(3)}m/s</span>
                     </div>
                     <div style={styles.infoRow}>
-                      <span>θ₁ (Link 1):</span>
-                      <span>{(pendulumSim.currentState.theta1 * 180 / Math.PI).toFixed(2)}°</span>
+                      <span>Links:</span>
+                      <span>{pendulumSim.currentState.numLinks}</span>
                     </div>
                     <div style={styles.infoRow}>
-                      <span>θ₂ (Link 2):</span>
-                      <span>{(pendulumSim.currentState.theta2 * 180 / Math.PI).toFixed(2)}°</span>
+                      <span>max |θ|:</span>
+                      <span>{(pendulumSim.currentState.angles.reduce((m, a) => Math.max(m, Math.abs(a)), 0) * 180 / Math.PI).toFixed(2)}°</span>
                     </div>
                     <div style={styles.infoRow}>
-                      <span>ω₁:</span>
-                      <span>{pendulumSim.currentState.omega1.toFixed(2)} rad/s</span>
-                    </div>
-                    <div style={styles.infoRow}>
-                      <span>ω₂:</span>
-                      <span>{pendulumSim.currentState.omega2.toFixed(2)} rad/s</span>
+                      <span>max |ω|:</span>
+                      <span>{pendulumSim.currentState.omegas.reduce((m, w) => Math.max(m, Math.abs(w)), 0).toFixed(2)} rad/s</span>
                     </div>
                     <div style={styles.infoRow}>
                       <span>Control Force:</span>

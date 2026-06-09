@@ -555,4 +555,129 @@ inline std::pair<
     return {A, B};
 }
 
+/**
+ * @brief Linearize the cart-N-pendulum about the upright equilibrium.
+ *
+ * State (size 2·(N+1)): [x, θ₁ … θ_N, ẋ, ω₁ … ω_N].
+ * Input: scalar force F on the cart.
+ *
+ * At the upright equilibrium (all θ = 0, all velocities = 0) the mass matrix
+ * is constant and the only first-order term in the right-hand side is the
+ * gravity torque g_j = M̄ⱼ g Lⱼ θⱼ (the Coriolis terms are second order in
+ * velocity and vanish). Hence
+ *   q̈ = M₀⁻¹ ( G q_angles + e₀ F )
+ * which directly populates the lower blocks of A and B.
+ *
+ * @tparam NLinks Number of pendulum links.
+ * @param mc      Cart mass.
+ * @param masses  Point mass at each link tip.
+ * @param lengths Length of each link.
+ * @param g       Gravity.
+ * @return Pair (A, B) with A of size (2N+2)×(2N+2) and B of size (2N+2)×1.
+ */
+template<size_t NLinks>
+std::pair<
+    std::array<std::array<double, 2 * (NLinks + 1)>, 2 * (NLinks + 1)>,
+    std::array<std::array<double, 1>, 2 * (NLinks + 1)>
+> linearizeCartNPendulum(
+    double mc,
+    const std::array<double, NLinks>& masses,
+    const std::array<double, NLinks>& lengths,
+    double g
+) {
+    constexpr size_t NDof  = NLinks + 1;       // generalized coordinates
+    constexpr size_t NFull = 2 * NDof;         // full linear state size
+
+    auto tail_mass = [&](size_t link) {
+        double sum = 0.0;
+        for (size_t i = link; i < NLinks; ++i) sum += masses[i];
+        return sum;
+    };
+
+    // Mass matrix at equilibrium (all cos = 1).
+    std::array<std::array<double, NDof>, NDof> M{};
+    double total = mc;
+    for (size_t i = 0; i < NLinks; ++i) total += masses[i];
+    M[0][0] = total;
+    for (size_t a = 0; a < NLinks; ++a) {
+        double coupling = tail_mass(a) * lengths[a];
+        M[0][a + 1] = coupling;
+        M[a + 1][0] = coupling;
+    }
+    for (size_t a = 0; a < NLinks; ++a) {
+        for (size_t b = 0; b < NLinks; ++b) {
+            size_t mx = (a > b) ? a : b;
+            M[a + 1][b + 1] = tail_mass(mx) * lengths[a] * lengths[b];
+        }
+    }
+
+    // Invert M via Gauss-Jordan elimination with partial pivoting.
+    std::array<std::array<double, NDof>, NDof> Minv{};
+    {
+        std::array<std::array<double, 2 * NDof>, NDof> aug{};
+        for (size_t i = 0; i < NDof; ++i) {
+            for (size_t j = 0; j < NDof; ++j) aug[i][j] = M[i][j];
+            aug[i][NDof + i] = 1.0;
+        }
+        for (size_t col = 0; col < NDof; ++col) {
+            size_t pivot = col;
+            double best = std::abs(aug[col][col]);
+            for (size_t row = col + 1; row < NDof; ++row) {
+                if (std::abs(aug[row][col]) > best) { best = std::abs(aug[row][col]); pivot = row; }
+            }
+            if (best < 1e-15) {
+                throw std::runtime_error("linearizeCartNPendulum: mass matrix is singular");
+            }
+            std::swap(aug[col], aug[pivot]);
+            double diag = aug[col][col];
+            for (size_t j = 0; j < 2 * NDof; ++j) aug[col][j] /= diag;
+            for (size_t row = 0; row < NDof; ++row) {
+                if (row == col) continue;
+                double factor = aug[row][col];
+                for (size_t j = 0; j < 2 * NDof; ++j) aug[row][j] -= factor * aug[col][j];
+            }
+        }
+        for (size_t i = 0; i < NDof; ++i)
+            for (size_t j = 0; j < NDof; ++j)
+                Minv[i][j] = aug[i][NDof + j];
+    }
+
+    // Gravity Jacobian G (NDof×NDof): only diagonal angle entries.
+    std::array<std::array<double, NDof>, NDof> G{};
+    for (size_t a = 0; a < NLinks; ++a) {
+        G[a + 1][a + 1] = tail_mass(a) * g * lengths[a];
+    }
+
+    // MinvG = M⁻¹ G  -> lower-left block of A (accelerations vs. coordinates).
+    std::array<std::array<double, NDof>, NDof> MinvG{};
+    for (size_t i = 0; i < NDof; ++i) {
+        for (size_t j = 0; j < NDof; ++j) {
+            double s = 0.0;
+            for (size_t k = 0; k < NDof; ++k) s += Minv[i][k] * G[k][j];
+            MinvG[i][j] = s;
+        }
+    }
+
+    // Assemble A and B.
+    std::array<std::array<double, NFull>, NFull> A{};
+    std::array<std::array<double, 1>, NFull> B{};
+
+    // Upper-right identity: q̇ part of the state.
+    for (size_t i = 0; i < NDof; ++i) {
+        A[i][NDof + i] = 1.0;
+    }
+    // Lower-left: M⁻¹ G mapping coordinates to accelerations.
+    for (size_t i = 0; i < NDof; ++i) {
+        for (size_t j = 0; j < NDof; ++j) {
+            A[NDof + i][j] = MinvG[i][j];
+        }
+    }
+    // Input column: M⁻¹ e₀ (force enters only the cart equation).
+    for (size_t i = 0; i < NDof; ++i) {
+        B[NDof + i][0] = Minv[i][0];
+    }
+
+    return {A, B};
+}
+
 } // namespace sopot::control
