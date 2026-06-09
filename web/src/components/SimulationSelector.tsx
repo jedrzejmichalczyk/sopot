@@ -33,7 +33,7 @@ export function SimulationSelector({
     {
       type: 'pendulum' as SimulationType,
       label: 'INVPND',
-      title: 'Inverted Double Pendulum',
+      title: 'Inverted 6-Pendulum on Cart',
       description: 'LQR-controlled balancing with real-time stabilization',
       subsystem: 'CONTROL',
     },

@@ -197,12 +197,16 @@ export interface Grid2DSimulator {
 }
 
 /**
- * Inverted Double Pendulum Simulator
+ * Cart-N-Pendulum Simulator (configured for 6 inverted pendulum links).
  */
 export interface InvertedPendulumSimulator {
   // Configuration
-  setParameters(cartMass: number, m1: number, m2: number, L1: number, L2: number, g: number): void;
-  setInitialState(x: number, theta1: number, theta2: number, xdot: number, omega1: number, omega2: number): void;
+  getNumLinks(): number;
+  setUniformParameters(cartMass: number, linkMass: number, linkLength: number, g: number): void;
+  setParameters(cartMass: number, masses: number[], lengths: number[], g: number): void;
+  setInitialAnglesUniform(angleRad: number): void;
+  setInitialState(state: number[]): void;
+  setInitialAngles(angles: number[]): void;
   setTimestep(dt: number): void;
   setMaxForce(maxForce: number): void;
   configureLQR(qDiag: number[], r: number): void;
@@ -214,38 +218,38 @@ export interface InvertedPendulumSimulator {
   stepWithDt(dt: number): boolean;
   setControllerEnabled(enabled: boolean): void;
   applyCartImpulse(impulse: number): void;
-  applyLink1Impulse(impulse: number): void;
-  applyLink2Impulse(impulse: number): void;
+  applyLinkImpulse(link: number, impulse: number): void;
 
   // State queries
   getTime(): number;
   getCartPosition(): number;
-  getTheta1(): number;
-  getTheta2(): number;
   getCartVelocity(): number;
-  getOmega1(): number;
-  getOmega2(): number;
+  getMaxAngle(): number;
   getControlForce(): number;
+  getAngles(): number[];
+  getAngularVelocities(): number[];
+  getJoints(): Array<{ x: number; y: number }>;
   getFullState(): {
     time: number;
     x: number;
+    xdot: number;
+    controlForce: number;
+    numLinks: number;
+    angles: number[];
+    omegas: number[];
+    joints: Array<{ x: number; y: number }>;
+    // Backward-compatible scalar fields (first two links)
     theta1: number;
     theta2: number;
-    xdot: number;
     omega1: number;
     omega2: number;
-    controlForce: number;
-    link1Tip: { x: number; y: number };
-    link2Tip: { x: number; y: number };
   };
   getVisualizationData(): {
     cart: { x: number; y: number };
-    joint1: { x: number; y: number };
-    joint2: { x: number; y: number };
-    tip: { x: number; y: number };
-    theta1: number;
-    theta2: number;
+    joints: Array<{ x: number; y: number }>;
+    angles: number[];
     controlForce: number;
+    numLinks: number;
   };
 
   // History
@@ -255,20 +259,14 @@ export interface InvertedPendulumSimulator {
   getHistory(): {
     time: number[];
     x: number[];
-    theta1: number[];
-    theta2: number[];
-    xdot: number[];
-    omega1: number[];
-    omega2: number[];
     controlForce: number[];
+    maxAngle: number[];
   };
 
   // Parameters
   getCartMass(): number;
-  getMass1(): number;
-  getMass2(): number;
-  getLength1(): number;
-  getLength2(): number;
+  getLinkMass(i: number): number;
+  getLinkLength(i: number): number;
   getGravity(): number;
   getMaxForce(): number;
   isInitialized(): boolean;

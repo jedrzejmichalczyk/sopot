@@ -62,14 +62,14 @@ async function testWasmLoading() {
         // Get initial state
         const t = pendulum.getTime();
         const x = pendulum.getCartPosition();
-        const theta1 = pendulum.getTheta1();
-        const theta2 = pendulum.getTheta2();
+        const numLinks = pendulum.getNumLinks();
+        const angles = pendulum.getAngles();
 
         console.log(`\nInitial state:`);
         console.log(`  Time: ${t.toFixed(3)}s`);
         console.log(`  Cart position: ${x.toFixed(3)}m`);
-        console.log(`  Theta1: ${theta1.toFixed(3)}rad`);
-        console.log(`  Theta2: ${theta2.toFixed(3)}rad`);
+        console.log(`  Links: ${numLinks}`);
+        console.log(`  Angles: [${angles.map((a) => a.toFixed(3)).join(', ')}] rad`);
 
         // Try a simulation step
         pendulum.step();

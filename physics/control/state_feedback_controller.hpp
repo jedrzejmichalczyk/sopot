@@ -203,4 +203,65 @@ inline InvertedDoublePendulumController InvertedDoublePendulumController::create
     return InvertedDoublePendulumController(lqr.getGain());
 }
 
+/**
+ * @brief LQR state-feedback controller for the cart-N-pendulum.
+ *
+ * Generalizes InvertedDoublePendulumController to an arbitrary number of
+ * links. The state has size 2·(N+1) = [x, θ₁…θ_N, ẋ, ω₁…ω_N] and there is a
+ * single control input (force on the cart).
+ *
+ * @tparam NLinks Number of pendulum links.
+ */
+template<size_t NLinks>
+class CartNPendulumController : public StateFeedbackController<2 * (NLinks + 1), 1> {
+public:
+    static constexpr size_t state_dim = 2 * (NLinks + 1);
+    using Base = StateFeedbackController<state_dim, 1>;
+    using typename Base::GainMatrix;
+
+    explicit CartNPendulumController(const GainMatrix& K) : Base(K) {}
+
+    /**
+     * @brief Linearize about the upright equilibrium and solve the LQR problem.
+     *
+     * @param mc       Cart mass.
+     * @param masses   Point mass at each link tip.
+     * @param lengths  Length of each link.
+     * @param g        Gravity.
+     * @param q_diag   Diagonal of the state weight matrix Q (size 2·(N+1)).
+     * @param r        Scalar control weight R.
+     */
+    static CartNPendulumController createWithLQR(
+        double mc,
+        const std::array<double, NLinks>& masses,
+        const std::array<double, NLinks>& lengths,
+        double g,
+        const std::array<double, state_dim>& q_diag,
+        double r,
+        double riccati_dt = 0.002
+    ) {
+        auto [A, B] = linearizeCartNPendulum<NLinks>(mc, masses, lengths, g);
+
+        std::array<std::array<double, state_dim>, state_dim> Q{};
+        for (size_t i = 0; i < state_dim; ++i) {
+            Q[i][i] = q_diag[i];
+        }
+
+        std::array<std::array<double, 1>, 1> R{};
+        R[0][0] = r;
+
+        LQR<state_dim, 1> lqr;
+        lqr.solve(A, B, Q, R, riccati_dt);
+
+        return CartNPendulumController(lqr.getGain());
+    }
+
+    /**
+     * @brief Compute the scalar control force for a full state vector.
+     */
+    double computeForce(const std::array<double, state_dim>& state) const {
+        return this->compute(state)[0];
+    }
+};
+
 } // namespace sopot::control

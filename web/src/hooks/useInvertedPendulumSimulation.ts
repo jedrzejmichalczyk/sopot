@@ -1,92 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { SopotModule } from '../types/sopot';
+import type { SopotModule, InvertedPendulumSimulator } from '../types/sopot';
 import type { PendulumState, PendulumVisualizationData } from '../components/InvertedPendulumVisualization';
 import { loadSopotWasmModule } from '../utils/wasmLoader';
 
 /**
- * Interface for the InvertedPendulumSimulator from WASM
- */
-interface InvertedPendulumSimulator {
-  setupDefault(): void;
-  reset(): void;
-  step(): boolean;
-  stepWithDt(dt: number): boolean;
-  setControllerEnabled(enabled: boolean): void;
-  applyCartImpulse(impulse: number): void;
-  applyLink1Impulse(impulse: number): void;
-  applyLink2Impulse(impulse: number): void;
-  setParameters(cartMass: number, m1: number, m2: number, L1: number, L2: number, g: number): void;
-  setInitialState(x: number, theta1: number, theta2: number, xdot: number, omega1: number, omega2: number): void;
-  setTimestep(dt: number): void;
-  setMaxForce(maxForce: number): void;
-  configureLQR(qDiag: number[], r: number): void;
-
-  // State queries
-  getTime(): number;
-  getCartPosition(): number;
-  getTheta1(): number;
-  getTheta2(): number;
-  getCartVelocity(): number;
-  getOmega1(): number;
-  getOmega2(): number;
-  getControlForce(): number;
-  getFullState(): {
-    time: number;
-    x: number;
-    theta1: number;
-    theta2: number;
-    xdot: number;
-    omega1: number;
-    omega2: number;
-    controlForce: number;
-    link1Tip: { x: number; y: number };
-    link2Tip: { x: number; y: number };
-  };
-  getVisualizationData(): {
-    cart: { x: number; y: number };
-    joint1: { x: number; y: number };
-    joint2: { x: number; y: number };
-    tip: { x: number; y: number };
-    theta1: number;
-    theta2: number;
-    controlForce: number;
-  };
-
-  // Parameters
-  getCartMass(): number;
-  getMass1(): number;
-  getMass2(): number;
-  getLength1(): number;
-  getLength2(): number;
-  getGravity(): number;
-  getMaxForce(): number;
-  isInitialized(): boolean;
-  isControllerEnabled(): boolean;
-  getLQRGain(): number[];
-
-  // History
-  setRecordHistory(record: boolean): void;
-  getHistorySize(): number;
-  clearHistory(): void;
-  getHistory(): {
-    time: number[];
-    x: number[];
-    theta1: number[];
-    theta2: number[];
-    xdot: number[];
-    omega1: number[];
-    omega2: number[];
-    controlForce: number[];
-  };
-
-  delete(): void;
-}
-
-/**
- * Hook for inverted double pendulum simulation using WASM
+ * Hook for the cart-N-pendulum simulation (six inverted links) using WASM.
  *
- * All physics and control computations run in C++ via WebAssembly.
- * The frontend handles visualization and user interaction.
+ * All physics and LQR control run in C++ via WebAssembly. The frontend
+ * handles visualization and user interaction.
  */
 export function useInvertedPendulumSimulation() {
   const [isReady, setIsReady] = useState(false);
@@ -98,6 +19,7 @@ export function useInvertedPendulumSimulation() {
   const [playbackSpeed, setPlaybackSpeedState] = useState(1.0);
   const [controllerEnabled, setControllerEnabledState] = useState(true);
   const [simulationFailed, setSimulationFailed] = useState(false);
+  const [numLinks, setNumLinks] = useState(6);
 
   const moduleRef = useRef<SopotModule | null>(null);
   const simulatorRef = useRef<InvertedPendulumSimulator | null>(null);
@@ -111,15 +33,10 @@ export function useInvertedPendulumSimulation() {
     const loadModule = async () => {
       try {
         console.log('[Pendulum] Loading WASM module...');
-
-        // Load the SOPOT WebAssembly module
         const module = await loadSopotWasmModule();
-
         if (!mounted) return;
-
         moduleRef.current = module;
 
-        // Check if InvertedPendulumSimulator is available
         if (module.InvertedPendulumSimulator) {
           console.log('[Pendulum] WASM module loaded with InvertedPendulumSimulator');
           setIsReady(true);
@@ -135,10 +52,7 @@ export function useInvertedPendulumSimulation() {
     };
 
     loadModule();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   // Update state from simulator
@@ -150,12 +64,11 @@ export function useInvertedPendulumSimulation() {
     setCurrentState({
       time: fullState.time,
       x: fullState.x,
-      theta1: fullState.theta1,
-      theta2: fullState.theta2,
       xdot: fullState.xdot,
-      omega1: fullState.omega1,
-      omega2: fullState.omega2,
+      angles: fullState.angles,
+      omegas: fullState.omegas,
       controlForce: fullState.controlForce,
+      numLinks: fullState.numLinks,
     });
 
     const vizData = simulator.getVisualizationData();
@@ -164,13 +77,10 @@ export function useInvertedPendulumSimulation() {
 
   // Initialize simulation
   const initialize = useCallback((
+    initialAngleRad?: number,
     cartMass?: number,
-    m1?: number,
-    m2?: number,
-    L1?: number,
-    L2?: number,
-    initialTheta1?: number,
-    initialTheta2?: number,
+    linkMass?: number,
+    linkLength?: number,
   ) => {
     const module = moduleRef.current;
     if (!module || !module.InvertedPendulumSimulator) {
@@ -179,48 +89,40 @@ export function useInvertedPendulumSimulation() {
     }
 
     try {
-      // Clean up existing simulator
       if (simulatorRef.current) {
         simulatorRef.current.delete();
       }
 
-      // Create new simulator - we've verified InvertedPendulumSimulator exists above
-      const SimulatorClass = module.InvertedPendulumSimulator!;
+      const SimulatorClass = module.InvertedPendulumSimulator;
       simulatorRef.current = new SimulatorClass();
-      const simulator = simulatorRef.current!;
+      const simulator = simulatorRef.current;
 
-      // Set up with default or custom parameters
       simulator.setupDefault();
 
-      // Override with custom parameters if provided
-      if (cartMass !== undefined || m1 !== undefined) {
-        simulator.setParameters(
-          cartMass ?? 1.0,
-          m1 ?? 0.5,
-          m2 ?? 0.5,
-          L1 ?? 0.7,
-          L2 ?? 0.7,
-          9.81
+      if (cartMass !== undefined || linkMass !== undefined || linkLength !== undefined) {
+        simulator.setUniformParameters(
+          cartMass ?? 2.0,
+          linkMass ?? 0.1,
+          linkLength ?? 0.3,
+          9.81,
         );
+        // Re-arm controller for the new parameters.
+        simulator.setupDefault();
       }
 
-      if (initialTheta1 !== undefined || initialTheta2 !== undefined) {
-        simulator.setInitialState(
-          0,
-          initialTheta1 ?? 0.1,
-          initialTheta2 ?? 0.05,
-          0, 0, 0
-        );
+      if (initialAngleRad !== undefined) {
+        simulator.setInitialAnglesUniform(initialAngleRad);
       }
 
       simulator.reset();
+      setNumLinks(simulator.getNumLinks());
       updateState();
 
       setIsInitialized(true);
       setSimulationFailed(false);
       setError(null);
 
-      console.log('[Pendulum] Simulation initialized');
+      console.log('[Pendulum] Simulation initialized with', simulator.getNumLinks(), 'links');
       console.log('[Pendulum] LQR Gains:', simulator.getLQRGain());
     } catch (err) {
       console.error('[Pendulum] Failed to initialize:', err);
@@ -234,50 +136,41 @@ export function useInvertedPendulumSimulation() {
 
     const simulator = simulatorRef.current;
 
-    // Calculate elapsed real time
     if (lastTimeRef.current === 0) {
       lastTimeRef.current = timestamp;
     }
 
-    const realDelta = (timestamp - lastTimeRef.current) / 1000; // seconds
+    const realDelta = (timestamp - lastTimeRef.current) / 1000;
     lastTimeRef.current = timestamp;
 
-    // Calculate simulation steps based on playback speed
     const simDelta = realDelta * playbackSpeed;
-    const dt = 0.005; // 5ms fixed physics timestep
-    const steps = Math.min(Math.floor(simDelta / dt), 20); // Cap at 20 steps per frame
+    const dt = 0.002; // 2ms fixed physics timestep (stiff six-link system)
+    const steps = Math.min(Math.floor(simDelta / dt), 40);
 
-    // Run physics steps
     for (let i = 0; i < steps; i++) {
       const stillRunning = simulator.step();
       if (!stillRunning) {
-        // Pendulum has fallen
         setIsRunning(false);
         setSimulationFailed(true);
-        console.log('[Pendulum] Simulation stopped: pendulum fell');
+        console.log('[Pendulum] Simulation stopped: a pendulum fell');
         break;
       }
     }
 
-    // Update visualization state
     updateState();
 
-    // Continue animation loop
     if (isRunning && !simulationFailed) {
       animationFrameRef.current = requestAnimationFrame(animate);
     }
   }, [isRunning, playbackSpeed, simulationFailed, updateState]);
 
-  // Start/stop animation when isRunning changes
   useEffect(() => {
     if (isRunning && simulatorRef.current) {
       lastTimeRef.current = 0;
       animationFrameRef.current = requestAnimationFrame(animate);
-    } else {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
+    } else if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
 
     return () => {
@@ -287,7 +180,6 @@ export function useInvertedPendulumSimulation() {
     };
   }, [isRunning, animate]);
 
-  // Control functions
   const start = useCallback(() => {
     if (isInitialized && !simulationFailed) {
       setIsRunning(true);
@@ -318,21 +210,13 @@ export function useInvertedPendulumSimulation() {
     }
   }, []);
 
-  const applyDisturbance = useCallback((type: 'cart' | 'link1' | 'link2', impulse: number) => {
+  const applyDisturbance = useCallback((type: 'cart' | 'link', index: number, impulse: number) => {
     if (!simulatorRef.current) return;
-
-    switch (type) {
-      case 'cart':
-        simulatorRef.current.applyCartImpulse(impulse);
-        break;
-      case 'link1':
-        simulatorRef.current.applyLink1Impulse(impulse);
-        break;
-      case 'link2':
-        simulatorRef.current.applyLink2Impulse(impulse);
-        break;
+    if (type === 'cart') {
+      simulatorRef.current.applyCartImpulse(impulse);
+    } else {
+      simulatorRef.current.applyLinkImpulse(index, impulse);
     }
-
     updateState();
   }, [updateState]);
 
@@ -348,13 +232,11 @@ export function useInvertedPendulumSimulation() {
     };
   }, []);
 
-  // Get history for plotting
   const getHistory = useCallback(() => {
     if (!simulatorRef.current) return null;
     return simulatorRef.current.getHistory();
   }, []);
 
-  // Get LQR gains
   const getLQRGains = useCallback(() => {
     if (!simulatorRef.current) return null;
     return simulatorRef.current.getLQRGain();
@@ -371,6 +253,7 @@ export function useInvertedPendulumSimulation() {
     playbackSpeed,
     controllerEnabled,
     simulationFailed,
+    numLinks,
 
     // Actions
     initialize,

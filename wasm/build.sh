@@ -128,7 +128,7 @@ if [ -f "sopot.js" ] && [ -f "sopot.wasm" ]; then
     echo "  // Rocket simulation:"
     echo "  const rocket = new Module.RocketSimulator();"
     echo ""
-    echo "  // Inverted double pendulum:"
+    echo "  // Inverted six-pendulum on a cart:"
     echo "  const pendulum = new Module.InvertedPendulumSimulator();"
     echo "  pendulum.setupDefault();"
     echo "  pendulum.step();"

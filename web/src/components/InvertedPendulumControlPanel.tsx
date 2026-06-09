@@ -9,13 +9,14 @@ interface InvertedPendulumControlPanelProps {
   controllerEnabled: boolean;
   playbackSpeed: number;
   lqrGains: number[] | null;
-  onInitialize: (theta1?: number, theta2?: number) => void;
+  numLinks: number;
+  onInitialize: (initialAngleRad?: number) => void;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
   onSetPlaybackSpeed: (speed: number) => void;
   onSetControllerEnabled: (enabled: boolean) => void;
-  onApplyDisturbance: (type: 'cart' | 'link1' | 'link2', impulse: number) => void;
+  onApplyDisturbance: (type: 'cart' | 'link', index: number, impulse: number) => void;
 }
 
 export function InvertedPendulumControlPanel({
@@ -26,6 +27,7 @@ export function InvertedPendulumControlPanel({
   controllerEnabled,
   playbackSpeed,
   lqrGains,
+  numLinks,
   onInitialize,
   onStart,
   onPause,
@@ -34,19 +36,14 @@ export function InvertedPendulumControlPanel({
   onSetControllerEnabled,
   onApplyDisturbance,
 }: InvertedPendulumControlPanelProps) {
-  const [initialTheta1, setInitialTheta1] = useState(5.7); // degrees
-  const [initialTheta2, setInitialTheta2] = useState(2.9); // degrees
+  const [initialTilt, setInitialTilt] = useState(1.7); // degrees, applied to every link
   const [disturbanceStrength, setDisturbanceStrength] = useState(5);
 
   const handleInitialize = () => {
-    const theta1Rad = (initialTheta1 * Math.PI) / 180;
-    const theta2Rad = (initialTheta2 * Math.PI) / 180;
-    onInitialize(theta1Rad, theta2Rad);
+    onInitialize((initialTilt * Math.PI) / 180);
   };
 
-  const formatAngle = (rad: number) => {
-    return ((rad * 180) / Math.PI).toFixed(1);
-  };
+  const formatAngle = (rad: number) => ((rad * 180) / Math.PI).toFixed(1);
 
   return (
     <div className="control-panel" style={{
@@ -56,49 +53,33 @@ export function InvertedPendulumControlPanel({
       maxWidth: '400px',
     }}>
       <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text-primary)' }}>
-        Inverted Pendulum Control
+        Inverted {numLinks}-Pendulum Control
       </h3>
 
       {/* Initialization Section */}
       {!isInitialized && (
         <div style={{ marginBottom: '16px' }}>
-          <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-secondary)' }}>Initial Angles</h4>
-          <div style={{ display: 'flex', gap: '16px', marginBottom: '8px' }}>
-            <label style={{ flex: 1 }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>θ₁ (degrees)</span>
-              <input
-                type="number"
-                value={initialTheta1}
-                onChange={(e) => setInitialTheta1(parseFloat(e.target.value) || 0)}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  marginTop: '4px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  color: 'var(--text-primary)',
-                }}
-              />
-            </label>
-            <label style={{ flex: 1 }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>θ₂ (degrees)</span>
-              <input
-                type="number"
-                value={initialTheta2}
-                onChange={(e) => setInitialTheta2(parseFloat(e.target.value) || 0)}
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  marginTop: '4px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  color: 'var(--text-primary)',
-                }}
-              />
-            </label>
-          </div>
+          <h4 style={{ margin: '0 0 8px 0', color: 'var(--text-secondary)' }}>Initial Tilt</h4>
+          <label style={{ display: 'block', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+              Angle per link (degrees)
+            </span>
+            <input
+              type="number"
+              value={initialTilt}
+              step="0.1"
+              onChange={(e) => setInitialTilt(parseFloat(e.target.value) || 0)}
+              style={{
+                width: '100%',
+                padding: '8px',
+                marginTop: '4px',
+                backgroundColor: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '4px',
+                color: 'var(--text-primary)',
+              }}
+            />
+          </label>
           <button
             onClick={handleInitialize}
             className="touch-button btn-primary"
@@ -171,7 +152,7 @@ export function InvertedPendulumControlPanel({
             </label>
             {!controllerEnabled && (
               <p style={{ margin: '4px 0 0 26px', fontSize: '12px', color: 'var(--accent-danger)' }}>
-                Warning: Pendulum will fall without controller!
+                Warning: the pendulums will fall without the controller!
               </p>
             )}
           </div>
@@ -193,53 +174,29 @@ export function InvertedPendulumControlPanel({
                 style={{ width: '100%', marginTop: '4px' }}
               />
             </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
-                onClick={() => onApplyDisturbance('cart', disturbanceStrength)}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
+                onClick={() => onApplyDisturbance('cart', 0, disturbanceStrength)}
+                style={disturbanceButtonStyle}
               >
                 Push Cart →
               </button>
               <button
-                onClick={() => onApplyDisturbance('link1', disturbanceStrength * 0.1)}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
+                onClick={() => onApplyDisturbance('link', 0, disturbanceStrength * 0.1)}
+                style={disturbanceButtonStyle}
               >
-                Tap Link 1
+                Tap Bottom Link
               </button>
               <button
-                onClick={() => onApplyDisturbance('link2', disturbanceStrength * 0.05)}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                }}
+                onClick={() => onApplyDisturbance('link', numLinks - 1, disturbanceStrength * 0.05)}
+                style={disturbanceButtonStyle}
               >
-                Tap Link 2
+                Tap Top Link
               </button>
             </div>
+            <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+              Tip: click any mass in the visualization to nudge that link.
+            </p>
           </div>
 
           {/* Status */}
@@ -252,10 +209,10 @@ export function InvertedPendulumControlPanel({
               marginBottom: '16px',
             }}>
               <p style={{ margin: 0, color: 'var(--accent-danger)', fontWeight: 'bold' }}>
-                Pendulum Fell!
+                A Pendulum Fell!
               </p>
               <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                The pendulum angles exceeded 45°. Click Reset to try again.
+                A link exceeded 45°. Click Reset to try again.
               </p>
             </div>
           )}
@@ -277,17 +234,21 @@ export function InvertedPendulumControlPanel({
                 <span style={{ color: 'var(--text-tertiary)' }}>Cart x:</span>
                 <span style={{ color: 'var(--text-primary)' }}>{state.x.toFixed(3)} m</span>
 
-                <span style={{ color: 'var(--text-tertiary)' }}>θ₁:</span>
-                <span style={{ color: 'var(--text-primary)' }}>{formatAngle(state.theta1)}°</span>
-
-                <span style={{ color: 'var(--text-tertiary)' }}>θ₂:</span>
-                <span style={{ color: 'var(--text-primary)' }}>{formatAngle(state.theta2)}°</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>max |θ|:</span>
+                <span style={{ color: 'var(--text-primary)' }}>
+                  {formatAngle(state.angles.reduce((m, a) => Math.max(m, Math.abs(a)), 0))}°
+                </span>
 
                 <span style={{ color: 'var(--text-tertiary)' }}>Control:</span>
                 <span style={{ color: state.controlForce > 0 ? '#4ade80' : '#f87171' }}>
                   {state.controlForce.toFixed(1)} N
                 </span>
               </div>
+              {state.angles.length > 0 && (
+                <div style={{ marginTop: '8px', color: 'var(--text-tertiary)' }}>
+                  θ = [{state.angles.map((a) => formatAngle(a)).join(', ')}]°
+                </div>
+              )}
             </div>
           )}
 
@@ -300,9 +261,11 @@ export function InvertedPendulumControlPanel({
               borderRadius: '6px',
               fontSize: '11px',
             }}>
-              <h4 style={{ margin: '0 0 4px 0', color: 'var(--text-secondary)' }}>LQR Gains</h4>
-              <div style={{ fontFamily: 'monospace', color: 'var(--text-tertiary)' }}>
-                K = [{lqrGains.map(k => k.toFixed(1)).join(', ')}]
+              <h4 style={{ margin: '0 0 4px 0', color: 'var(--text-secondary)' }}>
+                LQR Gains ({lqrGains.length} states)
+              </h4>
+              <div style={{ fontFamily: 'monospace', color: 'var(--text-tertiary)', wordBreak: 'break-all' }}>
+                K = [{lqrGains.map((k) => k.toFixed(1)).join(', ')}]
               </div>
             </div>
           )}
@@ -311,5 +274,17 @@ export function InvertedPendulumControlPanel({
     </div>
   );
 }
+
+const disturbanceButtonStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: '90px',
+  padding: '8px',
+  backgroundColor: 'var(--bg-tertiary)',
+  color: 'var(--text-primary)',
+  border: '1px solid var(--border-color)',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '12px',
+};
 
 export default InvertedPendulumControlPanel;

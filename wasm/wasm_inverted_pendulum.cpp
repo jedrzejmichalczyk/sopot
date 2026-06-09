@@ -1,8 +1,9 @@
 /**
- * WebAssembly wrapper for SOPOT Inverted Double Pendulum Control System
+ * WebAssembly wrapper for the SOPOT Cart-N-Pendulum Control System.
  *
- * This file provides Emscripten embind bindings to expose the C++ inverted
- * double pendulum control system to JavaScript/TypeScript.
+ * Configured for a cart balancing a chain of NUM_LINKS inverted pendulums
+ * (six by default) stabilized by an LQR controller. Provides Emscripten
+ * embind bindings exposing the C++ control system to JavaScript/TypeScript.
  *
  * Build with:
  *   emcc -std=c++20 -lembind -O3 -s WASM=1 \
@@ -12,7 +13,7 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #include <emscripten/emscripten.h>
-#include "../physics/control/cart_double_pendulum.hpp"
+#include "../physics/control/cart_n_pendulum.hpp"
 #include "../physics/control/lqr.hpp"
 #include "../physics/control/state_feedback_controller.hpp"
 #include "../core/typed_component.hpp"
@@ -28,246 +29,205 @@ using namespace sopot;
 using namespace sopot::control;
 
 /**
- * InvertedPendulumSimulator: JavaScript-friendly wrapper for the control system
+ * InvertedPendulumSimulator: JavaScript-friendly wrapper for the control system.
  *
- * This class provides:
- * - Clean initialization with physical parameters
- * - LQR controller with tunable weights
- * - Single-step integration for JavaScript-controlled animation
- * - State queries returning JavaScript objects
- * - Disturbance injection for demos
+ * The cart carries NUM_LINKS serially-connected pendulum links. The state
+ * vector has size 2*(NUM_LINKS+1) = [x, θ₁…θ_N, ẋ, ω₁…ω_N]. All physics and
+ * control runs in C++; the frontend handles visualization and interaction.
  */
 class InvertedPendulumSimulator {
+public:
+    static constexpr size_t NUM_LINKS = 6;
+    static constexpr size_t NSTATE = 2 * (NUM_LINKS + 1);  // 14
+
 private:
-    // System parameters
-    double m_cart_mass{1.0};
-    double m_mass1{0.5};
-    double m_mass2{0.5};
-    double m_length1{0.5};
-    double m_length2{0.5};
+    using Plant = CartNPendulum<NUM_LINKS, double>;
+    using Controller = CartNPendulumController<NUM_LINKS>;
+
+    // System parameters (uniform links by default).
+    double m_cart_mass{2.0};
+    std::array<double, NUM_LINKS> m_link_mass{};
+    std::array<double, NUM_LINKS> m_link_length{};
     double m_gravity{9.81};
 
-    // Controller
-    std::unique_ptr<InvertedDoublePendulumController> m_controller;
+    std::unique_ptr<Controller> m_controller;
 
-    // State: [x, θ₁, θ₂, ẋ, ω₁, ω₂]
-    std::array<double, 6> m_state{};
-    std::array<double, 6> m_initial_state{};
+    std::array<double, NSTATE> m_state{};
+    std::array<double, NSTATE> m_initial_state{};
 
-    // Simulation
     double m_time{0.0};
-    double m_dt{0.01};  // 10ms timestep
+    double m_dt{0.01};
     bool m_initialized{false};
     bool m_controller_enabled{true};
+    double m_max_force{500.0};
 
-    // Control limits
-    double m_max_force{100.0};  // N
+    // LQR design weights / parameters.
+    std::array<double, NSTATE> m_q_diag{};
+    double m_r{0.001};
+    double m_riccati_dt{0.005};
 
-    // History for visualization
     struct HistoryEntry {
         double time;
-        double x, theta1, theta2;
-        double xdot, omega1, omega2;
+        double x;
         double control_force;
+        double max_angle;
     };
     std::vector<HistoryEntry> m_history;
     bool m_record_history{true};
     static constexpr size_t MAX_HISTORY_SIZE = 10000;
 
-    // RK4 integration step
+    static constexpr size_t idxX()  { return 0; }
+    static constexpr size_t idxTheta(size_t i) { return 1 + i; }
+    static constexpr size_t idxXDot() { return NUM_LINKS + 1; }
+    static constexpr size_t idxOmega(size_t i) { return NUM_LINKS + 2 + i; }
+
+    double maxAbsAngle() const {
+        double m = 0.0;
+        for (size_t i = 0; i < NUM_LINKS; ++i) m = std::max(m, std::abs(m_state[idxTheta(i)]));
+        return m;
+    }
+
+    double currentControlForce() const {
+        if (!m_controller_enabled || !m_controller) return 0.0;
+        std::array<double, NSTATE> s = m_state;
+        double F = m_controller->computeForce(s);
+        return std::clamp(F, -m_max_force, m_max_force);
+    }
+
+    // Evaluate the plant derivative with a fixed control force.
+    std::array<double, NSTATE> derivativesAt(const std::array<double, NSTATE>& s, double F) const {
+        Plant plant(m_cart_mass, m_link_mass, m_link_length, m_gravity);
+        plant.setControlForce(F);
+        std::vector<double> sv(s.begin(), s.end());
+        std::span<const double> sp(sv);
+        TypedRegistry<double> reg{};
+        auto d = plant.derivatives(0.0, sp, sp, reg);
+        std::array<double, NSTATE> out{};
+        for (size_t i = 0; i < NSTATE; ++i) out[i] = d[i];
+        return out;
+    }
+
     void rk4Step(double dt) {
-        // Get control force
-        double F = 0.0;
-        if (m_controller_enabled && m_controller) {
-            F = m_controller->compute(m_state)[0];
-            F = std::clamp(F, -m_max_force, m_max_force);
-        }
+        // Control force held constant across the RK4 stages (computed once).
+        double F = currentControlForce();
 
-        // RK4 integration
-        auto derivs = [this, F](const std::array<double, 6>& s) -> std::array<double, 6> {
-            // Create temporary plant with current state
-            double x = s[0], theta1 = s[1], theta2 = s[2];
-            double xdot = s[3], omega1 = s[4], omega2 = s[5];
-
-            // Compute derivatives (physics from CartDoublePendulum)
-            double mc = m_cart_mass, m1 = m_mass1, m2 = m_mass2;
-            double L1 = m_length1, L2 = m_length2, g = m_gravity;
-
-            double s1 = std::sin(theta1), c1 = std::cos(theta1);
-            double s2 = std::sin(theta2), c2 = std::cos(theta2);
-            double s12 = std::sin(theta1 - theta2), c12 = std::cos(theta1 - theta2);
-
-            // Mass matrix elements
-            double M11 = mc + m1 + m2;
-            double M12 = (m1 + m2) * L1 * c1;
-            double M13 = m2 * L2 * c2;
-            double M22 = (m1 + m2) * L1 * L1;
-            double M23 = m2 * L1 * L2 * c12;
-            double M33 = m2 * L2 * L2;
-
-            // Right-hand side
-            double rhs1 = F + (m1 + m2) * L1 * s1 * omega1 * omega1
-                           + m2 * L2 * s2 * omega2 * omega2;
-            double rhs2 = (m1 + m2) * g * L1 * s1
-                        - m2 * L1 * L2 * s12 * omega2 * omega2;
-            double rhs3 = m2 * g * L2 * s2
-                        + m2 * L1 * L2 * s12 * omega1 * omega1;
-
-            // Solve 3x3 system using Cramer's rule
-            double det = M11 * (M22 * M33 - M23 * M23)
-                       - M12 * (M12 * M33 - M23 * M13)
-                       + M13 * (M12 * M23 - M22 * M13);
-
-            double C11 = M22 * M33 - M23 * M23;
-            double C12 = -(M12 * M33 - M13 * M23);
-            double C13 = M12 * M23 - M13 * M22;
-            double C21 = -(M12 * M33 - M13 * M23);
-            double C22 = M11 * M33 - M13 * M13;
-            double C23 = -(M11 * M23 - M12 * M13);
-            double C31 = M12 * M23 - M13 * M22;
-            double C32 = -(M11 * M23 - M12 * M13);
-            double C33 = M11 * M22 - M12 * M12;
-
-            if (std::abs(det) < 1e-12) {
-                throw std::runtime_error("InvertedPendulumSimulator: mass matrix is singular");
-            }
-            double inv_det = 1.0 / det;
-            double xddot = inv_det * (C11 * rhs1 + C12 * rhs2 + C13 * rhs3);
-            double alpha1 = inv_det * (C21 * rhs1 + C22 * rhs2 + C23 * rhs3);
-            double alpha2 = inv_det * (C31 * rhs1 + C32 * rhs2 + C33 * rhs3);
-
-            return {xdot, omega1, omega2, xddot, alpha1, alpha2};
+        auto add = [](const std::array<double, NSTATE>& a,
+                      const std::array<double, NSTATE>& b, double h) {
+            std::array<double, NSTATE> r{};
+            for (size_t i = 0; i < NSTATE; ++i) r[i] = a[i] + h * b[i];
+            return r;
         };
 
-        // RK4 stages
-        auto k1 = derivs(m_state);
+        auto k1 = derivativesAt(m_state, F);
+        auto k2 = derivativesAt(add(m_state, k1, 0.5 * dt), F);
+        auto k3 = derivativesAt(add(m_state, k2, 0.5 * dt), F);
+        auto k4 = derivativesAt(add(m_state, k3, dt), F);
 
-        std::array<double, 6> s2;
-        for (int i = 0; i < 6; i++) s2[i] = m_state[i] + 0.5 * dt * k1[i];
-        auto k2 = derivs(s2);
-
-        std::array<double, 6> s3;
-        for (int i = 0; i < 6; i++) s3[i] = m_state[i] + 0.5 * dt * k2[i];
-        auto k3 = derivs(s3);
-
-        std::array<double, 6> s4;
-        for (int i = 0; i < 6; i++) s4[i] = m_state[i] + dt * k3[i];
-        auto k4 = derivs(s4);
-
-        // Update state
-        for (int i = 0; i < 6; i++) {
-            m_state[i] += dt * (k1[i] + 2*k2[i] + 2*k3[i] + k4[i]) / 6.0;
+        for (size_t i = 0; i < NSTATE; ++i) {
+            m_state[i] += dt * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]) / 6.0;
         }
-
         m_time += dt;
 
-        // Record history
         if (m_record_history && m_history.size() < MAX_HISTORY_SIZE) {
-            m_history.push_back({
-                m_time,
-                m_state[0], m_state[1], m_state[2],
-                m_state[3], m_state[4], m_state[5],
-                F
-            });
+            m_history.push_back({m_time, m_state[idxX()], F, maxAbsAngle()});
         }
     }
 
+    void rebuildController() {
+        m_controller = std::make_unique<Controller>(
+            Controller::createWithLQR(
+                m_cart_mass, m_link_mass, m_link_length, m_gravity,
+                m_q_diag, m_r, m_riccati_dt
+            )
+        );
+        m_controller->setSaturationLimits({-m_max_force}, {m_max_force});
+    }
+
 public:
-    InvertedPendulumSimulator() = default;
+    InvertedPendulumSimulator() {
+        m_link_mass.fill(0.1);
+        m_link_length.fill(0.3);
+    }
 
     //=========================================================================
     // CONFIGURATION
     //=========================================================================
 
-    /**
-     * Set physical parameters
-     */
-    void setParameters(double cart_mass, double m1, double m2, double L1, double L2, double g) {
+    size_t getNumLinks() const { return NUM_LINKS; }
+
+    /** Set uniform physical parameters for every link. */
+    void setUniformParameters(double cart_mass, double link_mass, double link_length, double g) {
         m_cart_mass = cart_mass;
-        m_mass1 = m1;
-        m_mass2 = m2;
-        m_length1 = L1;
-        m_length2 = L2;
+        m_link_mass.fill(link_mass);
+        m_link_length.fill(link_length);
         m_gravity = g;
         m_initialized = false;
     }
 
-    /**
-     * Set initial state
-     * @param x Cart position (m)
-     * @param theta1 Angle of link 1 from vertical (rad)
-     * @param theta2 Angle of link 2 from vertical (rad)
-     * @param xdot Cart velocity (m/s)
-     * @param omega1 Angular velocity of link 1 (rad/s)
-     * @param omega2 Angular velocity of link 2 (rad/s)
-     */
-    void setInitialState(double x, double theta1, double theta2,
-                         double xdot, double omega1, double omega2) {
-        m_initial_state = {x, theta1, theta2, xdot, omega1, omega2};
+    /** Set per-link masses and lengths from JS arrays (length NUM_LINKS). */
+    void setParameters(double cart_mass, val masses_js, val lengths_js, double g) {
+        m_cart_mass = cart_mass;
+        for (size_t i = 0; i < NUM_LINKS; ++i) {
+            m_link_mass[i] = masses_js[i].as<double>();
+            m_link_length[i] = lengths_js[i].as<double>();
+        }
+        m_gravity = g;
+        m_initialized = false;
     }
 
-    /**
-     * Set simulation timestep
-     */
-    void setTimestep(double dt) {
-        m_dt = dt;
+    /** Set all link angles to the same value (cart at rest, upright chain). */
+    void setInitialAnglesUniform(double angle_rad) {
+        m_initial_state.fill(0.0);
+        for (size_t i = 0; i < NUM_LINKS; ++i) m_initial_state[idxTheta(i)] = angle_rad;
     }
 
-    /**
-     * Set maximum control force
-     */
+    /** Set the full initial state from a JS array (length NSTATE). */
+    void setInitialState(val state_js) {
+        for (size_t i = 0; i < NSTATE; ++i) m_initial_state[i] = state_js[i].as<double>();
+    }
+
+    /** Set initial angles from a JS array (length NUM_LINKS), cart at rest. */
+    void setInitialAngles(val angles_js) {
+        m_initial_state.fill(0.0);
+        for (size_t i = 0; i < NUM_LINKS; ++i) {
+            m_initial_state[idxTheta(i)] = angles_js[i].as<double>();
+        }
+    }
+
+    void setTimestep(double dt) { m_dt = dt; }
+
     void setMaxForce(double max_force) {
         m_max_force = max_force;
+        if (m_controller) m_controller->setSaturationLimits({-m_max_force}, {m_max_force});
     }
 
-    /**
-     * Configure LQR controller weights
-     * @param q_diag Diagonal elements of Q matrix [q_x, q_θ1, q_θ2, q_ẋ, q_ω1, q_ω2]
-     * @param r Control weight R
-     */
+    /** Configure the LQR controller (qDiag length NSTATE, scalar r). */
     void configureLQR(val q_diag_js, double r) {
-        std::array<double, 6> q_diag;
-        for (int i = 0; i < 6; i++) {
-            q_diag[i] = q_diag_js[i].as<double>();
-        }
-
-        m_controller = std::make_unique<InvertedDoublePendulumController>(
-            InvertedDoublePendulumController::createWithLQR(
-                m_cart_mass, m_mass1, m_mass2, m_length1, m_length2, m_gravity,
-                q_diag, r
-            )
-        );
-
-        // Set saturation limits
-        m_controller->setSaturationLimits({-m_max_force}, {m_max_force});
+        for (size_t i = 0; i < NSTATE; ++i) m_q_diag[i] = q_diag_js[i].as<double>();
+        m_r = r;
+        rebuildController();
     }
 
-    /**
-     * Initialize with default parameters
-     */
+    /** Initialize with sensible defaults for a six-link inverted pendulum. */
     void setupDefault() {
-        // Default parameters: lab-scale inverted pendulum
-        m_cart_mass = 1.0;
-        m_mass1 = 0.5;
-        m_mass2 = 0.5;
-        m_length1 = 0.5;
-        m_length2 = 0.5;
+        m_cart_mass = 2.0;
+        m_link_mass.fill(0.1);
+        m_link_length.fill(0.3);
         m_gravity = 9.81;
 
-        // Default initial state: small perturbation from upright
-        m_initial_state = {0.0, 0.1, 0.05, 0.0, 0.0, 0.0};
+        // Default LQR weights: heavy penalty on link angles.
+        m_q_diag.fill(0.0);
+        m_q_diag[idxX()] = 1.0;
+        for (size_t i = 0; i < NUM_LINKS; ++i) m_q_diag[idxTheta(i)] = 200.0;
+        m_q_diag[idxXDot()] = 1.0;
+        for (size_t i = 0; i < NUM_LINKS; ++i) m_q_diag[idxOmega(i)] = 10.0;
+        m_r = 0.001;
+        m_riccati_dt = 0.005;
 
-        // Default LQR weights
-        std::array<double, 6> q_diag = {10.0, 100.0, 100.0, 1.0, 10.0, 10.0};
-        double r = 0.1;
+        // Small initial perturbation from upright.
+        setInitialAnglesUniform(0.02);
 
-        m_controller = std::make_unique<InvertedDoublePendulumController>(
-            InvertedDoublePendulumController::createWithLQR(
-                m_cart_mass, m_mass1, m_mass2, m_length1, m_length2, m_gravity,
-                q_diag, r
-            )
-        );
-        m_controller->setSaturationLimits({-m_max_force}, {m_max_force});
+        rebuildController();
 
         m_state = m_initial_state;
         m_time = 0.0;
@@ -275,22 +235,12 @@ public:
         m_initialized = true;
     }
 
-    /**
-     * Reset to initial state
-     */
     void reset() {
         m_state = m_initial_state;
         m_time = 0.0;
         m_history.clear();
-
-        // Record initial state
         if (m_record_history) {
-            m_history.push_back({
-                0.0,
-                m_state[0], m_state[1], m_state[2],
-                m_state[3], m_state[4], m_state[5],
-                0.0
-            });
+            m_history.push_back({0.0, m_state[idxX()], 0.0, maxAbsAngle()});
         }
     }
 
@@ -298,67 +248,31 @@ public:
     // SIMULATION CONTROL
     //=========================================================================
 
-    /**
-     * Advance simulation by one timestep
-     * Returns true if simulation is stable (angles < 45°)
-     */
+    /** Advance one timestep; returns true while the chain is still upright. */
     bool step() {
-        if (!m_initialized) {
-            throw std::runtime_error("Call setupDefault() or configure before step()");
-        }
-
+        if (!m_initialized) throw std::runtime_error("Call setupDefault() or configure before step()");
         rk4Step(m_dt);
-
-        // Check if pendulum has fallen (angles > 45°)
-        double theta1 = std::abs(m_state[1]);
-        double theta2 = std::abs(m_state[2]);
-        return theta1 < M_PI/4 && theta2 < M_PI/4;
+        return maxAbsAngle() < M_PI / 4;
     }
 
-    /**
-     * Step with custom timestep
-     */
     bool stepWithDt(double dt) {
-        if (!m_initialized) {
-            throw std::runtime_error("Call setupDefault() or configure before step()");
-        }
-
+        if (!m_initialized) throw std::runtime_error("Call setupDefault() or configure before step()");
         rk4Step(dt);
-
-        double theta1 = std::abs(m_state[1]);
-        double theta2 = std::abs(m_state[2]);
-        return theta1 < M_PI/4 && theta2 < M_PI/4;
+        return maxAbsAngle() < M_PI / 4;
     }
 
-    /**
-     * Enable/disable controller (for demonstrating unstable behavior)
-     */
-    void setControllerEnabled(bool enabled) {
-        m_controller_enabled = enabled;
-    }
+    void setControllerEnabled(bool enabled) { m_controller_enabled = enabled; }
 
-    /**
-     * Apply impulse disturbance to cart
-     */
+    /** Apply a horizontal impulse to the cart. */
     void applyCartImpulse(double impulse) {
-        m_state[3] += impulse / m_cart_mass;  // Δv = J/m
+        m_state[idxXDot()] += impulse / m_cart_mass;
     }
 
-    /**
-     * Apply angular impulse to link 1
-     */
-    void applyLink1Impulse(double impulse) {
-        // Approximate: impulse affects angular velocity
-        double I1 = m_mass1 * m_length1 * m_length1;
-        m_state[4] += impulse / I1;
-    }
-
-    /**
-     * Apply angular impulse to link 2
-     */
-    void applyLink2Impulse(double impulse) {
-        double I2 = m_mass2 * m_length2 * m_length2;
-        m_state[5] += impulse / I2;
+    /** Apply an angular impulse to a given link (0-based index). */
+    void applyLinkImpulse(int link, double impulse) {
+        if (link < 0 || link >= static_cast<int>(NUM_LINKS)) return;
+        double I = m_link_mass[link] * m_link_length[link] * m_link_length[link];
+        m_state[idxOmega(static_cast<size_t>(link))] += impulse / I;
     }
 
     //=========================================================================
@@ -366,121 +280,74 @@ public:
     //=========================================================================
 
     double getTime() const { return m_time; }
+    double getCartPosition() const { return m_state[idxX()]; }
+    double getCartVelocity() const { return m_state[idxXDot()]; }
+    double getMaxAngle() const { return maxAbsAngle(); }
+    double getControlForce() const { return currentControlForce(); }
 
-    double getCartPosition() const { return m_state[0]; }
-    double getTheta1() const { return m_state[1]; }
-    double getTheta2() const { return m_state[2]; }
-    double getCartVelocity() const { return m_state[3]; }
-    double getOmega1() const { return m_state[4]; }
-    double getOmega2() const { return m_state[5]; }
-
-    /**
-     * Get link 1 tip position [x, y]
-     */
-    val getLink1TipPosition() const {
-        double x = m_state[0];
-        double theta1 = m_state[1];
-        double L1 = m_length1;
-
-        val result = val::object();
-        result.set("x", x + L1 * std::sin(theta1));
-        result.set("y", L1 * std::cos(theta1));
-        return result;
+    /** Angle of each link (radians) as a JS array. */
+    val getAngles() const {
+        std::vector<double> a(NUM_LINKS);
+        for (size_t i = 0; i < NUM_LINKS; ++i) a[i] = m_state[idxTheta(i)];
+        return val::array(a.begin(), a.end());
     }
 
-    /**
-     * Get link 2 tip position [x, y]
-     */
-    val getLink2TipPosition() const {
-        double x = m_state[0];
-        double theta1 = m_state[1];
-        double theta2 = m_state[2];
-        double L1 = m_length1, L2 = m_length2;
-
-        val result = val::object();
-        result.set("x", x + L1 * std::sin(theta1) + L2 * std::sin(theta2));
-        result.set("y", L1 * std::cos(theta1) + L2 * std::cos(theta2));
-        return result;
+    /** Angular velocity of each link as a JS array. */
+    val getAngularVelocities() const {
+        std::vector<double> w(NUM_LINKS);
+        for (size_t i = 0; i < NUM_LINKS; ++i) w[i] = m_state[idxOmega(i)];
+        return val::array(w.begin(), w.end());
     }
 
-    /**
-     * Get current control force
-     */
-    double getControlForce() const {
-        if (!m_controller_enabled || !m_controller) return 0.0;
-        double F = m_controller->compute(m_state)[0];
-        return std::clamp(F, -m_max_force, m_max_force);
+    /** Joint positions: [pivot, tip₁, …, tip_N] as a JS array of {x,y}. */
+    val getJoints() const {
+        val arr = val::array();
+        double px = m_state[idxX()];
+        double py = 0.0;
+        val pivot = val::object();
+        pivot.set("x", px);
+        pivot.set("y", py);
+        arr.set(0, pivot);
+        for (size_t i = 0; i < NUM_LINKS; ++i) {
+            double theta = m_state[idxTheta(i)];
+            px += m_link_length[i] * std::sin(theta);
+            py += m_link_length[i] * std::cos(theta);
+            val joint = val::object();
+            joint.set("x", px);
+            joint.set("y", py);
+            arr.set(static_cast<int>(i + 1), joint);
+        }
+        return arr;
     }
 
-    /**
-     * Get full state as JavaScript object
-     */
     val getFullState() const {
         val result = val::object();
         result.set("time", m_time);
-        result.set("x", m_state[0]);
-        result.set("theta1", m_state[1]);
-        result.set("theta2", m_state[2]);
-        result.set("xdot", m_state[3]);
-        result.set("omega1", m_state[4]);
-        result.set("omega2", m_state[5]);
+        result.set("x", m_state[idxX()]);
+        result.set("xdot", m_state[idxXDot()]);
         result.set("controlForce", getControlForce());
-        result.set("link1Tip", getLink1TipPosition());
-        result.set("link2Tip", getLink2TipPosition());
+        result.set("numLinks", static_cast<double>(NUM_LINKS));
+        result.set("angles", getAngles());
+        result.set("omegas", getAngularVelocities());
+        result.set("joints", getJoints());
+        // Backward-compatible scalar fields for the first two links.
+        result.set("theta1", m_state[idxTheta(0)]);
+        result.set("theta2", NUM_LINKS > 1 ? m_state[idxTheta(1)] : 0.0);
+        result.set("omega1", m_state[idxOmega(0)]);
+        result.set("omega2", NUM_LINKS > 1 ? m_state[idxOmega(1)] : 0.0);
         return result;
     }
 
-    /**
-     * Get visualization data: cart and pendulum geometry
-     */
     val getVisualizationData() const {
-        double x = m_state[0];
-        double theta1 = m_state[1];
-        double theta2 = m_state[2];
-        double L1 = m_length1, L2 = m_length2;
-
-        // Cart center
-        double cart_x = x;
-        double cart_y = 0.0;
-
-        // Link 1 joint (cart pivot)
-        double j1_x = cart_x;
-        double j1_y = cart_y;
-
-        // Link 1 tip = Link 2 joint
-        double j2_x = j1_x + L1 * std::sin(theta1);
-        double j2_y = j1_y + L1 * std::cos(theta1);
-
-        // Link 2 tip
-        double tip_x = j2_x + L2 * std::sin(theta2);
-        double tip_y = j2_y + L2 * std::cos(theta2);
-
         val result = val::object();
-
         val cart = val::object();
-        cart.set("x", cart_x);
-        cart.set("y", cart_y);
+        cart.set("x", m_state[idxX()]);
+        cart.set("y", 0.0);
         result.set("cart", cart);
-
-        val joint1 = val::object();
-        joint1.set("x", j1_x);
-        joint1.set("y", j1_y);
-        result.set("joint1", joint1);
-
-        val joint2 = val::object();
-        joint2.set("x", j2_x);
-        joint2.set("y", j2_y);
-        result.set("joint2", joint2);
-
-        val tip = val::object();
-        tip.set("x", tip_x);
-        tip.set("y", tip_y);
-        result.set("tip", tip);
-
-        result.set("theta1", theta1);
-        result.set("theta2", theta2);
+        result.set("joints", getJoints());
+        result.set("angles", getAngles());
         result.set("controlForce", getControlForce());
-
+        result.set("numLinks", static_cast<double>(NUM_LINKS));
         return result;
     }
 
@@ -492,33 +359,19 @@ public:
     size_t getHistorySize() const { return m_history.size(); }
     void clearHistory() { m_history.clear(); }
 
-    /**
-     * Get history as JavaScript arrays
-     */
     val getHistory() const {
         val result = val::object();
-
-        std::vector<double> time, x, theta1, theta2, xdot, omega1, omega2, control;
+        std::vector<double> time, x, control, maxangle;
         for (const auto& h : m_history) {
             time.push_back(h.time);
             x.push_back(h.x);
-            theta1.push_back(h.theta1);
-            theta2.push_back(h.theta2);
-            xdot.push_back(h.xdot);
-            omega1.push_back(h.omega1);
-            omega2.push_back(h.omega2);
             control.push_back(h.control_force);
+            maxangle.push_back(h.max_angle);
         }
-
         result.set("time", val::array(time.begin(), time.end()));
         result.set("x", val::array(x.begin(), x.end()));
-        result.set("theta1", val::array(theta1.begin(), theta1.end()));
-        result.set("theta2", val::array(theta2.begin(), theta2.end()));
-        result.set("xdot", val::array(xdot.begin(), xdot.end()));
-        result.set("omega1", val::array(omega1.begin(), omega1.end()));
-        result.set("omega2", val::array(omega2.begin(), omega2.end()));
         result.set("controlForce", val::array(control.begin(), control.end()));
-
+        result.set("maxAngle", val::array(maxangle.begin(), maxangle.end()));
         return result;
     }
 
@@ -527,22 +380,16 @@ public:
     //=========================================================================
 
     double getCartMass() const { return m_cart_mass; }
-    double getMass1() const { return m_mass1; }
-    double getMass2() const { return m_mass2; }
-    double getLength1() const { return m_length1; }
-    double getLength2() const { return m_length2; }
+    double getLinkMass(int i) const { return m_link_mass[static_cast<size_t>(i)]; }
+    double getLinkLength(int i) const { return m_link_length[static_cast<size_t>(i)]; }
     double getGravity() const { return m_gravity; }
     double getMaxForce() const { return m_max_force; }
     bool isInitialized() const { return m_initialized; }
     bool isControllerEnabled() const { return m_controller_enabled; }
 
-    /**
-     * Get LQR gain matrix as array
-     */
+    /** LQR gain row as a JS array (length NSTATE). */
     val getLQRGain() const {
-        if (!m_controller) {
-            return val::array();
-        }
+        if (!m_controller) return val::array();
         const auto& K = m_controller->getGain();
         std::vector<double> gains(K[0].begin(), K[0].end());
         return val::array(gains.begin(), gains.end());
@@ -558,8 +405,12 @@ EMSCRIPTEN_BINDINGS(inverted_pendulum) {
         .constructor<>()
 
         // Configuration
+        .function("getNumLinks", &InvertedPendulumSimulator::getNumLinks)
+        .function("setUniformParameters", &InvertedPendulumSimulator::setUniformParameters)
         .function("setParameters", &InvertedPendulumSimulator::setParameters)
+        .function("setInitialAnglesUniform", &InvertedPendulumSimulator::setInitialAnglesUniform)
         .function("setInitialState", &InvertedPendulumSimulator::setInitialState)
+        .function("setInitialAngles", &InvertedPendulumSimulator::setInitialAngles)
         .function("setTimestep", &InvertedPendulumSimulator::setTimestep)
         .function("setMaxForce", &InvertedPendulumSimulator::setMaxForce)
         .function("configureLQR", &InvertedPendulumSimulator::configureLQR)
@@ -571,20 +422,17 @@ EMSCRIPTEN_BINDINGS(inverted_pendulum) {
         .function("stepWithDt", &InvertedPendulumSimulator::stepWithDt)
         .function("setControllerEnabled", &InvertedPendulumSimulator::setControllerEnabled)
         .function("applyCartImpulse", &InvertedPendulumSimulator::applyCartImpulse)
-        .function("applyLink1Impulse", &InvertedPendulumSimulator::applyLink1Impulse)
-        .function("applyLink2Impulse", &InvertedPendulumSimulator::applyLink2Impulse)
+        .function("applyLinkImpulse", &InvertedPendulumSimulator::applyLinkImpulse)
 
         // State queries
         .function("getTime", &InvertedPendulumSimulator::getTime)
         .function("getCartPosition", &InvertedPendulumSimulator::getCartPosition)
-        .function("getTheta1", &InvertedPendulumSimulator::getTheta1)
-        .function("getTheta2", &InvertedPendulumSimulator::getTheta2)
         .function("getCartVelocity", &InvertedPendulumSimulator::getCartVelocity)
-        .function("getOmega1", &InvertedPendulumSimulator::getOmega1)
-        .function("getOmega2", &InvertedPendulumSimulator::getOmega2)
-        .function("getLink1TipPosition", &InvertedPendulumSimulator::getLink1TipPosition)
-        .function("getLink2TipPosition", &InvertedPendulumSimulator::getLink2TipPosition)
+        .function("getMaxAngle", &InvertedPendulumSimulator::getMaxAngle)
         .function("getControlForce", &InvertedPendulumSimulator::getControlForce)
+        .function("getAngles", &InvertedPendulumSimulator::getAngles)
+        .function("getAngularVelocities", &InvertedPendulumSimulator::getAngularVelocities)
+        .function("getJoints", &InvertedPendulumSimulator::getJoints)
         .function("getFullState", &InvertedPendulumSimulator::getFullState)
         .function("getVisualizationData", &InvertedPendulumSimulator::getVisualizationData)
 
@@ -596,10 +444,8 @@ EMSCRIPTEN_BINDINGS(inverted_pendulum) {
 
         // Parameters
         .function("getCartMass", &InvertedPendulumSimulator::getCartMass)
-        .function("getMass1", &InvertedPendulumSimulator::getMass1)
-        .function("getMass2", &InvertedPendulumSimulator::getMass2)
-        .function("getLength1", &InvertedPendulumSimulator::getLength1)
-        .function("getLength2", &InvertedPendulumSimulator::getLength2)
+        .function("getLinkMass", &InvertedPendulumSimulator::getLinkMass)
+        .function("getLinkLength", &InvertedPendulumSimulator::getLinkLength)
         .function("getGravity", &InvertedPendulumSimulator::getGravity)
         .function("getMaxForce", &InvertedPendulumSimulator::getMaxForce)
         .function("isInitialized", &InvertedPendulumSimulator::isInitialized)
