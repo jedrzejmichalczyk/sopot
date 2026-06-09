@@ -3,8 +3,10 @@ import type { PendulumState } from './InvertedPendulumVisualization';
 
 interface InvertedPendulumControlPanelProps {
   state: PendulumState | null;
-  isRunning: boolean;
+  isReady: boolean;
   isInitialized: boolean;
+  isRunning: boolean;
+  error: string | null;
   simulationFailed: boolean;
   controllerEnabled: boolean;
   playbackSpeed: number;
@@ -21,8 +23,10 @@ interface InvertedPendulumControlPanelProps {
 
 export function InvertedPendulumControlPanel({
   state,
+  isReady,
   isRunning,
   isInitialized,
+  error,
   simulationFailed,
   controllerEnabled,
   playbackSpeed,
@@ -56,6 +60,21 @@ export function InvertedPendulumControlPanel({
         Inverted {numLinks}-Pendulum Control
       </h3>
 
+      {/* Error display */}
+      {error && (
+        <div style={{
+          padding: '12px',
+          marginBottom: '16px',
+          backgroundColor: 'rgba(248, 113, 113, 0.1)',
+          border: '1px solid var(--accent-danger)',
+          borderRadius: '6px',
+          color: 'var(--accent-danger)',
+          fontSize: '13px',
+        }}>
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
       {/* Initialization Section */}
       {!isInitialized && (
         <div style={{ marginBottom: '16px' }}>
@@ -68,6 +87,7 @@ export function InvertedPendulumControlPanel({
               type="number"
               value={initialTilt}
               step="0.1"
+              disabled={!isReady}
               onChange={(e) => setInitialTilt(parseFloat(e.target.value) || 0)}
               style={{
                 width: '100%',
@@ -82,11 +102,17 @@ export function InvertedPendulumControlPanel({
           </label>
           <button
             onClick={handleInitialize}
+            disabled={!isReady}
             className="touch-button btn-primary"
-            style={{ width: '100%' }}
+            style={{ width: '100%', opacity: isReady ? 1 : 0.5, cursor: isReady ? 'pointer' : 'not-allowed' }}
           >
             Initialize Simulation
           </button>
+          {!isReady && !error && (
+            <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: 'var(--text-tertiary)' }}>
+              Loading WebAssembly module…
+            </p>
+          )}
         </div>
       )}
 
