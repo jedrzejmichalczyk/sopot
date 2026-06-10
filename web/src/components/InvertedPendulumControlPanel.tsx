@@ -54,7 +54,6 @@ export function InvertedPendulumControlPanel({
       padding: '16px',
       backgroundColor: 'var(--bg-secondary)',
       borderRadius: '8px',
-      maxWidth: '400px',
     }}>
       <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text-primary)' }}>
         Inverted {numLinks}-Pendulum Control
@@ -85,18 +84,21 @@ export function InvertedPendulumControlPanel({
             </span>
             <input
               type="number"
+              inputMode="decimal"
               value={initialTilt}
               step="0.1"
               disabled={!isReady}
               onChange={(e) => setInitialTilt(parseFloat(e.target.value) || 0)}
               style={{
                 width: '100%',
+                minHeight: '44px',
                 padding: '8px',
                 marginTop: '4px',
                 backgroundColor: 'var(--bg-tertiary)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '4px',
                 color: 'var(--text-primary)',
+                fontSize: '16px', // Prevent zoom on iOS
               }}
             />
           </label>
@@ -155,6 +157,7 @@ export function InvertedPendulumControlPanel({
               </span>
               <input
                 type="range"
+                className="touch-slider"
                 min="0.1"
                 max="5"
                 step="0.1"
@@ -192,6 +195,7 @@ export function InvertedPendulumControlPanel({
               </span>
               <input
                 type="range"
+                className="touch-slider"
                 min="1"
                 max="20"
                 step="1"
@@ -201,6 +205,12 @@ export function InvertedPendulumControlPanel({
               />
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => onApplyDisturbance('cart', 0, -disturbanceStrength)}
+                style={disturbanceButtonStyle}
+              >
+                ← Push Cart
+              </button>
               <button
                 onClick={() => onApplyDisturbance('cart', 0, disturbanceStrength)}
                 style={disturbanceButtonStyle}
@@ -221,7 +231,7 @@ export function InvertedPendulumControlPanel({
               </button>
             </div>
             <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-              Tip: click any mass in the visualization to nudge that link.
+              Tip: tap any mass to nudge that link, or tap beside the cart to push it toward that side.
             </p>
           </div>
 
@@ -303,14 +313,15 @@ export function InvertedPendulumControlPanel({
 
 const disturbanceButtonStyle: React.CSSProperties = {
   flex: 1,
-  minWidth: '90px',
-  padding: '8px',
+  minWidth: '110px',
+  minHeight: '44px', // Accessible touch target
+  padding: '8px 10px',
   backgroundColor: 'var(--bg-tertiary)',
   color: 'var(--text-primary)',
   border: '1px solid var(--border-color)',
-  borderRadius: '4px',
+  borderRadius: '6px',
   cursor: 'pointer',
-  fontSize: '12px',
+  fontSize: '13px',
 };
 
 export default InvertedPendulumControlPanel;

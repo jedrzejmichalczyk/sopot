@@ -2,8 +2,11 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 // Constants for touch interaction and visualization
 const CANVAS_PADDING_PX = 60; // pixels - padding around visualization area
+const CANVAS_PADDING_COMPACT_PX = 24; // pixels - padding on small screens
 const TOUCH_FEEDBACK_DURATION_MS = 200; // milliseconds - visual feedback duration
-const HIT_AREA_EXPANSION_PX = 10; // pixels - expansion of hit detection areas
+const HIT_AREA_EXPANSION_PX = 16; // pixels - expansion of hit detection areas
+const COMPACT_WIDTH_PX = 520; // below this width, use compact text and padding
+const CART_BAND_HEIGHT_FACTOR = 3; // cart-push hit band height in cart heights
 const IMPULSE_CART_NS = 5; // N·s - impulse strength for cart
 const IMPULSE_LINK_NS = 0.5; // N·s - impulse strength for links
 const MASS_BASE_RADIUS_PX = 6; // pixels - base radius for mass rendering
@@ -100,24 +103,33 @@ export function InvertedPendulumVisualization({
     return joints;
   }, [visualizationData, state, linkLength, numLinks]);
 
-  // Handle canvas resizing
+  // Handle canvas resizing (observe the container, not just the window,
+  // so orientation changes and panel toggles are picked up too).
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const updateSize = () => {
-      if (containerRef.current) {
-        const { width, height } = containerRef.current.getBoundingClientRect();
+      const { width, height } = container.getBoundingClientRect();
+      if (width > 0 && height > 0) {
         setDimensions({ width, height });
       }
     };
 
     updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateSize);
+    };
   }, []);
 
   // Compute the simulation->canvas transform (shared by render and hit testing).
   const computeTransform = useCallback(() => {
     const totalHeight = numLinks * linkLength;
-    const padding = CANVAS_PADDING_PX;
+    const padding = dimensions.width < COMPACT_WIDTH_PX ? CANVAS_PADDING_COMPACT_PX : CANVAS_PADDING_PX;
     const viewWidth = Math.max(trackWidth, 2 * totalHeight);
     const viewHeight = totalHeight * VIEW_HEIGHT_FACTOR;
 
@@ -150,7 +162,6 @@ export function InvertedPendulumVisualization({
     if (joints.length === 0) return;
 
     const { scale, toCanvasX, toCanvasY, groundY } = computeTransform();
-    const cartWidth = CART_WIDTH_M * scale;
     const cartHeight = CART_HEIGHT_M * scale;
     const massRadius = MASS_BASE_RADIUS_PX + linkMass * MASS_RADIUS_SCALE_FACTOR;
 
@@ -167,15 +178,16 @@ export function InvertedPendulumVisualization({
       }
     }
 
-    // Check cart.
+    // Check cart: any tap in the band around the track pushes the cart
+    // toward the tapped side. This gives a large, forgiving touch target
+    // and makes both push directions reachable.
     const cartX = toCanvasX(joints[0].x);
     if (
-      canvasX >= cartX - cartWidth / 2 - HIT_AREA_EXPANSION_PX &&
-      canvasX <= cartX + cartWidth / 2 + HIT_AREA_EXPANSION_PX &&
-      canvasY >= groundY - cartHeight - HIT_AREA_EXPANSION_PX &&
-      canvasY <= groundY + HIT_AREA_EXPANSION_PX
+      canvasY >= groundY - cartHeight * CART_BAND_HEIGHT_FACTOR &&
+      canvasY <= groundY + cartHeight + HIT_AREA_EXPANSION_PX
     ) {
-      onApplyImpulse('cart', 0, IMPULSE_CART_NS);
+      const direction = canvasX >= cartX ? 1 : -1;
+      onApplyImpulse('cart', 0, direction * IMPULSE_CART_NS);
       setHighlighted({ type: 'cart', index: 0 });
       setTimeout(() => setHighlighted(null), TOUCH_FEEDBACK_DURATION_MS);
     }
@@ -214,6 +226,12 @@ export function InvertedPendulumVisualization({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // Render at device resolution so lines stay crisp on high-DPI screens.
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const compact = dimensions.width < COMPACT_WIDTH_PX;
 
     // Clear canvas with background
     ctx.fillStyle = getCSSVariable('--bg-primary') || '#1a1a2e';
@@ -348,14 +366,26 @@ export function InvertedPendulumVisualization({
       ctx.shadowBlur = 0;
     }
 
+    // Title (drawn first so the telemetry overlay can start below it on
+    // narrow screens, where the two would otherwise collide)
+    ctx.fillStyle = getCSSVariable('--text-secondary') || '#888';
+    ctx.font = compact ? 'bold 13px sans-serif' : 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    const nLinks = joints.length - 1;
+    const title = compact
+      ? `Inverted ${nLinks}-Pendulum · LQR`
+      : `Inverted ${nLinks}-Pendulum on Cart with LQR Control`;
+    ctx.fillText(title, dimensions.width / 2, compact ? 20 : 25);
+    ctx.textAlign = 'left';
+
     // Telemetry overlay
     if (showTelemetry && state) {
       ctx.fillStyle = getCSSVariable('--text-primary') || '#fff';
-      ctx.font = '14px monospace';
+      ctx.font = compact ? '12px monospace' : '14px monospace';
 
-      const tX = 20;
-      let tY = 30;
-      const lh = 18;
+      const tX = compact ? 12 : 20;
+      let tY = compact ? 44 : 30;
+      const lh = compact ? 16 : 18;
 
       ctx.fillText(`t = ${state.time.toFixed(2)} s`, tX, tY); tY += lh;
       ctx.fillText(`x = ${state.x.toFixed(3)} m`, tX, tY); tY += lh;
@@ -363,15 +393,9 @@ export function InvertedPendulumVisualization({
       ctx.fillText(`max|θ| = ${((maxAng * 180) / Math.PI).toFixed(1)}°`, tX, tY); tY += lh;
       ctx.fillText(`F = ${state.controlForce.toFixed(1)} N`, tX, tY);
     }
-
-    // Title
-    ctx.fillStyle = getCSSVariable('--text-secondary') || '#888';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.textAlign = 'center';
-    const nLinks = joints.length - 1;
-    ctx.fillText(`Inverted ${nLinks}-Pendulum on Cart with LQR Control`, dimensions.width / 2, 25);
-    ctx.textAlign = 'left';
   }, [state, visualizationData, dimensions, linkMass, numLinks, linkLength, showTelemetry, showForceArrow, trackWidth, highlighted, resolveJoints, computeTransform]);
+
+  const dpr = window.devicePixelRatio || 1;
 
   return (
     <div
@@ -379,18 +403,19 @@ export function InvertedPendulumVisualization({
       style={{
         width: '100%',
         height: '100%',
-        minHeight: '400px',
+        minHeight: 0,
         position: 'relative',
       }}
     >
       <canvas
         ref={canvasRef}
-        width={dimensions.width}
-        height={dimensions.height}
+        width={Math.round(dimensions.width * dpr)}
+        height={Math.round(dimensions.height * dpr)}
         style={{
           display: 'block',
           width: '100%',
           height: '100%',
+          touchAction: 'none',
         }}
       />
     </div>
