@@ -24,10 +24,11 @@ function App() {
   const [showVelocities, setShowVelocities] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [cameraTracking, setCameraTracking] = useState(false);
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(
-    window.innerWidth < 768 ? 'controls' : null
-  );
+  // Start with all panels closed: the visualization placeholder has its own
+  // "Start" CTA, so we don't cover the screen with a sheet on load.
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [pendingAutoStart, setPendingAutoStart] = useState(false);
 
   // Note: All hooks are instantiated to maintain React hook call order,
   // but inactive simulations are reset when switching types to free resources.
@@ -47,6 +48,14 @@ function App() {
     : simulationType === 'grid2d'
       ? gridSim
       : pendulumSim;
+
+  // Run the simulation as soon as a quick-start initialization lands
+  useEffect(() => {
+    if (pendingAutoStart && activeSim.isInitialized) {
+      activeSim.start();
+      setPendingAutoStart(false);
+    }
+  }, [pendingAutoStart, activeSim]);
 
   // Handle window resize for responsive layout
   useEffect(() => {
@@ -155,6 +164,24 @@ function App() {
     setSimulationType(type);
     setTrajectoryHistory([]);
     setTimeSeries(null);
+    setPendingAutoStart(false);
+  };
+
+  // One-tap start with sensible defaults, used by the placeholder CTA.
+  // Critical on mobile, where the control panels live behind the FAB menu.
+  const handleQuickStart = () => {
+    if (simulationType === 'rocket') {
+      Promise.resolve(
+        rocketSim.initialize({ elevation: 85, azimuth: 0, diameter: 0.16, timestep: 0.01 })
+      ).catch((err) => console.error('Quick start failed:', err));
+    } else if (simulationType === 'grid2d') {
+      Promise.resolve(gridSim.initialize()).catch((err) =>
+        console.error('Quick start failed:', err)
+      );
+    } else {
+      pendulumSim.initialize((1.7 * Math.PI) / 180);
+    }
+    setPendingAutoStart(true);
   };
 
   // Render center panel based on simulation type
@@ -187,14 +214,41 @@ function App() {
       // Pendulum simulation
       if (pendulumSim.isInitialized) {
         return (
-          <InvertedPendulumVisualization
-            state={pendulumSim.currentState}
-            visualizationData={pendulumSim.visualizationData}
-            numLinks={pendulumSim.numLinks}
-            showTelemetry={true}
-            showForceArrow={true}
-            onApplyImpulse={pendulumSim.applyDisturbance}
-          />
+          <div style={styles.visualizationWrapper}>
+            <InvertedPendulumVisualization
+              state={pendulumSim.currentState}
+              visualizationData={pendulumSim.visualizationData}
+              numLinks={pendulumSim.numLinks}
+              showTelemetry={true}
+              showForceArrow={true}
+              onApplyImpulse={pendulumSim.applyDisturbance}
+            />
+            {pendulumSim.simulationFailed ? (
+              <div style={styles.vizOverlayCenter}>
+                <div style={styles.failedCard}>
+                  <p style={styles.failedTitle}>A pendulum fell!</p>
+                  <p style={styles.failedText}>A link exceeded 45°. Reset to try again.</p>
+                  <button
+                    className="touch-button btn-danger"
+                    onClick={pendulumSim.reset}
+                    style={{ width: '100%' }}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            ) : (
+              !pendulumSim.isRunning && (
+                <button
+                  className="touch-button btn-success"
+                  style={styles.resumeChip}
+                  onClick={pendulumSim.start}
+                >
+                  ▶ {pendulumSim.currentState && pendulumSim.currentState.time > 0 ? 'Resume' : 'Run simulation'}
+                </button>
+              )
+            )}
+          </div>
         );
       }
       return renderPlaceholder('⚖️ Inverted 6-Pendulum on Cart', pendulumSim.isReady);
@@ -216,8 +270,25 @@ function App() {
         <div style={styles.placeholderContent}>
           <h1 style={styles.placeholderTitle}>{title}</h1>
           <p style={styles.placeholderText}>{description}</p>
-          <p style={styles.placeholderText}>Initialize the simulation to begin</p>
-          {!isReady && (
+          {activeSim.error && (
+            <p style={styles.placeholderError}>{activeSim.error}</p>
+          )}
+          {isReady ? (
+            <>
+              <button
+                className="touch-button btn-success"
+                style={styles.quickStartButton}
+                onClick={handleQuickStart}
+              >
+                ▶ Start Simulation
+              </button>
+              <p style={styles.placeholderHint}>
+                {isMobile
+                  ? 'Tune parameters via the menu button below'
+                  : 'Or tune parameters in the panel on the left'}
+              </p>
+            </>
+          ) : !activeSim.error && (
             <div style={styles.loadingIndicator}>
               <div style={styles.spinner} />
               <p style={styles.loadingText}>{loadingText}</p>
@@ -605,17 +676,83 @@ const styles = {
   placeholderContent: {
     textAlign: 'center' as const,
     color: '#fff',
-    padding: '40px',
+    padding: '24px',
+    maxWidth: '520px',
   },
   placeholderTitle: {
-    fontSize: '48px',
+    fontSize: 'clamp(26px, 6vw, 48px)',
     marginBottom: '20px',
     fontWeight: 'bold' as const,
   },
   placeholderText: {
-    fontSize: '20px',
+    fontSize: 'clamp(15px, 4vw, 20px)',
     marginBottom: '10px',
     opacity: 0.9,
+  },
+  placeholderError: {
+    fontSize: '14px',
+    margin: '16px 0',
+    padding: '12px',
+    borderRadius: '8px',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    color: '#ffb4b4',
+    wordBreak: 'break-word' as const,
+  },
+  placeholderHint: {
+    fontSize: '13px',
+    marginTop: '12px',
+    opacity: 0.7,
+  },
+  quickStartButton: {
+    marginTop: '24px',
+    width: '100%',
+    maxWidth: '320px',
+    fontSize: '18px',
+  },
+  visualizationWrapper: {
+    position: 'relative' as const,
+    width: '100%',
+    height: '100%',
+  },
+  vizOverlayCenter: {
+    position: 'absolute' as const,
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 14, 20, 0.55)',
+    padding: '24px',
+  },
+  failedCard: {
+    backgroundColor: 'var(--bg-secondary)',
+    border: '1px solid var(--accent-red)',
+    borderRadius: '12px',
+    padding: '24px',
+    maxWidth: '320px',
+    width: '100%',
+    textAlign: 'center' as const,
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+  },
+  failedTitle: {
+    margin: '0 0 8px 0',
+    fontSize: '18px',
+    fontWeight: 'bold' as const,
+    color: 'var(--accent-red)',
+  },
+  failedText: {
+    margin: '0 0 16px 0',
+    fontSize: '14px',
+    color: 'var(--text-secondary)',
+  },
+  resumeChip: {
+    position: 'absolute' as const,
+    bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    padding: '12px 28px',
+    fontSize: '16px',
+    whiteSpace: 'nowrap' as const,
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
   },
   loadingIndicator: {
     marginTop: '40px',

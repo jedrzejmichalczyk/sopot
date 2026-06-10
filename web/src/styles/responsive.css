@@ -92,8 +92,16 @@ body {
   flex-direction: column;
   width: 100vw;
   height: 100vh;
+  /* Dynamic viewport height: avoids content hiding behind mobile browser
+     address bars (falls back to 100vh where unsupported) */
+  height: 100dvh;
   background-color: var(--bg-primary);
   overflow: hidden;
+}
+
+.app-layout {
+  height: 100vh;
+  height: 100dvh;
 }
 
 /* ============================================
@@ -335,6 +343,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
   }
 
   .top-section {
@@ -378,6 +387,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
   }
 
   .top-section {
@@ -426,6 +436,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
   }
 
   .top-section {
@@ -462,6 +473,7 @@ body {
     max-width: 80vw;
     border-radius: 20px 0 0 20px;
     height: 100vh !important;
+    height: 100dvh !important;
   }
 
   .bottom-sheet-backdrop {
