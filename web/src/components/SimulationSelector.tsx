@@ -74,6 +74,20 @@ export function SimulationSelector({
             </button>
           );
         })}
+        <a
+          href={`${import.meta.env.BASE_URL}winding.html`}
+          className="touch-button mission-panel corner-accent"
+          style={{ ...styles.card, textDecoration: 'none', display: 'block' }}
+        >
+          <div style={styles.labelContainer}>
+            <div className="technical-label" style={styles.label}>FILWND</div>
+            <div style={styles.subsystem}>MANUFACTURING</div>
+          </div>
+          <div style={styles.cardTitle}>Filament Winding CAD/CAM</div>
+          <div style={styles.cardDescription}>
+            Oxidizer tank winding machine simulation with G-code output ↗
+          </div>
+        </a>
       </div>
     </div>
   );
