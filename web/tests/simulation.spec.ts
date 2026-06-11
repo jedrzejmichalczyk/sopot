@@ -56,6 +56,20 @@ test.describe('SOPOT Web UI', () => {
     await expect(page.getByText('RKTFLT').first()).toBeVisible();
   });
 
+  test('mobile FAB Controls button opens the controls sheet', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    // Open the floating action menu, then tap the "Controls" (settings) item.
+    // Regression: the full-screen backdrop used to paint over the menu items
+    // and swallow the tap, so the sheet never opened.
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await page.getByRole('button', { name: 'Controls' }).click();
+
+    // The controls sheet should now be visible with the rocket panel inside.
+    await expect(page.getByText('Mission Control')).toBeVisible();
+  });
+
   test('WASM module loads', async ({ page }) => {
     await page.goto('/');
 

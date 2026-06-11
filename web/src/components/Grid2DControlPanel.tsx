@@ -1,6 +1,7 @@
 import type { GridTopology, IntegratorType } from '../types/sopot';
 import type { GridSize } from '../hooks/useGrid2DSimulation';
 import { SUPPORTED_GRID_SIZES, SUPPORTED_INTEGRATORS, INTEGRATOR_LABELS } from '../hooks/useGrid2DSimulation';
+import { StatusBadge } from './StatusBadge';
 
 interface Grid2DControlPanelProps {
   isReady: boolean;
@@ -77,23 +78,9 @@ export function Grid2DControlPanel({
   return (
     <div style={styles.container}>
       {/* Header */}
-      <div style={styles.header}>
-        <h2 style={styles.title}>2D Grid Controls</h2>
-        <div style={styles.statusBadge}>
-          <div
-            style={{
-              ...styles.statusDot,
-              backgroundColor: isRunning
-                ? 'var(--accent-green)'
-                : isInitialized
-                ? 'var(--accent-amber)'
-                : 'var(--text-secondary)',
-            }}
-          />
-          <span style={styles.statusText}>
-            {isRunning ? 'Running' : isInitialized ? 'Ready' : 'Stopped'}
-          </span>
-        </div>
+      <div className="ctl-panel-header">
+        <h2>Grid Controls</h2>
+        <StatusBadge isReady={isReady} isInitialized={isInitialized} isRunning={isRunning} />
       </div>
 
       {/* Error Display */}
@@ -422,29 +409,6 @@ const styles = {
     overflowY: 'auto' as const,
     display: 'flex',
     flexDirection: 'column' as const,
-  },
-  header: {
-    padding: '20px',
-    borderBottom: '2px solid var(--bg-tertiary)',
-  },
-  title: {
-    margin: '0 0 10px 0',
-    fontSize: '20px',
-    fontWeight: 'bold' as const,
-  },
-  statusBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  statusDot: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
-  },
-  statusText: {
-    fontSize: '14px',
-    color: 'var(--text-secondary)',
   },
   errorBox: {
     margin: '10px 20px',

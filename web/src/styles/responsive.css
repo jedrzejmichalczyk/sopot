@@ -14,11 +14,13 @@
   --bg-tertiary: #1a2332;       /* Card backgrounds */
   --text-primary: #c5d4e8;      /* Light technical blue-gray */
   --text-secondary: #7a8a9e;    /* Medium technical gray */
+  --text-tertiary: #5a6a7e;     /* Dim technical gray (hints, captions) */
   --border-color: #2a3f5f;      /* Steel blue borders */
   --accent-cyan: #00d4ff;       /* Telemetry data (primary accent) */
   --accent-green: #00ff88;      /* Go/Success status */
   --accent-amber: #ffaa00;      /* Warning/Caution */
   --accent-red: #ff3b3b;        /* Critical/Danger */
+  --accent-danger: #ff3b3b;     /* Alias of --accent-red for control panels */
 
   /* Technical grid overlay */
   --grid-color: rgba(42, 63, 95, 0.3);
@@ -206,6 +208,43 @@ body {
   letter-spacing: 0.3px;
 }
 
+/* ============================================
+   SHARED CONTROL-PANEL PRIMITIVES
+   Used by every sub-problem control panel so the
+   three simulations read as one coherent UI.
+   ============================================ */
+.ctl-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ctl-panel-header h2 {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+.ctl-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ctl-status-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
 /* Active problem summary (above the control panel) */
 .sim-active-banner {
   margin: var(--spacing-md);
@@ -349,6 +388,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    /* Sit above the full-screen backdrop (z-index 999); without an explicit
+       stacking position the backdrop paints over the menu and swallows taps,
+       making the menu items (e.g. "Controls") appear dead. */
+    position: relative;
+    z-index: 1000;
     animation: slideUpFab 0.2s ease-out;
   }
 

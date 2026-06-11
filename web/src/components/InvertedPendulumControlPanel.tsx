@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { PendulumState } from './InvertedPendulumVisualization';
+import { StatusBadge } from './StatusBadge';
 
 interface InvertedPendulumControlPanelProps {
   state: PendulumState | null;
@@ -51,14 +52,19 @@ export function InvertedPendulumControlPanel({
 
   return (
     <div className="control-panel" style={{
-      padding: '16px',
       backgroundColor: 'var(--bg-secondary)',
-      borderRadius: '8px',
     }}>
-      <h3 style={{ marginTop: 0, marginBottom: '16px', color: 'var(--text-primary)' }}>
-        Inverted {numLinks}-Pendulum Control
-      </h3>
+      <div className="ctl-panel-header">
+        <h2>{numLinks}-Pendulum Control</h2>
+        <StatusBadge
+          isReady={isReady}
+          isInitialized={isInitialized}
+          isRunning={isRunning}
+          failed={simulationFailed}
+        />
+      </div>
 
+      <div style={{ padding: '16px' }}>
       {/* Error display */}
       {error && (
         <div style={{
@@ -307,6 +313,7 @@ export function InvertedPendulumControlPanel({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
