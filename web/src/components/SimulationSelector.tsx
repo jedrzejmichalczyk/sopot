@@ -1,172 +1,112 @@
-import { useState } from 'react';
-
 export type SimulationType = 'rocket' | 'grid2d' | 'pendulum';
+
+export interface SimulationInfo {
+  type: SimulationType;
+  label: string;
+  shortTitle: string;
+  title: string;
+  description: string;
+  subsystem: string;
+}
+
+export const SIMULATIONS: SimulationInfo[] = [
+  {
+    type: 'rocket',
+    label: 'RKTFLT',
+    shortTitle: 'Rocket Flight',
+    title: 'Rocket Flight',
+    description: '6-DOF trajectory simulation with aerodynamics',
+    subsystem: 'PROPULSION',
+  },
+  {
+    type: 'grid2d',
+    label: 'GRID2D',
+    shortTitle: 'Mass-Spring Grid',
+    title: '2D Mass-Spring Grid',
+    description: 'Deformable membrane physics simulation',
+    subsystem: 'STRUCTURAL',
+  },
+  {
+    type: 'pendulum',
+    label: 'INVPND',
+    shortTitle: 'Inverted Pendulum',
+    title: 'Inverted 6-Pendulum on Cart',
+    description: 'LQR-controlled balancing with real-time stabilization',
+    subsystem: 'CONTROL',
+  },
+];
 
 interface SimulationSelectorProps {
   currentSimulation: SimulationType;
   onSimulationChange: (type: SimulationType) => void;
-  disabled?: boolean;
 }
 
+/**
+ * Top-level problem selector, rendered as an always-visible tab bar.
+ *
+ * Selection is intentionally never disabled: switching mid-run is safe
+ * because the App-level handler pauses and resets the active simulation.
+ */
 export function SimulationSelector({
   currentSimulation,
   onSimulationChange,
-  disabled = false,
 }: SimulationSelectorProps) {
-  const [hoveredType, setHoveredType] = useState<SimulationType | null>(null);
-
-  const simulations = [
-    {
-      type: 'rocket' as SimulationType,
-      label: 'RKTFLT',
-      title: 'Rocket Flight',
-      description: '6-DOF trajectory simulation with aerodynamics',
-      subsystem: 'PROPULSION',
-    },
-    {
-      type: 'grid2d' as SimulationType,
-      label: 'GRID2D',
-      title: '2D Mass-Spring Grid',
-      description: 'Deformable membrane physics simulation',
-      subsystem: 'STRUCTURAL',
-    },
-    {
-      type: 'pendulum' as SimulationType,
-      label: 'INVPND',
-      title: 'Inverted 6-Pendulum on Cart',
-      description: 'LQR-controlled balancing with real-time stabilization',
-      subsystem: 'CONTROL',
-    },
-  ];
-
   return (
-    <div style={styles.container}>
-      <h3 style={styles.header} className="section-title">Simulation Type</h3>
-      <div style={styles.cardContainer}>
-        {simulations.map((sim) => {
+    <header className="sim-header">
+      <div className="sim-header-brand">
+        <span className="sim-header-logo">SOPOT</span>
+        <span className="sim-header-tagline">Physics Lab</span>
+      </div>
+      <nav className="sim-tabs" role="tablist" aria-label="Simulation problem">
+        {SIMULATIONS.map((sim) => {
           const isSelected = currentSimulation === sim.type;
-          const isHovered = hoveredType === sim.type;
-
           return (
             <button
               key={sim.type}
-              onClick={() => !disabled && onSimulationChange(sim.type)}
-              onMouseEnter={() => setHoveredType(sim.type)}
-              onMouseLeave={() => setHoveredType(null)}
-              disabled={disabled}
-              className="touch-button mission-panel corner-accent"
-              style={{
-                ...styles.card,
-                ...(isSelected ? styles.cardSelected : {}),
-                ...(isHovered && !disabled ? styles.cardHovered : {}),
-                ...(disabled ? styles.cardDisabled : {}),
-              }}
+              role="tab"
+              aria-selected={isSelected}
+              className={`sim-tab${isSelected ? ' sim-tab-active' : ''}`}
+              onClick={() => onSimulationChange(sim.type)}
+              title={`${sim.title} — ${sim.description}`}
             >
-              <div style={styles.labelContainer}>
-                <div className="technical-label" style={styles.label}>{sim.label}</div>
-                <div style={styles.subsystem}>{sim.subsystem}</div>
-              </div>
-              <div style={styles.cardTitle}>{sim.title}</div>
-              <div style={styles.cardDescription}>{sim.description}</div>
-              {isSelected && (
-                <div className="status-indicator active" style={styles.statusDot}></div>
-              )}
+              <span className="sim-tab-code">{sim.label}</span>
+              <span className="sim-tab-title">{sim.shortTitle}</span>
             </button>
           );
         })}
         <a
           href={`${import.meta.env.BASE_URL}winding.html`}
-          className="touch-button mission-panel corner-accent"
-          style={{ ...styles.card, textDecoration: 'none', display: 'block' }}
+          className="sim-tab sim-tab-link"
+          title="Filament Winding CAD/CAM — Oxidizer tank winding machine simulation with G-code output (opens separate tool)"
         >
-          <div style={styles.labelContainer}>
-            <div className="technical-label" style={styles.label}>FILWND</div>
-            <div style={styles.subsystem}>MANUFACTURING</div>
-          </div>
-          <div style={styles.cardTitle}>Filament Winding CAD/CAM</div>
-          <div style={styles.cardDescription}>
-            Oxidizer tank winding machine simulation with G-code output ↗
-          </div>
+          <span className="sim-tab-code">FILWND</span>
+          <span className="sim-tab-title">Filament Winding ↗</span>
         </a>
-      </div>
-    </div>
+      </nav>
+    </header>
   );
 }
 
-const styles = {
-  container: {
-    padding: '20px',
-    borderBottom: '1px solid var(--border-color)',
-    background: 'linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%)',
-  },
-  header: {
-    margin: '0 0 15px 0',
-    fontSize: '14px',
-    fontWeight: 600,
-    color: 'var(--text-secondary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '2px',
-  },
-  cardContainer: {
-    display: 'flex',
-    gap: '12px',
-    flexDirection: 'column' as const,
-  },
-  card: {
-    padding: '16px',
-    cursor: 'pointer',
-    transition: 'all 0.25s ease',
-    textAlign: 'left' as const,
-    position: 'relative' as const,
-  },
-  cardSelected: {
-    borderColor: 'var(--accent-cyan)',
-    boxShadow: '0 0 16px rgba(0, 212, 255, 0.4), inset 0 1px 0 rgba(0, 212, 255, 0.2)',
-  },
-  cardHovered: {
-    transform: 'translateY(-2px)',
-    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.4)',
-  },
-  cardDisabled: {
-    opacity: 0.4,
-    cursor: 'not-allowed',
-  },
-  labelContainer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '12px',
-  },
-  label: {
-    fontSize: '14px',
-    color: 'var(--accent-cyan)',
-    padding: '4px 8px',
-    background: 'rgba(0, 212, 255, 0.1)',
-    border: '1px solid rgba(0, 212, 255, 0.3)',
-    borderRadius: '4px',
-  },
-  subsystem: {
-    fontSize: '9px',
-    color: 'var(--text-secondary)',
-    letterSpacing: '1.5px',
-    fontWeight: 600,
-    textTransform: 'uppercase' as const,
-  },
-  cardTitle: {
-    fontSize: '16px',
-    fontWeight: 600,
-    color: 'var(--text-primary)',
-    marginBottom: '6px',
-    letterSpacing: '0.3px',
-  },
-  cardDescription: {
-    fontSize: '12px',
-    color: 'var(--text-secondary)',
-    lineHeight: '1.5',
-  },
-  statusDot: {
-    position: 'absolute' as const,
-    top: '12px',
-    right: '12px',
-  },
-};
+/**
+ * Compact summary of the currently selected problem, shown above the
+ * control panel (left panel on desktop, controls sheet on mobile).
+ */
+export function ActiveSimulationBanner({
+  currentSimulation,
+}: {
+  currentSimulation: SimulationType;
+}) {
+  const sim = SIMULATIONS.find((s) => s.type === currentSimulation);
+  if (!sim) return null;
+
+  return (
+    <div className="sim-active-banner mission-panel corner-accent">
+      <div className="sim-active-banner-row">
+        <span className="sim-active-banner-code">{sim.label}</span>
+        <span className="sim-active-banner-subsystem">{sim.subsystem}</span>
+      </div>
+      <div className="sim-active-banner-title">{sim.title}</div>
+      <div className="sim-active-banner-desc">{sim.description}</div>
+    </div>
+  );
+}
