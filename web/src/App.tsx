@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import * as THREE from 'three';
-import { SimulationSelector, SimulationType } from './components/SimulationSelector';
+import {
+  SimulationSelector,
+  ActiveSimulationBanner,
+  SimulationType,
+} from './components/SimulationSelector';
 import { RocketVisualization3D } from './components/RocketVisualization3D';
 import { Grid2DVisualization } from './components/Grid2DVisualization';
 import { InvertedPendulumVisualization } from './components/InvertedPendulumVisualization';
@@ -143,8 +147,11 @@ function App() {
     }
   }, [simulationType, rocketSim.isRunning, rocketSim.simulator, rocketSim.isInitialized]);
 
-  // Handle simulation type change - reset all simulations
+  // Handle simulation type change - reset all simulations.
+  // Safe to call mid-run: everything is paused before switching, so the
+  // selector stays enabled at all times.
   const handleSimulationTypeChange = (type: SimulationType) => {
+    if (type === simulationType) return;
     console.log(`[App] Switching simulation type to: ${type}`);
 
     // Pause all simulations
@@ -284,8 +291,8 @@ function App() {
               </button>
               <p style={styles.placeholderHint}>
                 {isMobile
-                  ? 'Tune parameters via the menu button below'
-                  : 'Or tune parameters in the panel on the left'}
+                  ? 'Switch problems via the tabs above · tune parameters via the menu button below'
+                  : 'Switch problems via the tabs above · tune parameters in the panel on the left'}
               </p>
             </>
           ) : !activeSim.error && (
@@ -323,15 +330,17 @@ function App() {
 
       {/* Main Layout */}
       <div className="app-layout">
+        {/* Problem selector: always-visible tab bar (all breakpoints) */}
+        <SimulationSelector
+          currentSimulation={simulationType}
+          onSimulationChange={handleSimulationTypeChange}
+        />
+
         {/* Top section: 3-column layout (desktop/tablet) */}
         <div className="top-section">
           {/* Left Panel: Controls (desktop/tablet) */}
           <div className="left-panel desktop-only">
-            <SimulationSelector
-              currentSimulation={simulationType}
-              onSimulationChange={handleSimulationTypeChange}
-              disabled={activeSim.isRunning}
-            />
+            <ActiveSimulationBanner currentSimulation={simulationType} />
 
             <div style={styles.controlPanelWrapper}>
               {simulationType === 'rocket' ? (
@@ -496,11 +505,7 @@ function App() {
             title="Controls"
             initialSnapPoint="half"
           >
-            <SimulationSelector
-              currentSimulation={simulationType}
-              onSimulationChange={handleSimulationTypeChange}
-              disabled={activeSim.isRunning}
-            />
+            <ActiveSimulationBanner currentSimulation={simulationType} />
             {simulationType === 'rocket' ? (
               <ControlPanel
                 isReady={rocketSim.isReady}
