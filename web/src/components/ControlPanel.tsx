@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SimulationConfig } from '../hooks/useRocketSimulation';
+import { StatusBadge } from './StatusBadge';
 
 interface ControlPanelProps {
   isReady: boolean;
@@ -54,10 +55,9 @@ export function ControlPanel({
 
   return (
     <div style={styles.container}>
-      <div style={styles.titleContainer}>
-        <div className="technical-label" style={styles.systemLabel}>SYS-SOPOT</div>
-        <h2 style={styles.title}>MISSION CONTROL</h2>
-        <div style={styles.subtitle}>6-DOF Trajectory Simulation</div>
+      <div className="ctl-panel-header">
+        <h2>Mission Control</h2>
+        <StatusBadge isReady={isReady} isInitialized={isInitialized} isRunning={isRunning} />
       </div>
 
       {/* Error display */}
@@ -288,42 +288,13 @@ export function ControlPanel({
 
 const styles = {
   container: {
-    padding: '20px',
+    padding: '0 20px 20px',
     background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)',
     color: 'var(--text-primary)',
     height: '100%',
     overflowY: 'auto' as const,
     display: 'flex',
     flexDirection: 'column' as const,
-  },
-  titleContainer: {
-    marginBottom: '24px',
-    textAlign: 'center' as const,
-    borderBottom: '2px solid var(--border-color)',
-    paddingBottom: '16px',
-  },
-  systemLabel: {
-    marginBottom: '8px',
-    color: 'var(--accent-cyan)',
-    background: 'rgba(0, 212, 255, 0.1)',
-    border: '1px solid rgba(0, 212, 255, 0.3)',
-    padding: '4px 12px',
-    borderRadius: '4px',
-    display: 'inline-block',
-  },
-  title: {
-    margin: '8px 0',
-    fontSize: '22px',
-    fontWeight: 700,
-    color: 'var(--text-primary)',
-    letterSpacing: '2px',
-  },
-  subtitle: {
-    fontSize: '11px',
-    color: 'var(--text-secondary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '1.5px',
-    marginTop: '4px',
   },
   section: {
     marginBottom: '16px',
